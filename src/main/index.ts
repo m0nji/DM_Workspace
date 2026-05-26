@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeTheme } from 'electron';
 import { join } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -27,6 +27,10 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
   const isWin = process.platform === 'win32';
+  // Force the dark color scheme so the Windows 11 acrylic backdrop uses its dark
+  // tint. Without this, acrylic follows the system theme and renders a washed-out
+  // light tint over the desktop, making the dark terminals look bright.
+  if (isWin) nativeTheme.themeSource = 'dark';
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
