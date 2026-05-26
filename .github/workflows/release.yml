@@ -25,15 +25,19 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Decode App Store Connect API key (.p8)
+      - name: Decode signing certificate (.p12) and API key (.p8)
         run: |
+          # Decode to files ourselves (tolerates the line wrapping that `base64`
+          # adds), then point electron-builder at the file paths. Passing the
+          # base64 string directly via CSC_LINK fails with "Unknown format".
+          echo "${{ secrets.APPLE_CERTIFICATE }}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          echo "CSC_LINK=$RUNNER_TEMP/cert.p12" >> "$GITHUB_ENV"
           mkdir -p "$HOME/private_keys"
           echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$HOME/private_keys/AuthKey.p8"
           echo "APPLE_API_KEY=$HOME/private_keys/AuthKey.p8" >> "$GITHUB_ENV"
+          echo "cert: $(file -b "$RUNNER_TEMP/cert.p12")"
       - name: Build, sign, notarize & publish (macOS)
         env:
-          # Developer ID Application certificate (base64-encoded .p12) + its password.
-          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           # Notarization via App Store Connect API key (APPLE_API_KEY path set above).
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
