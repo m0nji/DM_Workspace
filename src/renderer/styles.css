@@ -1,0 +1,74 @@
+:root {
+  --bg: #0d0d0d;
+  --panel: #1a1a1a;
+  --border: #333;
+  --text: #ddd;
+  --muted: #888;
+  --accent: #c97b4a;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+}
+.app { display: flex; height: 100vh; }
+
+.sidebar {
+  width: 200px; flex-shrink: 0; background: var(--panel);
+  border-right: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column;
+}
+.sidebar-header { display: flex; justify-content: space-between; align-items: center;
+  color: var(--muted); font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }
+.ws-item { display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+  border-radius: 6px; cursor: pointer; }
+.ws-item.active { background: #2a2a2a; }
+.ws-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.ws-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-item .badge { color: var(--muted); font-size: 11px; }
+.ws-item .del { color: var(--muted); visibility: hidden; }
+.ws-item:hover .del { visibility: visible; }
+.add-ws { color: var(--muted); cursor: pointer; padding: 7px 8px; margin-top: 4px; }
+.add-ws:hover { color: var(--text); }
+.ws-rename-input { flex: 1; background: #000; color: var(--text);
+  border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
+
+.workspace-view { flex: 1; position: relative; overflow: hidden; }
+
+.welcome { display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100%; gap: 20px; }
+.welcome h2 { font-weight: 500; opacity: .85; }
+.preset-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.preset { cursor: pointer; text-align: center; }
+.preset .glyph { width: 90px; height: 64px; border: 1px solid var(--border);
+  border-radius: 6px; display: grid; gap: 3px; padding: 3px; }
+.preset:hover .glyph { border-color: var(--accent); }
+.preset .cell { background: #2a2a2a; border-radius: 3px; }
+.preset .label { font-size: 11px; margin-top: 6px; color: var(--muted); }
+
+.split-container { position: absolute; inset: 0; display: flex; }
+.split-container.v { flex-direction: column; }
+.splitter { background: var(--border); flex-shrink: 0; z-index: 5; }
+.split-container.h > .splitter { width: 4px; cursor: col-resize; }
+.split-container.v > .splitter { height: 4px; cursor: row-resize; }
+.splitter:hover { background: var(--accent); }
+
+.split-child { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+
+.pane { display: flex; flex-direction: column; border: 1px solid var(--border);
+  border-radius: 6px; overflow: hidden; min-width: 0; min-height: 0; height: 100%; }
+.pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: #141414; border-bottom: 1px solid var(--border); }
+.pane-title { flex: 1; color: var(--muted); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.pane-btn { color: var(--muted); cursor: pointer; padding: 0 3px; background: none;
+  border: none; font-size: 13px; }
+.pane-btn:hover { color: var(--text); }
+.pane-body { flex: 1; min-height: 0; }
+.pane-body .xterm { height: 100%; padding: 4px; }
+.xterm-host { height: 100%; }
+
+.maximized-host { position: absolute; inset: 8px; }
