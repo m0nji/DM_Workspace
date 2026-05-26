@@ -2,7 +2,7 @@ export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
 export interface PaneNode {
   type: 'pane';
-  id: string; // also the paneId
+  id: string; // unique id; also used as the PTY pane identifier
 }
 
 export interface SplitNode {

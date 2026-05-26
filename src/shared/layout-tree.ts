@@ -4,6 +4,9 @@ export function makePane(id: string): PaneNode {
   return { type: 'pane', id };
 }
 
+function clampRatio(r: number): number { return Math.min(0.9, Math.max(0.1, r)); }
+
+// Returns pane ids in left-to-right depth-first order.
 export function collectPaneIds(node: LayoutNode | null): string[] {
   if (node === null) return [];
   if (node.type === 'pane') return [node.id];
@@ -24,7 +27,7 @@ export function splitPane(
       type: 'split',
       id: newSplitId,
       direction,
-      ratio,
+      ratio: clampRatio(ratio),
       children: [node, makePane(newPaneId)]
     };
   }
@@ -43,7 +46,7 @@ export function closePane(node: LayoutNode, targetPaneId: string): LayoutNode | 
   }
   const a = closePane(node.children[0], targetPaneId);
   const b = closePane(node.children[1], targetPaneId);
-  if (a === null && b === null) return null;
+  if (a === null && b === null) return null; // defensive: unreachable while pane ids are unique
   if (a === null) return b;
   if (b === null) return a;
   if (a === node.children[0] && b === node.children[1]) return node; // unchanged
@@ -53,8 +56,7 @@ export function closePane(node: LayoutNode, targetPaneId: string): LayoutNode | 
 export function setRatio(node: LayoutNode, splitId: string, ratio: number): LayoutNode {
   if (node.type === 'pane') return node;
   if (node.id === splitId) {
-    const clamped = Math.min(0.9, Math.max(0.1, ratio));
-    return { ...node, ratio: clamped };
+    return { ...node, ratio: clampRatio(ratio) };
   }
   return {
     ...node,
@@ -96,6 +98,10 @@ export function makePreset(
       const top = row(4, nextPaneId, nextSplitId);
       const bottom = row(4, nextPaneId, nextSplitId);
       return split(nextSplitId(), 'v', top, bottom);
+    }
+    default: {
+      const _exhaustive: never = kind;
+      throw new Error(`Unknown preset kind: ${_exhaustive as string}`);
     }
   }
 }

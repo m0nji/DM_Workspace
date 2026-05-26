@@ -50,6 +50,16 @@ describe('splitPane', () => {
     const tree = makePane('a');
     expect(splitPane(tree, 'zzz', 'h', 'b', 's1')).toEqual(tree);
   });
+
+  it('clamps ratio to 0.9 when ratio > 0.9', () => {
+    const result = splitPane(makePane('a'), 'a', 'h', 'b', 's1', 5) as any;
+    expect(result.ratio).toBe(0.9);
+  });
+
+  it('clamps ratio to 0.1 when ratio < 0.1', () => {
+    const result = splitPane(makePane('a'), 'a', 'h', 'b', 's1', 0) as any;
+    expect(result.ratio).toBe(0.1);
+  });
 });
 
 describe('closePane', () => {
@@ -74,6 +84,11 @@ describe('closePane', () => {
   it('returns tree unchanged when pane not found', () => {
     const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
     expect(closePane(tree, 'zzz')).toEqual(tree);
+  });
+
+  it('returns the same reference when pane not found (no reallocation)', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(closePane(tree, 'zzz')).toBe(tree);
   });
 });
 
@@ -120,13 +135,27 @@ describe('makePreset', () => {
     expect((makePreset('2v', next, next) as any).direction).toBe('v');
   });
 
-  it('4 => four panes (2x2)', () => {
+  it('4 => 2x2 with outer vertical split and horizontal rows', () => {
     const next = (() => { let n = 0; return () => `id${++n}`; })();
-    expect(collectPaneIds(makePreset('4', next, next))).toHaveLength(4);
+    const tree = makePreset('4', next, next) as any;
+    expect(collectPaneIds(tree)).toHaveLength(4);
+    expect(tree.type).toBe('split');
+    expect(tree.direction).toBe('v');
+    expect(tree.children[0].direction).toBe('h');
+    expect(tree.children[1].direction).toBe('h');
   });
 
-  it('8 => eight panes (2x4)', () => {
+  it('8 => 2x4 with outer vertical split, children are horizontal rows of 4', () => {
     const next = (() => { let n = 0; return () => `id${++n}`; })();
-    expect(collectPaneIds(makePreset('8', next, next))).toHaveLength(8);
+    const tree = makePreset('8', next, next) as any;
+    expect(collectPaneIds(tree)).toHaveLength(8);
+    expect(tree.type).toBe('split');
+    expect(tree.direction).toBe('v');
+    expect(tree.children[0].direction).toBe('h');
+    expect(tree.children[1].direction).toBe('h');
+    expect(tree.children[0].children[0].direction).toBe('h');
+    expect(tree.children[0].children[1].direction).toBe('h');
+    expect(tree.children[1].children[0].direction).toBe('h');
+    expect(tree.children[1].children[1].direction).toBe('h');
   });
 });
