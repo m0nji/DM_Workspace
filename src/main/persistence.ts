@@ -1,7 +1,7 @@
 import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { AppState, Settings } from '../shared/types';
+import type { AppState, Settings, WindowBounds } from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 
 export function defaultSettings(): Settings {
@@ -22,6 +22,19 @@ export function migrateSettings(raw: unknown): Settings {
   const terminalOpacity = typeof r.terminalOpacity === 'number' ? r.terminalOpacity : d.terminalOpacity;
   const out: Settings = { themeId, terminalOpacity };
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
+  return out;
+}
+
+// Validate a persisted windowBounds blob. width/height/isMaximized are required;
+// x/y are optional (absent => the window is centered on next launch). Returns
+// undefined for any malformed input so a bad value never blocks loading the rest.
+export function migrateWindowBounds(raw: unknown): WindowBounds | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.width !== 'number' || typeof r.height !== 'number') return undefined;
+  if (typeof r.isMaximized !== 'boolean') return undefined;
+  const out: WindowBounds = { width: r.width, height: r.height, isMaximized: r.isMaximized };
+  if (typeof r.x === 'number' && typeof r.y === 'number') { out.x = r.x; out.y = r.y; }
   return out;
 }
 
@@ -51,7 +64,10 @@ export function deserialize(json: string): AppState {
     const parsed = JSON.parse(json);
     if (!isValid(parsed)) return defaultState();
     // Migrate persisted settings to the current shape.
-    return { ...parsed, settings: migrateSettings(parsed.settings) };
+    const out: AppState = { ...parsed, settings: migrateSettings(parsed.settings) };
+    const wb = migrateWindowBounds((parsed as unknown as Record<string, unknown>).windowBounds);
+    if (wb) out.windowBounds = wb; else delete out.windowBounds;
+    return out;
   } catch {
     return defaultState();
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile } from '../src/main/persistence';
+import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile, migrateWindowBounds } from '../src/main/persistence';
 import type { AppState } from '../src/shared/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -49,6 +49,38 @@ describe('persistence serialize/deserialize', () => {
     expect(s.workspaces).toHaveLength(1);
     expect(s.workspaces[0].layout).toBeNull();
     expect(s.activeWorkspaceId).toBe(s.workspaces[0].id);
+  });
+
+  it('round-trips windowBounds through serialize/deserialize', () => {
+    const withBounds: AppState = {
+      ...sample,
+      windowBounds: { x: 100, y: 120, width: 1600, height: 1000, isMaximized: false }
+    };
+    expect(deserialize(serialize(withBounds))).toEqual(withBounds);
+  });
+
+  it('drops malformed windowBounds but keeps the rest of the state', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [],
+      settings: { themeId: 'default', terminalOpacity: 0.75 },
+      windowBounds: { width: 'oops' } // ungültig
+    }));
+    expect(result.windowBounds).toBeUndefined();
+    expect(result.activeWorkspaceId).toBe('w1');
+    expect(result.workspaces).toEqual([]);
+  });
+
+  it('preserves a maximized windowBounds flag', () => {
+    expect(migrateWindowBounds({ width: 800, height: 600, isMaximized: true }))
+      .toEqual({ width: 800, height: 600, isMaximized: true });
+  });
+
+  it('returns undefined for non-object windowBounds', () => {
+    expect(migrateWindowBounds(undefined)).toBeUndefined();
+    expect(migrateWindowBounds(null)).toBeUndefined();
+    expect(migrateWindowBounds(42)).toBeUndefined();
   });
 });
 

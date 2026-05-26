@@ -34,11 +34,20 @@ export interface Settings {
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
 }
 
+export interface WindowBounds {
+  x?: number;          // fehlt => beim Start zentrieren
+  y?: number;
+  width: number;
+  height: number;
+  isMaximized: boolean;
+}
+
 export interface AppState {
   version: 1;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   settings: Settings;
+  windowBounds?: WindowBounds; // vom Main-Prozess verwaltet; fehlt beim Erststart
 }
 
 export interface AgentDonePayload {
