@@ -15,7 +15,17 @@ body {
   font-size: 13px;
   overflow: hidden;
 }
-.app { display: flex; height: 100vh; }
+.root { display: flex; flex-direction: column; height: 100vh; }
+/* macOS hiddenInset: a full-width draggable strip so the window can be moved and
+   the traffic lights have their own space above the sidebar/content. */
+.titlebar {
+  height: 38px; flex-shrink: 0;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+.app { display: flex; flex: 1; min-height: 0; }
+/* Everything below the titlebar must stay interactive (no-drag). */
+.app, .sidebar, .workspace-view { -webkit-app-region: no-drag; }
 
 .sidebar {
   width: 200px; flex-shrink: 0; background: var(--panel);

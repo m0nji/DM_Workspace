@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import { resolveCwd } from './resolve-cwd';
 
 export interface SpawnOptions {
   cwd: string;
@@ -29,7 +30,7 @@ export class PtyManager {
       name: 'xterm-color',
       cols: opts.cols,
       rows: opts.rows,
-      cwd: opts.cwd,
+      cwd: resolveCwd(opts.cwd),
       env: process.env as Record<string, string>
     });
     proc.onData((data) => this.dataListeners.forEach((l) => l(paneId, data)));

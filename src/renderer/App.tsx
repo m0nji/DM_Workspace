@@ -9,12 +9,23 @@ export function App(): JSX.Element {
 
   useEffect(() => { void hydrate(); }, [hydrate]);
 
-  if (!hydrated) return <div className="app" />;
+  if (!hydrated) {
+    return (
+      <div className="root">
+        <div className="titlebar" />
+        <div className="app" />
+      </div>
+    );
+  }
 
   return (
-    <div className="app">
-      <Sidebar />
-      <WorkspaceView />
+    <div className="root">
+      {/* Draggable strip clearing the macOS traffic lights (hiddenInset). */}
+      <div className="titlebar" />
+      <div className="app">
+        <Sidebar />
+        <WorkspaceView />
+      </div>
     </div>
   );
 }
