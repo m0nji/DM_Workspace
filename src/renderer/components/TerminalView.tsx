@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { SerializeAddon } from '@xterm/addon-serialize';
 import '@xterm/xterm/css/xterm.css';
 import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
@@ -69,6 +70,8 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     const search = new SearchAddon();
     term.loadAddon(search);
     registerSearch(paneId, search);
+    const serializeAddon = new SerializeAddon();
+    term.loadAddon(serializeAddon);
     term.open(host);
 
     // Track whether the viewport is scrolled to the bottom (controls the
@@ -104,32 +107,29 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       return false;
     };
 
-    // Rolling capture of raw PTY output so it can be replayed after a restart.
-    // The PTY process itself does not survive a restart (it's killed on quit and
-    // a fresh shell is spawned), so this restores the *visible history* only — it
-    // re-feeds the saved bytes to xterm, which re-renders them. Capped so the
-    // buffer (and the persisted file) can't grow without bound.
-    const MAX_BUFFER = 256 * 1024;
-    let buffer = '';
+    // Persist the *rendered* terminal buffer (text + colors) rather than the raw
+    // PTY byte stream. SerializeAddon emits only the normal buffer — no alt-screen
+    // contents, color-query replies, or cursor-jump sequences — so a restart
+    // replays clean, reflowable history instead of control-character garbage.
+    // Cap the exported scrollback so scrollback.json can't grow without bound.
+    const SCROLLBACK_LINES = 1000;
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
-    const flushSave = () => {
+    const doSave = (): void => {
+      window.api.saveScrollback(paneId, serializeAddon.serialize({ scrollback: SCROLLBACK_LINES }));
+    };
+    const flushSave = (): void => {
       if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-      window.api.saveScrollback(paneId, buffer);
+      doSave();
     };
-    const scheduleSave = () => {
+    const scheduleSave = (): void => {
       if (saveTimer) return; // coalesce bursts of output into one write per second
-      saveTimer = setTimeout(() => { saveTimer = null; window.api.saveScrollback(paneId, buffer); }, 1000);
-    };
-    const capture = (data: string) => {
-      buffer += data;
-      if (buffer.length > MAX_BUFFER) buffer = buffer.slice(buffer.length - MAX_BUFFER);
-      scheduleSave();
+      saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 1000);
     };
 
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
       term.write(data, updateAtBottom);
-      capture(data);
+      scheduleSave();
       activity.onOutput();
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
@@ -148,7 +148,6 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
         restorePromise = window.api.getScrollback(paneId).then((saved) => {
           if (saved) {
             term.write(saved);
-            buffer = saved;
             term.write('\r\n\x1b[2m── vorherige Sitzung wiederhergestellt (Prozess neu gestartet) ──\x1b[0m\r\n');
           }
         });
