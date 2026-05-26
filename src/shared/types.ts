@@ -61,6 +61,16 @@ export interface PtyExitEvent {
   exitCode: number;
 }
 
+// Auto-update lifecycle events sent from main to the renderer.
+export type UpdateEvent =
+  | { type: 'checking' }
+  | { type: 'available'; version: string }
+  | { type: 'not-available' }
+  | { type: 'progress'; percent: number }
+  | { type: 'downloaded'; version: string }
+  | { type: 'error'; message: string }
+  | { type: 'disabled' }; // updates only work in the packaged app
+
 // Shape exposed on window.api by the preload script
 export interface RendererApi {
   spawn(req: PtySpawnRequest): Promise<void>;
@@ -72,6 +82,11 @@ export interface RendererApi {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;
+  // auto-update
+  checkForUpdates(): void;
+  downloadUpdate(): void;
+  quitAndInstall(): void;
+  onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
 }
 
 declare global {

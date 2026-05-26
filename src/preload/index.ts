@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
-  PtyDataEvent, PtyExitEvent, AppState
+  PtyDataEvent, PtyExitEvent, AppState, UpdateEvent
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -41,7 +41,15 @@ const api: RendererApi = {
   onExit: (paneId: string, cb: (exitCode: number) => void) => subscribe(exitSubs, paneId, cb),
   loadState: () => ipcRenderer.invoke('state:load') as Promise<AppState>,
   saveState: (state: AppState) => ipcRenderer.invoke('state:save', state),
-  pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory') as Promise<string | null>
+  pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory') as Promise<string | null>,
+  checkForUpdates: () => ipcRenderer.send('updates:check'),
+  downloadUpdate: () => ipcRenderer.send('updates:download'),
+  quitAndInstall: () => ipcRenderer.send('updates:install'),
+  onUpdateEvent: (cb: (e: UpdateEvent) => void) => {
+    const handler = (_e: unknown, payload: UpdateEvent) => cb(payload);
+    ipcRenderer.on('updates:event', handler);
+    return () => ipcRenderer.removeListener('updates:event', handler);
+  }
 };
 
 contextBridge.exposeInMainWorld('api', api);

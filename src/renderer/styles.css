@@ -78,6 +78,10 @@ body {
 .swatch:hover { border-color: var(--accent); }
 .swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .modal-hint { color: var(--muted); font-size: 11px; margin: 6px 0 0; line-height: 1.4; }
+.update-status { flex: 1; color: var(--muted); font-size: 12px; }
+.settings-btn { position: relative; }
+.update-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--accent); border: 1px solid var(--panel); }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
 

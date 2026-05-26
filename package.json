@@ -45,9 +45,17 @@
     "asarUnpack": [
       "**/node_modules/node-pty/**"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "m0nji",
+        "repo": "DM_Workspace"
+      }
+    ],
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
@@ -71,6 +79,7 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
+    "electron-updater": "^6.8.3",
     "node-pty": "^1.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

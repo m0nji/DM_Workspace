@@ -1,11 +1,22 @@
 import { create } from 'zustand';
-import type { AppState, PresetKind, Direction, Workspace, Settings } from '../shared/types';
+import type { AppState, PresetKind, Direction, Workspace, Settings, UpdateEvent } from '../shared/types';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
 
 const DEFAULT_SETTINGS: Settings = { terminalBackground: '#1e1e1e', terminalOpacity: 0.75 };
+
+export type UpdateStatus =
+  | 'idle' | 'checking' | 'available' | 'downloading'
+  | 'downloaded' | 'not-available' | 'error' | 'disabled';
+
+export interface UpdateState {
+  status: UpdateStatus;
+  version?: string;
+  percent?: number;
+  error?: string;
+}
 
 const nextPaneId = createIdGenerator('p');
 const nextSplitId = createIdGenerator('s');
@@ -33,6 +44,12 @@ interface StoreState extends AppState {
   // settings
   updateSettings: (patch: Partial<Settings>) => void;
   setSettingsOpen: (open: boolean) => void;
+  // updates
+  update: UpdateState;
+  applyUpdateEvent: (e: UpdateEvent) => void;
+  checkForUpdates: () => void;
+  downloadUpdate: () => void;
+  installUpdate: () => void;
 }
 
 function persist(state: AppState): void {
@@ -52,6 +69,7 @@ export const useStore = create<StoreState>((set, get) => ({
   maximizedPaneId: null,
   hydrated: false,
   settingsOpen: false,
+  update: { status: 'idle' },
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -153,5 +171,21 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  setSettingsOpen: (open) => set({ settingsOpen: open })
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  applyUpdateEvent: (e) => set(() => {
+    switch (e.type) {
+      case 'checking': return { update: { status: 'checking' } };
+      case 'available': return { update: { status: 'available', version: e.version } };
+      case 'not-available': return { update: { status: 'not-available' } };
+      case 'progress': return { update: { status: 'downloading', percent: e.percent } };
+      case 'downloaded': return { update: { status: 'downloaded', version: e.version } };
+      case 'error': return { update: { status: 'error', error: e.message } };
+      case 'disabled': return { update: { status: 'disabled' } };
+    }
+  }),
+
+  checkForUpdates: () => { set({ update: { status: 'checking' } }); window.api.checkForUpdates(); },
+  downloadUpdate: () => { set({ update: { status: 'downloading', percent: 0 } }); window.api.downloadUpdate(); },
+  installUpdate: () => window.api.quitAndInstall()
 }));

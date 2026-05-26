@@ -3,6 +3,7 @@ import { join } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
+import { registerUpdater } from './updater';
 
 // E2E isolation: when DMWS_E2E is set, redirect userData to a fresh temp dir
 // so each test run starts from defaultState (welcome screen) instead of any
@@ -44,6 +45,7 @@ function createWindow(): void {
 }
 
 const pty = registerIpc(() => mainWindow);
+registerUpdater(() => mainWindow);
 
 app.whenReady().then(createWindow);
 

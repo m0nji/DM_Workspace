@@ -48,6 +48,18 @@ Code signing uses a Developer ID Application certificate from the keychain.
 Notarization uses an App Store Connect API key — see `scripts/notarize-build.sh`
 and `build/.notarize.env.example`. Secrets are never committed.
 
+## Releases & auto-update
+
+The app checks GitHub Releases for updates on startup and from **Settings → Updates**
+(via [electron-updater](https://www.electron.build/auto-update)). When an update is
+available the user downloads and installs it in one click.
+
+Releases are built by the **Release** GitHub Actions workflow (`.github/workflows/release.yml`)
+on a `v*` tag or manual dispatch: it builds the signed + notarized macOS app and the
+Windows app and publishes them to a draft GitHub Release. Required repository secrets:
+`APPLE_CERTIFICATE` (base64 .p12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_API_KEY` (base64 .p8),
+`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
+
 ## License
 
 Private project.

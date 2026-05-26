@@ -10,6 +10,58 @@ const COLOR_PRESETS: { label: string; value: string }[] = [
   { label: 'Dark purple', value: '#2d1b46' }
 ];
 
+function UpdateSection(): JSX.Element {
+  const update = useStore((s) => s.update);
+  const checkForUpdates = useStore((s) => s.checkForUpdates);
+  const downloadUpdate = useStore((s) => s.downloadUpdate);
+
+  let status: string;
+  let button: JSX.Element | null = (
+    <button className="cwd-btn" onClick={checkForUpdates}>Check for updates</button>
+  );
+
+  switch (update.status) {
+    case 'checking':
+      status = 'Checking for updates…';
+      button = <button className="cwd-btn" disabled>Checking…</button>;
+      break;
+    case 'available':
+      status = `Update available: v${update.version}`;
+      button = <button className="cwd-btn" onClick={downloadUpdate}>Download &amp; install</button>;
+      break;
+    case 'downloading':
+      status = `Downloading… ${update.percent ?? 0}%`;
+      button = <button className="cwd-btn" disabled>Downloading…</button>;
+      break;
+    case 'downloaded':
+      status = `Update v${update.version} ready — restarting…`;
+      button = null;
+      break;
+    case 'not-available':
+      status = "You're up to date.";
+      break;
+    case 'error':
+      status = `Update error: ${update.error ?? 'unknown'}`;
+      break;
+    case 'disabled':
+      status = 'Updates are available only in the installed app.';
+      button = null;
+      break;
+    default:
+      status = '';
+  }
+
+  return (
+    <>
+      <div className="modal-section-label">Updates</div>
+      <div className="setting-row">
+        <span className="update-status">{status}</span>
+        {button}
+      </div>
+    </>
+  );
+}
+
 export function SettingsPanel(): JSX.Element | null {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
@@ -69,6 +121,8 @@ export function SettingsPanel(): JSX.Element | null {
         <p className="modal-hint">
           Lower opacity reveals a blurred backdrop behind the terminals (macOS).
         </p>
+
+        <UpdateSection />
       </div>
     </div>
   );

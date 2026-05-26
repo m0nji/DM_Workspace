@@ -7,8 +7,17 @@ import { SettingsPanel } from './components/SettingsPanel';
 export function App(): JSX.Element {
   const hydrated = useStore((s) => s.hydrated);
   const hydrate = useStore((s) => s.hydrate);
+  const applyUpdateEvent = useStore((s) => s.applyUpdateEvent);
+  const checkForUpdates = useStore((s) => s.checkForUpdates);
 
   useEffect(() => { void hydrate(); }, [hydrate]);
+
+  // Subscribe to update events and check for updates on startup.
+  useEffect(() => {
+    const off = window.api.onUpdateEvent(applyUpdateEvent);
+    checkForUpdates();
+    return off;
+  }, [applyUpdateEvent, checkForUpdates]);
 
   if (!hydrated) {
     return (

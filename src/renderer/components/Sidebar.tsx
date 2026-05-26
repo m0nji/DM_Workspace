@@ -10,6 +10,7 @@ export function Sidebar(): JSX.Element {
   const renameWorkspace = useStore((s) => s.renameWorkspace);
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const updateAvailable = useStore((s) => s.update.status === 'available');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -95,6 +96,7 @@ export function Sidebar(): JSX.Element {
             <circle cx="10.5" cy="8" r="1.7" fill="currentColor" stroke="none" />
             <circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" />
           </svg>
+          {updateAvailable && <span className="update-dot" title="Update available" />}
         </button>
       </div>
     </div>
