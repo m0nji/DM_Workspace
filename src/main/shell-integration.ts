@@ -23,8 +23,11 @@ export function bashPromptCommand(): string {
 export function zshIntegrationFiles(dir: string): Record<string, string> {
   const source = (name: string) =>
     `[ -f "$_DMWS_USER_ZDOTDIR/${name}" ] && . "$_DMWS_USER_ZDOTDIR/${name}"\n`;
+  // POSIX-safe single-quote escaping for embedding dir inside a '...' literal:
+  // a single quote becomes '\'' (close quote, escaped quote, reopen quote).
+  const quotedDir = dir.replace(/'/g, `'\\''`);
   return {
-    '.zshenv': source('.zshenv') + `ZDOTDIR='${dir}'\n`,
+    '.zshenv': source('.zshenv') + `ZDOTDIR='${quotedDir}'\n`,
     '.zprofile': source('.zprofile'),
     '.zshrc':
       source('.zshrc') +

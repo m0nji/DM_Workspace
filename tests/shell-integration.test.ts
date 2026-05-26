@@ -31,6 +31,12 @@ describe('zshIntegrationFiles', () => {
     expect(files['.zshenv']).toContain(`ZDOTDIR='${dir}'`);
   });
 
+  it('escapes single quotes in the integration dir path', () => {
+    const f = zshIntegrationFiles("/tmp/o'brien/zsh");
+    // the embedded path must use POSIX '\'' escaping, not a raw single quote
+    expect(f['.zshenv']).toContain(`ZDOTDIR='/tmp/o'\\''brien/zsh'`);
+  });
+
   it('each file sources only its matching user startup file', () => {
     expect(files['.zprofile']).toContain('.zprofile');
     expect(files['.zlogin']).toContain('.zlogin');
