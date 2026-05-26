@@ -11,6 +11,11 @@ export function Sidebar(): JSX.Element {
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const updateAvailable = useStore((s) => s.update.status === 'available');
+  const paneStatus = useStore((s) => s.paneStatus);
+  const activeId2 = useStore((s) => s.activeWorkspaceId);
+  const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
+
+  const WS_COLORS = ['#c97b4a', '#4a90c9', '#5cb85c', '#c95a5a', '#a05ac9', '#c9b34a'];
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -39,7 +44,12 @@ export function Sidebar(): JSX.Element {
     <div className="sidebar">
       <div className="sidebar-header"><span>WORKSPACES</span></div>
       {workspaces.map((w) => {
-        const count = collectPaneIds(w.layout).length;
+        const paneIds = collectPaneIds(w.layout);
+        const count = paneIds.length;
+        // Badge: number of "done" panes in INACTIVE workspaces (where you can't see them).
+        const doneCount = w.id === activeId2
+          ? 0
+          : paneIds.filter((pid) => paneStatus[pid] === 'done').length;
         const editing = editingId === w.id;
         return (
           <div
@@ -48,24 +58,38 @@ export function Sidebar(): JSX.Element {
             onClick={() => { if (!editing) selectWorkspace(w.id); }}
             onDoubleClick={(e) => { e.preventDefault(); startEdit(w.id, w.name); }}
           >
-            <span className="dot" />
+            <span className="dot" style={w.color ? { background: w.color } : undefined} />
             {editing ? (
-              <input
-                ref={inputRef}
-                className="ws-rename-input"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commit();
-                  else if (e.key === 'Escape') cancel();
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
+              <>
+                <input
+                  ref={inputRef}
+                  className="ws-rename-input"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={commit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commit();
+                    else if (e.key === 'Escape') cancel();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <span className="ws-colors" onMouseDown={(e) => e.stopPropagation()}>
+                  {WS_COLORS.map((c) => (
+                    <span
+                      key={c}
+                      className="ws-color"
+                      style={{ background: c }}
+                      title="Set color"
+                      onClick={(e) => { e.stopPropagation(); setWorkspaceColor(w.id, c); }}
+                    />
+                  ))}
+                </span>
+              </>
             ) : (
               <>
                 <span className="name">{w.name}</span>
+                {doneCount > 0 && <span className="done-badge" title="Terminals ready">{doneCount}</span>}
                 <span className="badge">{count}</span>
                 <span
                   className="rename"
