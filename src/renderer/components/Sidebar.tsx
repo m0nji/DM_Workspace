@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 
@@ -12,42 +12,64 @@ export function Sidebar(): JSX.Element {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const commit = (id: string) => {
-    if (draft.trim()) renameWorkspace(id, draft.trim());
+  // Focus + select the field when entering edit mode (more reliable than autoFocus
+  // when the input is conditionally rendered inside a list that re-renders).
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingId]);
+
+  const startEdit = (id: string, name: string) => {
+    setDraft(name);
+    setEditingId(id);
+  };
+  const commit = () => {
+    if (editingId && draft.trim()) renameWorkspace(editingId, draft.trim());
     setEditingId(null);
   };
+  const cancel = () => setEditingId(null);
 
   return (
     <div className="sidebar">
       <div className="sidebar-header"><span>WORKSPACES</span></div>
       {workspaces.map((w) => {
         const count = collectPaneIds(w.layout).length;
+        const editing = editingId === w.id;
         return (
           <div
             key={w.id}
             className={`ws-item ${w.id === activeId ? 'active' : ''}`}
-            onClick={() => selectWorkspace(w.id)}
-            onDoubleClick={() => { setEditingId(w.id); setDraft(w.name); }}
+            onClick={() => { if (!editing) selectWorkspace(w.id); }}
+            onDoubleClick={(e) => { e.preventDefault(); startEdit(w.id, w.name); }}
           >
             <span className="dot" />
-            {editingId === w.id ? (
+            {editing ? (
               <input
+                ref={inputRef}
                 className="ws-rename-input"
-                autoFocus
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => commit(w.id)}
+                onBlur={commit}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commit(w.id);
-                  if (e.key === 'Escape') setEditingId(null);
+                  if (e.key === 'Enter') commit();
+                  else if (e.key === 'Escape') cancel();
                 }}
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
               />
             ) : (
               <>
                 <span className="name">{w.name}</span>
                 <span className="badge">{count}</span>
+                <span
+                  className="rename"
+                  title="Rename workspace"
+                  onClick={(e) => { e.stopPropagation(); startEdit(w.id, w.name); }}
+                >✎</span>
                 <span
                   className="del"
                   title="Delete workspace"

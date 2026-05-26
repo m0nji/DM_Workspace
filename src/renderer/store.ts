@@ -19,6 +19,7 @@ interface StoreState extends AppState {
   selectWorkspace: (id: string) => void;
   addWorkspace: () => void;
   renameWorkspace: (id: string, name: string) => void;
+  setWorkspaceCwd: (id: string, cwd: string) => void;
   deleteWorkspace: (id: string) => void;
   // layout
   applyPreset: (kind: PresetKind) => void;
@@ -68,6 +69,12 @@ export const useStore = create<StoreState>((set, get) => ({
 
   renameWorkspace: (id, name) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, name } : w) };
+    persist(next);
+    return next;
+  }),
+
+  setWorkspaceCwd: (id, cwd) => set((s) => {
+    const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, cwd } : w) };
     persist(next);
     return next;
   }),

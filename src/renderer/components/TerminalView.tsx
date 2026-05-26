@@ -21,9 +21,21 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     term.loadAddon(fit);
     term.open(host);
     try { term.loadAddon(new WebglAddon()); } catch { /* fallback to canvas */ }
-    fit.fit();
 
-    void window.api.spawn({ paneId, cwd, cols: term.cols, rows: term.rows });
+    // Inactive workspaces stay mounted but hidden (display:none → 0×0). Only fit
+    // when the host actually has a size, otherwise xterm/fit compute garbage dims.
+    const safeFit = (): boolean => {
+      if (host.clientWidth > 0 && host.clientHeight > 0) {
+        fit.fit();
+        return true;
+      }
+      return false;
+    };
+    safeFit();
+
+    // Guard against spawning a PTY at 0 columns when mounted hidden; the
+    // ResizeObserver resizes it to the real size as soon as it becomes visible.
+    void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
 
     const offData = window.api.onData((e) => { if (e.paneId === paneId) term.write(e.data); });
     const offExit = window.api.onExit((e) => {
@@ -32,8 +44,9 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     const inputDisp = term.onData((data) => window.api.input({ paneId, data }));
 
     const resize = () => {
-      fit.fit();
-      window.api.resize({ paneId, cols: term.cols, rows: term.rows });
+      if (safeFit()) {
+        window.api.resize({ paneId, cols: term.cols, rows: term.rows });
+      }
     };
     const ro = new ResizeObserver(resize);
     ro.observe(host);

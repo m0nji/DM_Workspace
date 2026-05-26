@@ -12,11 +12,25 @@ const PRESETS: PresetDef[] = [
   { kind: '8',  label: '8 (2×4)',      cols: 4, rows: 2, cells: 8 }
 ];
 
-export function WelcomeScreen(): JSX.Element {
+interface Props { workspaceId: string; cwd: string; }
+
+export function WelcomeScreen({ workspaceId, cwd }: Props): JSX.Element {
   const applyPreset = useStore((s) => s.applyPreset);
+  const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
+
+  const chooseFolder = async () => {
+    const dir = await window.api.pickDirectory();
+    if (dir) setWorkspaceCwd(workspaceId, dir);
+  };
+
   return (
     <div className="welcome">
       <h2>How many terminals do you want to open?</h2>
+      <div className="welcome-cwd">
+        <span className="label">Working directory</span>
+        <code className="cwd-value" title={cwd}>{cwd}</code>
+        <button className="cwd-btn" onClick={chooseFolder}>Choose folder…</button>
+      </div>
       <div className="preset-row">
         {PRESETS.map((p) => (
           <div key={p.kind} className="preset" onClick={() => applyPreset(p.kind)}>

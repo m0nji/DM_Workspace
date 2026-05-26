@@ -39,18 +39,33 @@ body {
 .ws-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ws-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-item .badge { color: var(--muted); font-size: 11px; }
-.ws-item .del { color: var(--muted); visibility: hidden; }
-.ws-item:hover .del { visibility: visible; }
+.ws-item .del, .ws-item .rename { color: var(--muted); visibility: hidden; cursor: pointer; }
+.ws-item:hover .del, .ws-item:hover .rename { visibility: visible; }
+.ws-item .rename:hover, .ws-item .del:hover { color: var(--text); }
 .add-ws { color: var(--muted); cursor: pointer; padding: 7px 8px; margin-top: 4px; }
 .add-ws:hover { color: var(--text); }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
 
 .workspace-view { flex: 1; position: relative; overflow: hidden; }
+/* Each workspace is mounted and absolutely fills the view; only the active one is
+   shown (display toggled inline). Keeps terminals alive across switches. */
+.ws-host { position: absolute; inset: 0; }
 
 .welcome { display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 100%; gap: 20px; }
 .welcome h2 { font-weight: 500; opacity: .85; }
+.welcome-cwd { display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; max-width: 80%; }
+.welcome-cwd .label { color: var(--muted); font-size: 11px; letter-spacing: .04em;
+  text-transform: uppercase; }
+.welcome-cwd .cwd-value { color: var(--text); font-family: Menlo, monospace;
+  font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 360px; }
+.cwd-btn { background: #2a2a2a; color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.cwd-btn:hover { border-color: var(--accent); }
 .preset-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .preset { cursor: pointer; text-align: center; }
 .preset .glyph { width: 90px; height: 64px; border: 1px solid var(--border);
