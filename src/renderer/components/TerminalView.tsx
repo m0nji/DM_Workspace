@@ -59,18 +59,58 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       return false;
     };
 
+    // Rolling capture of raw PTY output so it can be replayed after a restart.
+    // The PTY process itself does not survive a restart (it's killed on quit and
+    // a fresh shell is spawned), so this restores the *visible history* only — it
+    // re-feeds the saved bytes to xterm, which re-renders them. Capped so the
+    // buffer (and the persisted file) can't grow without bound.
+    const MAX_BUFFER = 256 * 1024;
+    let buffer = '';
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushSave = () => {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      window.api.saveScrollback(paneId, buffer);
+    };
+    const scheduleSave = () => {
+      if (saveTimer) return; // coalesce bursts of output into one write per second
+      saveTimer = setTimeout(() => { saveTimer = null; window.api.saveScrollback(paneId, buffer); }, 1000);
+    };
+    const capture = (data: string) => {
+      buffer += data;
+      if (buffer.length > MAX_BUFFER) buffer = buffer.slice(buffer.length - MAX_BUFFER);
+      scheduleSave();
+    };
+
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
-    const offData = window.api.onData(paneId, (data) => term.write(data));
+    const offData = window.api.onData(paneId, (data) => { term.write(data); capture(data); });
     const offExit = window.api.onExit(paneId, (exitCode) => {
       term.write(`\r\n[Process exited — code ${exitCode}]\r\n`);
     });
     const inputDisp = term.onData((data) => window.api.input({ paneId, data }));
 
+    // Replay any saved scrollback once, before the fresh shell starts writing, so
+    // restored history appears above the new prompt rather than interleaved with it.
+    let restorePromise: Promise<void> | null = null;
+    const restoreOnce = (): Promise<void> => {
+      if (!restorePromise) {
+        restorePromise = window.api.getScrollback(paneId).then((saved) => {
+          if (saved) {
+            term.write(saved);
+            buffer = saved;
+            term.write('\r\n\x1b[2m── vorherige Sitzung wiederhergestellt (Prozess neu gestartet) ──\x1b[0m\r\n');
+          }
+        });
+      }
+      return restorePromise;
+    };
+
     let spawned = false;
     const spawnOnce = () => {
       if (spawned) return;
       spawned = true;
-      void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+      void restoreOnce().then(() => {
+        window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+      });
     };
 
     // Fit + spawn after the flex layout has settled so the PTY starts at the
@@ -91,6 +131,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     ro.observe(host);
 
     return () => {
+      flushSave();
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       ro.disconnect();

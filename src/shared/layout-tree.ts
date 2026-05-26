@@ -13,6 +13,12 @@ export function collectPaneIds(node: LayoutNode | null): string[] {
   return [...collectPaneIds(node.children[0]), ...collectPaneIds(node.children[1])];
 }
 
+// Returns split-node ids in depth-first order.
+export function collectSplitIds(node: LayoutNode | null): string[] {
+  if (node === null || node.type === 'pane') return [];
+  return [node.id, ...collectSplitIds(node.children[0]), ...collectSplitIds(node.children[1])];
+}
+
 export function splitPane(
   node: LayoutNode,
   targetPaneId: string,

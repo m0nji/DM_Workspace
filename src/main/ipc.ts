@@ -2,14 +2,18 @@ import { ipcMain, BrowserWindow, dialog, app } from 'electron';
 import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
+import { ScrollbackStore } from './scrollback';
+import { collectPaneIds } from '../shared/layout-tree';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent
 } from '../shared/types';
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
+const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
 
 export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
   const pty = new PtyManager();
+  const scrollback = new ScrollbackStore(SCROLLBACK_FILE());
 
   pty.onData((paneId, data) => {
     const payload: PtyDataEvent = { paneId, data };
@@ -28,7 +32,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
   ipcMain.on('pty:kill', (_e, paneId: string) => pty.kill(paneId));
 
   ipcMain.handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));
-  ipcMain.handle('state:save', (_e, state: AppState) => saveStateToFile(STATE_FILE(), state));
+  ipcMain.handle('state:save', (_e, state: AppState) => {
+    saveStateToFile(STATE_FILE(), state);
+    // Drop scrollback for panes that no longer exist in any layout (closed panes).
+    const liveIds = state.workspaces.flatMap((w) => collectPaneIds(w.layout));
+    scrollback.prune(liveIds);
+  });
+
+  ipcMain.handle('scrollback:get', (_e, paneId: string) => scrollback.get(paneId) ?? null);
+  ipcMain.on('scrollback:save', (_e, req: { paneId: string; data: string }) =>
+    scrollback.set(req.paneId, req.data)
+  );
 
   ipcMain.handle('dialog:pickDirectory', async () => {
     const win = getWindow();

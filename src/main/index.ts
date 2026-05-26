@@ -9,7 +9,12 @@ import { registerUpdater } from './updater';
 // so each test run starts from defaultState (welcome screen) instead of any
 // previously persisted layout. Must run before app.whenReady().
 let e2eTempDir: string | null = null;
-if (process.env.DMWS_E2E) {
+if (process.env.DMWS_USERDATA) {
+  // Explicit userData dir (used by tests that need persistence across restarts).
+  // Unlike DMWS_E2E this is NOT removed on quit, so a second launch sees the
+  // first launch's state. Never points at the real userData.
+  app.setPath('userData', process.env.DMWS_USERDATA);
+} else if (process.env.DMWS_E2E) {
   e2eTempDir = mkdtempSync(join(tmpdir(), 'dmws-e2e-'));
   app.setPath('userData', e2eTempDir);
 }

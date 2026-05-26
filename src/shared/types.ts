@@ -82,6 +82,9 @@ export interface RendererApi {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;
+  // terminal scrollback persistence (replayed on restart; the process itself is fresh)
+  getScrollback(paneId: string): Promise<string | null>;
+  saveScrollback(paneId: string, data: string): void;
   // auto-update
   checkForUpdates(): void;
   downloadUpdate(): void;

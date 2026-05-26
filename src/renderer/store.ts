@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { AppState, PresetKind, Direction, Workspace, Settings, UpdateEvent } from '../shared/types';
 import {
-  makePreset, splitPane, closePane, setRatio, collectPaneIds
+  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
 
@@ -73,6 +73,12 @@ export const useStore = create<StoreState>((set, get) => ({
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
+    // Seed the id generators past ids already used by the restored layout, so the
+    // next split/workspace can't reuse an existing id (which would make two panes
+    // share a paneId — colliding PTYs and duplicated scrollback replay).
+    nextPaneId.seed(loaded.workspaces.flatMap((w) => collectPaneIds(w.layout)));
+    nextSplitId.seed(loaded.workspaces.flatMap((w) => collectSplitIds(w.layout)));
+    nextWsId.seed(loaded.workspaces.map((w) => w.id));
     set({ ...loaded, hydrated: true });
   },
 
