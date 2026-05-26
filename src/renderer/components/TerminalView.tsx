@@ -1,29 +1,46 @@
 import React, { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
+import { useStore } from '../store';
 
 interface Props { paneId: string; cwd: string; }
 
+// '#0d0d0d' + opacity 0.8 -> 'rgba(13,13,13,0.8)'. Falls back to opaque on bad input.
+function toBackground(hex: string, opacity: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const a = Math.min(1, Math.max(0, opacity));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 export function TerminalView({ paneId, cwd }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const background = useStore((s) => s.settings.terminalBackground);
+  const opacity = useStore((s) => s.settings.terminalOpacity);
 
   useEffect(() => {
     const host = hostRef.current!;
     const term = new Terminal({
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
       fontSize: 13,
-      theme: { background: '#0d0d0d', foreground: '#ddd' },
+      // allowTransparency lets the terminal background blend with the window
+      // vibrancy when opacity < 1. (We use the default renderer, which supports
+      // transparency — the WebGL renderer forces an opaque background.)
+      allowTransparency: true,
+      theme: { background: toBackground(background, opacity), foreground: '#ddd' },
       cursorBlink: true
     });
+    termRef.current = term;
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    try { term.loadAddon(new WebglAddon()); } catch { /* fallback to canvas */ }
 
-    // Only fit when the host actually has a size. Inactive workspaces are mounted
-    // but hidden (display:none → 0×0), where fit would compute garbage dims.
     const safeFit = (): boolean => {
       if (host.clientWidth > 0 && host.clientHeight > 0) {
         fit.fit();
@@ -32,8 +49,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       return false;
     };
 
-    // Attach listeners BEFORE spawning so the shell's first output (the prompt)
-    // is never missed.
+    // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => term.write(data));
     const offExit = window.api.onExit(paneId, (exitCode) => {
       term.write(`\r\n[Process exited — code ${exitCode}]\r\n`);
@@ -47,16 +63,12 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
     };
 
-    // Fit + spawn AFTER the browser has applied the flex layout (two animation
-    // frames), so the PTY starts at the real terminal size and the first prompt
-    // renders correctly instead of leaving the pane blank.
+    // Fit + spawn after the flex layout has settled so the PTY starts at the
+    // real terminal size and the first prompt renders correctly.
     let raf1 = 0;
     let raf2 = 0;
     raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        safeFit();
-        spawnOnce();
-      });
+      raf2 = requestAnimationFrame(() => { safeFit(); spawnOnce(); });
     });
 
     const resize = () => {
@@ -76,10 +88,19 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       offExit();
       inputDisp.dispose();
       term.dispose();
+      termRef.current = null;
     };
     // paneId is stable for the component's lifetime; cwd only matters at spawn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paneId]);
+
+  // Apply theme changes live (background color / opacity) without recreating the terminal.
+  useEffect(() => {
+    const term = termRef.current;
+    if (term) {
+      term.options.theme = { background: toBackground(background, opacity), foreground: '#ddd' };
+    }
+  }, [background, opacity]);
 
   return <div className="xterm-host" ref={hostRef} />;
 }

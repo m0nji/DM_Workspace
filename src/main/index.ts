@@ -16,11 +16,16 @@ if (process.env.DMWS_E2E) {
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
+  const isMac = process.platform === 'darwin';
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    backgroundColor: '#0d0d0d',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // On macOS use a vibrancy (blurred) backdrop so the terminal-transparency
+    // setting reveals a frosted-glass effect like the native Terminal app.
+    backgroundColor: isMac ? '#00000000' : '#0d0d0d',
+    vibrancy: isMac ? 'under-window' : undefined,
+    visualEffectState: isMac ? 'active' : undefined,
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

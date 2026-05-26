@@ -9,6 +9,7 @@ export function Sidebar(): JSX.Element {
   const addWorkspace = useStore((s) => s.addWorkspace);
   const renameWorkspace = useStore((s) => s.renameWorkspace);
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -81,6 +82,17 @@ export function Sidebar(): JSX.Element {
         );
       })}
       <div className="add-ws" onClick={addWorkspace}>+ Workspace</div>
+
+      <div className="sidebar-footer">
+        <span className="app-version">v{__APP_VERSION__}</span>
+        <button className="settings-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="8" cy="8" r="2.2" />
+            <path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

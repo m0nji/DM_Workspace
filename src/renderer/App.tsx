@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useStore } from './store';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
+import { SettingsPanel } from './components/SettingsPanel';
 
 export function App(): JSX.Element {
   const hydrated = useStore((s) => s.hydrated);
@@ -26,6 +27,7 @@ export function App(): JSX.Element {
         <Sidebar />
         <WorkspaceView />
       </div>
+      <SettingsPanel />
     </div>
   );
 }

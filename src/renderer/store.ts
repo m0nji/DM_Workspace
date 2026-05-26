@@ -1,9 +1,11 @@
 import { create } from 'zustand';
-import type { AppState, PresetKind, Direction, Workspace } from '../shared/types';
+import type { AppState, PresetKind, Direction, Workspace, Settings } from '../shared/types';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
+
+const DEFAULT_SETTINGS: Settings = { terminalBackground: '#0d0d0d', terminalOpacity: 1 };
 
 const nextPaneId = createIdGenerator('p');
 const nextSplitId = createIdGenerator('s');
@@ -12,6 +14,7 @@ const nextWsId = createIdGenerator('w');
 interface StoreState extends AppState {
   maximizedPaneId: string | null;
   hydrated: boolean;
+  settingsOpen: boolean;
   // lifecycle
   hydrate: () => Promise<void>;
   // workspaces
@@ -27,13 +30,17 @@ interface StoreState extends AppState {
   closeActivePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number) => void;
   toggleMaximize: (paneId: string) => void;
+  // settings
+  updateSettings: (patch: Partial<Settings>) => void;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 function persist(state: AppState): void {
   void window.api.saveState({
     version: 1,
     workspaces: state.workspaces,
-    activeWorkspaceId: state.activeWorkspaceId
+    activeWorkspaceId: state.activeWorkspaceId,
+    settings: state.settings
   });
 }
 
@@ -41,8 +48,10 @@ export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
   activeWorkspaceId: null,
+  settings: DEFAULT_SETTINGS,
   maximizedPaneId: null,
   hydrated: false,
+  settingsOpen: false,
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -136,5 +145,13 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   toggleMaximize: (paneId) =>
-    set((s) => ({ maximizedPaneId: s.maximizedPaneId === paneId ? null : paneId }))
+    set((s) => ({ maximizedPaneId: s.maximizedPaneId === paneId ? null : paneId })),
+
+  updateSettings: (patch) => set((s) => {
+    const next = { ...s, settings: { ...s.settings, ...patch } };
+    persist(next);
+    return next;
+  }),
+
+  setSettingsOpen: (open) => set({ settingsOpen: open })
 }));

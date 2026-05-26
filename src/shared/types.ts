@@ -24,10 +24,16 @@ export interface Workspace {
   layout: LayoutNode | null; // null => welcome screen
 }
 
+export interface Settings {
+  terminalBackground: string; // hex color, e.g. '#0d0d0d'
+  terminalOpacity: number;    // 0..1 (1 = fully opaque)
+}
+
 export interface AppState {
   version: 1;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
+  settings: Settings;
 }
 
 // ---- IPC payloads ----
@@ -72,4 +78,6 @@ declare global {
   interface Window {
     api: RendererApi;
   }
+  // Injected at build time by electron-vite (see electron.vite.config.ts).
+  const __APP_VERSION__: string;
 }

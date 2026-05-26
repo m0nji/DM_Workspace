@@ -10,7 +10,9 @@
 html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-  background: var(--bg);
+  /* Transparent so the macOS window vibrancy shows through where terminals are
+     translucent. The sidebar/titlebar stay solid; the welcome screen is solid. */
+  background: transparent;
   color: var(--text);
   font-size: 13px;
   overflow: hidden;
@@ -44,6 +46,33 @@ body {
 .ws-item .rename:hover, .ws-item .del:hover { color: var(--text); }
 .add-ws { color: var(--muted); cursor: pointer; padding: 7px 8px; margin-top: 4px; }
 .add-ws:hover { color: var(--text); }
+
+.sidebar-footer { margin-top: auto; display: flex; align-items: center;
+  justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); }
+.app-version { color: var(--muted); font-size: 11px; }
+.settings-btn { background: none; border: none; color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; padding: 4px; border-radius: 4px; }
+.settings-btn:hover { color: var(--text); background: #2a2a2a; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+  -webkit-app-region: no-drag; }
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.modal-header { display: flex; justify-content: space-between; align-items: center;
+  font-weight: 500; margin-bottom: 14px; }
+.modal-close { background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 14px; }
+.modal-close:hover { color: var(--text); }
+.modal-section-label { color: var(--muted); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 10px; }
+.setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.setting-row label { flex: 1; }
+.setting-row input[type="color"] { width: 42px; height: 26px; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+.setting-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.setting-value { width: 42px; text-align: right; color: var(--muted); font-size: 12px; }
+.modal-hint { color: var(--muted); font-size: 11px; margin: 6px 0 0; line-height: 1.4; }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
 
@@ -51,9 +80,10 @@ body {
 /* Each workspace is mounted and absolutely fills the view; only the active one is
    shown (display toggled inline). The opaque background guarantees the active
    workspace fully covers the other (still-mounted) workspaces behind it. */
-.ws-host { position: absolute; inset: 0; background: var(--bg); }
+.ws-host { position: absolute; inset: 0; }
 
-.welcome { position: absolute; inset: 0; display: flex; flex-direction: column;
+.welcome { position: absolute; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 20px; }
 .welcome h2 { font-weight: 500; opacity: .85; }
 .welcome-cwd { display: flex; align-items: center; gap: 10px;

@@ -1,13 +1,18 @@
 import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { AppState } from '../shared/types';
+import type { AppState, Settings } from '../shared/types';
+
+export function defaultSettings(): Settings {
+  return { terminalBackground: '#0d0d0d', terminalOpacity: 1 };
+}
 
 export function defaultState(): AppState {
   return {
     version: 1,
     activeWorkspaceId: 'w1',
-    workspaces: [{ id: 'w1', name: 'Workspace 1', cwd: homedir(), layout: null }]
+    workspaces: [{ id: 'w1', name: 'Workspace 1', cwd: homedir(), layout: null }],
+    settings: defaultSettings()
   };
 }
 
@@ -26,7 +31,9 @@ function isValid(obj: unknown): obj is AppState {
 export function deserialize(json: string): AppState {
   try {
     const parsed = JSON.parse(json);
-    return isValid(parsed) ? (parsed as AppState) : defaultState();
+    if (!isValid(parsed)) return defaultState();
+    // Fill in settings for states persisted before settings existed / partial settings.
+    return { ...parsed, settings: { ...defaultSettings(), ...(parsed.settings ?? {}) } };
   } catch {
     return defaultState();
   }

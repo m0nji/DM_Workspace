@@ -11,11 +11,21 @@ describe('persistence serialize/deserialize', () => {
     activeWorkspaceId: 'w1',
     workspaces: [
       { id: 'w1', name: 'Workspace 1', cwd: '/home/x', layout: { type: 'pane', id: 'p1' } }
-    ]
+    ],
+    settings: { terminalBackground: '#101418', terminalOpacity: 0.8 }
   };
 
   it('round-trips state through serialize/deserialize', () => {
     expect(deserialize(serialize(sample))).toEqual(sample);
+  });
+
+  it('fills default settings when missing from persisted state', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: []
+    }));
+    expect(result.settings).toEqual({ terminalBackground: '#0d0d0d', terminalOpacity: 1 });
   });
 
   it('returns defaultState for invalid JSON', () => {
