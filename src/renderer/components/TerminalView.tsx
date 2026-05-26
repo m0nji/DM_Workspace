@@ -6,16 +6,26 @@ import { useStore } from '../store';
 
 interface Props { paneId: string; cwd: string; }
 
-// '#0d0d0d' + opacity 0.8 -> 'rgba(13,13,13,0.8)'. Falls back to opaque on bad input.
-function toBackground(hex: string, opacity: number): string {
+interface XtermTheme { background: string; foreground: string; cursor: string; }
+
+// Build an xterm theme from a hex background + opacity. The foreground (and cursor)
+// flip to dark on light backgrounds so text stays readable (e.g. white / light gray).
+function themeFor(hex: string, opacity: number): XtermTheme {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return hex;
+  if (!m) return { background: hex, foreground: '#dddddd', cursor: '#dddddd' };
   const n = parseInt(m[1], 16);
   const r = (n >> 16) & 255;
   const g = (n >> 8) & 255;
   const b = n & 255;
   const a = Math.min(1, Math.max(0, opacity));
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+  // Perceived luminance (0..255); >150 counts as "light".
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  const light = luminance > 150;
+  return {
+    background: `rgba(${r}, ${g}, ${b}, ${a})`,
+    foreground: light ? '#1a1a1a' : '#dddddd',
+    cursor: light ? '#1a1a1a' : '#dddddd'
+  };
 }
 
 export function TerminalView({ paneId, cwd }: Props): JSX.Element {
@@ -33,7 +43,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       // vibrancy when opacity < 1. (We use the default renderer, which supports
       // transparency — the WebGL renderer forces an opaque background.)
       allowTransparency: true,
-      theme: { background: toBackground(background, opacity), foreground: '#ddd' },
+      theme: themeFor(background, opacity),
       cursorBlink: true
     });
     termRef.current = term;
@@ -98,7 +108,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
   useEffect(() => {
     const term = termRef.current;
     if (term) {
-      term.options.theme = { background: toBackground(background, opacity), foreground: '#ddd' };
+      term.options.theme = themeFor(background, opacity);
     }
   }, [background, opacity]);
 

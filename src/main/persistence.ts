@@ -4,7 +4,7 @@ import { dirname } from 'path';
 import type { AppState, Settings } from '../shared/types';
 
 export function defaultSettings(): Settings {
-  return { terminalBackground: '#0d0d0d', terminalOpacity: 1 };
+  return { terminalBackground: '#1e1e1e', terminalOpacity: 0.75 };
 }
 
 export function defaultState(): AppState {

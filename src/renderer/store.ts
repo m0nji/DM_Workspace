@@ -5,7 +5,7 @@ import {
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
 
-const DEFAULT_SETTINGS: Settings = { terminalBackground: '#0d0d0d', terminalOpacity: 1 };
+const DEFAULT_SETTINGS: Settings = { terminalBackground: '#1e1e1e', terminalOpacity: 0.75 };
 
 const nextPaneId = createIdGenerator('p');
 const nextSplitId = createIdGenerator('s');

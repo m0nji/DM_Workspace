@@ -25,7 +25,7 @@ describe('persistence serialize/deserialize', () => {
       activeWorkspaceId: 'w1',
       workspaces: []
     }));
-    expect(result.settings).toEqual({ terminalBackground: '#0d0d0d', terminalOpacity: 1 });
+    expect(result.settings).toEqual({ terminalBackground: '#1e1e1e', terminalOpacity: 0.75 });
   });
 
   it('returns defaultState for invalid JSON', () => {

@@ -1,6 +1,15 @@
 import React from 'react';
 import { useStore } from '../store';
 
+const COLOR_PRESETS: { label: string; value: string }[] = [
+  { label: 'Black', value: '#000000' },
+  { label: 'Dark gray', value: '#1e1e1e' },
+  { label: 'Gray', value: '#3c3c43' },
+  { label: 'Light gray', value: '#c7c7cc' },
+  { label: 'White', value: '#ffffff' },
+  { label: 'Dark purple', value: '#2d1b46' }
+];
+
 export function SettingsPanel(): JSX.Element | null {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
@@ -28,6 +37,21 @@ export function SettingsPanel(): JSX.Element | null {
             value={settings.terminalBackground}
             onChange={(e) => updateSettings({ terminalBackground: e.target.value })}
           />
+        </div>
+
+        <div className="swatch-row">
+          {COLOR_PRESETS.map((p) => {
+            const active = settings.terminalBackground.toLowerCase() === p.value.toLowerCase();
+            return (
+              <button
+                key={p.value}
+                className={`swatch ${active ? 'active' : ''}`}
+                title={p.label}
+                style={{ background: p.value }}
+                onClick={() => updateSettings({ terminalBackground: p.value })}
+              />
+            );
+          })}
         </div>
 
         <div className="setting-row">

@@ -72,6 +72,11 @@ body {
   border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 .setting-row input[type="range"] { flex: 1; accent-color: var(--accent); }
 .setting-value { width: 42px; text-align: right; color: var(--muted); font-size: 12px; }
+.swatch-row { display: flex; gap: 8px; margin: -4px 0 14px; flex-wrap: wrap; }
+.swatch { width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18); padding: 0; }
+.swatch:hover { border-color: var(--accent); }
+.swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .modal-hint { color: var(--muted); font-size: 11px; margin: 6px 0 0; line-height: 1.4; }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
