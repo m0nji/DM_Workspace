@@ -1,8 +1,9 @@
-import { app, BrowserWindow, nativeTheme } from 'electron';
+import { app, BrowserWindow, nativeTheme, screen } from 'electron';
 import { join } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
+import { isBoundsVisible } from './window-bounds';
 import { registerUpdater } from './updater';
 import { installAppMenu } from './menu';
 
@@ -37,9 +38,16 @@ function createWindow(): void {
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, 'icon.ico')
     : join(__dirname, '../../build/icon.ico');
+  // Restore last-used window size/position. width/height always apply; x/y only
+  // if the saved frame still overlaps a connected display (a disconnected monitor
+  // would otherwise open the window off-screen) — otherwise the window is centered.
+  const saved = ipc.loadWindowBounds();
+  const displays = screen.getAllDisplays().map((d) => d.bounds);
+  const usePos = saved ? isBoundsVisible(saved, displays) : false;
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: saved?.width ?? 1400,
+    height: saved?.height ?? 900,
+    ...(usePos ? { x: saved!.x, y: saved!.y } : {}),
     show: false, // shown on ready-to-show to avoid a blank flash during load
     icon: iconPath,
     // macOS keeps the vibrancy frosted backdrop. Windows uses a solid dark base:
@@ -61,7 +69,10 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('ready-to-show', () => {
+    if (saved?.isMaximized) mainWindow?.maximize();
+    mainWindow?.show();
+  });
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -72,9 +83,24 @@ function createWindow(): void {
   mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));
   mainWindow.on('blur', () => mainWindow?.webContents.send('window:focus', false));
+
+  // Persist size/position shortly after the user stops dragging/resizing, and
+  // immediately on (un)maximize. Debounced so a resize drag writes once, not per frame.
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleBoundsSave = (): void => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(() => {
+      boundsTimer = null;
+      if (mainWindow) ipc.persistWindowBounds(mainWindow);
+    }, 500);
+  };
+  mainWindow.on('resize', scheduleBoundsSave);
+  mainWindow.on('move', scheduleBoundsSave);
+  mainWindow.on('maximize', () => mainWindow && ipc.persistWindowBounds(mainWindow));
+  mainWindow.on('unmaximize', () => mainWindow && ipc.persistWindowBounds(mainWindow));
 }
 
-const pty = registerIpc(() => mainWindow);
+const ipc = registerIpc(() => mainWindow);
 registerUpdater(() => mainWindow);
 
 app.whenReady().then(() => {
@@ -83,7 +109,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  pty.killAll();
+  ipc.pty.killAll();
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -92,7 +118,7 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  pty.killAll();
+  ipc.pty.killAll();
   // E2E only: remove the temporary userData dir created for test isolation
   if (e2eTempDir) {
     rmSync(e2eTempDir, { recursive: true, force: true });

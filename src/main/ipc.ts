@@ -4,14 +4,15 @@ import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { collectPaneIds } from '../shared/layout-tree';
+import { currentWindowBounds } from './window-bounds';
 import type {
-  AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload
+  AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
 const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
 
-export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
+export function registerIpc(getWindow: () => BrowserWindow | null) {
   const pty = new PtyManager();
   const scrollback = new ScrollbackStore(SCROLLBACK_FILE());
 
@@ -33,6 +34,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
 
   ipcMain.handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));
   ipcMain.handle('state:save', (_e, state: AppState) => {
+    const win = getWindow();
+    if (win) state.windowBounds = currentWindowBounds(win);
     saveStateToFile(STATE_FILE(), state);
     // Drop scrollback for panes that no longer exist in any layout (closed panes).
     const liveIds = state.workspaces.flatMap((w) => collectPaneIds(w.layout));
@@ -71,5 +74,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
     n.show();
   });
 
-  return pty;
+  // Read-modify-write only the windowBounds field so a bounds update never races
+  // away the renderer-owned parts of the state (and vice versa).
+  function persistWindowBounds(win: BrowserWindow): void {
+    const state = loadStateFromFile(STATE_FILE());
+    state.windowBounds = currentWindowBounds(win);
+    saveStateToFile(STATE_FILE(), state);
+  }
+
+  function loadWindowBounds(): WindowBounds | undefined {
+    return loadStateFromFile(STATE_FILE()).windowBounds;
+  }
+
+  return { pty, persistWindowBounds, loadWindowBounds };
 }
