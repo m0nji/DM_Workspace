@@ -79,7 +79,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, activeWorkspaceId };
+    const next = { ...s, workspaces, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
