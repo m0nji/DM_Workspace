@@ -1,6 +1,15 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'path';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
+
+// E2E isolation: when DMWS_E2E is set, redirect userData to a fresh temp dir
+// so each test run starts from defaultState (welcome screen) instead of any
+// previously persisted layout. Must run before app.whenReady().
+if (process.env.DMWS_E2E) {
+  app.setPath('userData', mkdtempSync(join(tmpdir(), 'dmws-e2e-')));
+}
 
 let mainWindow: BrowserWindow | null = null;
 
