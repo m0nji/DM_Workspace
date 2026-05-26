@@ -22,11 +22,14 @@ export interface Workspace {
   name: string;
   cwd: string;          // default working directory for new panes
   layout: LayoutNode | null; // null => welcome screen
+  color?: string;       // optional hex accent shown in the sidebar
 }
 
+export type PaneStatus = 'idle' | 'busy' | 'done';
+
 export interface Settings {
-  terminalBackground: string; // hex color, e.g. '#0d0d0d'
-  terminalOpacity: number;    // 0..1 (1 = fully opaque)
+  themeId: string;         // id from BUILTIN_THEMES (src/shared/themes.ts)
+  terminalOpacity: number; // 0..1 (1 = fully opaque)
 }
 
 export interface AppState {
@@ -34,6 +37,12 @@ export interface AppState {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   settings: Settings;
+}
+
+export interface AgentDonePayload {
+  workspaceId: string;
+  workspaceName: string;
+  paneTitle: string;
 }
 
 // ---- IPC payloads ----
@@ -90,6 +99,10 @@ export interface RendererApi {
   downloadUpdate(): void;
   quitAndInstall(): void;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
+  // agent-activity notifications
+  notifyAgentDone(payload: AgentDonePayload): void;
+  onWindowFocus(cb: (focused: boolean) => void): () => void;
+  onActivateWorkspace(cb: (workspaceId: string) => void): () => void;
 }
 
 declare global {
