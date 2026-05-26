@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { findNext, findPrevious } from '../search-registry';
+import { findNext, findPrevious, clearSearch } from '../search-registry';
 
 interface Props { paneId: string; }
 
@@ -19,7 +19,7 @@ export function SearchBar({ paneId }: Props): JSX.Element | null {
 
   if (!open) return null;
 
-  const close = (): void => setSearchOpen(null);
+  const close = (): void => { clearSearch(paneId); setSearchOpen(null); };
 
   return (
     <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>
