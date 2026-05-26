@@ -2,7 +2,6 @@ import React from 'react';
 import { useStore } from '../store';
 import { WelcomeScreen } from './WelcomeScreen';
 import { LayoutRenderer } from './LayoutRenderer';
-import { Pane } from './Pane';
 
 // Every workspace stays mounted; only the active one is visible. This keeps each
 // terminal's xterm instance (and its scrollback) alive across workspace switches,
@@ -19,14 +18,14 @@ export function WorkspaceView(): JSX.Element {
         let content: JSX.Element;
         if (!ws.layout) {
           content = <WelcomeScreen workspaceId={ws.id} cwd={ws.cwd} />;
-        } else if (active && maximizedPaneId) {
-          content = (
-            <div className="maximized-host">
-              <Pane paneId={maximizedPaneId} cwd={ws.cwd} />
-            </div>
-          );
         } else {
-          content = <LayoutRenderer node={ws.layout} cwd={ws.cwd} />;
+          content = (
+            <LayoutRenderer
+              node={ws.layout}
+              cwd={ws.cwd}
+              maximizedPaneId={active ? maximizedPaneId : null}
+            />
+          );
         }
         return (
           <div key={ws.id} className="ws-host" style={{ display: active ? 'block' : 'none' }}>
