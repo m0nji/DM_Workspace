@@ -4,21 +4,41 @@ import type {
   PtyDataEvent, PtyExitEvent, AppState
 } from '../shared/types';
 
+// Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
+// listener per channel. Registering one ipcRenderer listener per terminal would
+// exceed EventEmitter's default max (10) and re-broadcast every chunk to all panes.
+const dataSubs = new Map<string, Set<(data: string) => void>>();
+const exitSubs = new Map<string, Set<(exitCode: number) => void>>();
+
+ipcRenderer.on('pty:data', (_e, p: PtyDataEvent) => {
+  dataSubs.get(p.paneId)?.forEach((cb) => cb(p.data));
+});
+ipcRenderer.on('pty:exit', (_e, p: PtyExitEvent) => {
+  exitSubs.get(p.paneId)?.forEach((cb) => cb(p.exitCode));
+});
+
+function subscribe<T>(map: Map<string, Set<T>>, paneId: string, cb: T): () => void {
+  let set = map.get(paneId);
+  if (!set) {
+    set = new Set<T>();
+    map.set(paneId, set);
+  }
+  set.add(cb);
+  return () => {
+    const s = map.get(paneId);
+    if (!s) return;
+    s.delete(cb);
+    if (s.size === 0) map.delete(paneId);
+  };
+}
+
 const api: RendererApi = {
   spawn: (req: PtySpawnRequest) => ipcRenderer.invoke('pty:spawn', req),
   input: (req: PtyInputRequest) => ipcRenderer.send('pty:input', req),
   resize: (req: PtyResizeRequest) => ipcRenderer.send('pty:resize', req),
   kill: (paneId: string) => ipcRenderer.send('pty:kill', paneId),
-  onData: (cb: (e: PtyDataEvent) => void) => {
-    const handler = (_e: unknown, payload: PtyDataEvent) => cb(payload);
-    ipcRenderer.on('pty:data', handler);
-    return () => ipcRenderer.removeListener('pty:data', handler);
-  },
-  onExit: (cb: (e: PtyExitEvent) => void) => {
-    const handler = (_e: unknown, payload: PtyExitEvent) => cb(payload);
-    ipcRenderer.on('pty:exit', handler);
-    return () => ipcRenderer.removeListener('pty:exit', handler);
-  },
+  onData: (paneId: string, cb: (data: string) => void) => subscribe(dataSubs, paneId, cb),
+  onExit: (paneId: string, cb: (exitCode: number) => void) => subscribe(exitSubs, paneId, cb),
   loadState: () => ipcRenderer.invoke('state:load') as Promise<AppState>,
   saveState: (state: AppState) => ipcRenderer.invoke('state:save', state),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory') as Promise<string | null>

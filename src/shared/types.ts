@@ -61,8 +61,8 @@ export interface RendererApi {
   input(req: PtyInputRequest): void;
   resize(req: PtyResizeRequest): void;
   kill(paneId: string): void;
-  onData(cb: (e: PtyDataEvent) => void): () => void;
-  onExit(cb: (e: PtyExitEvent) => void): () => void;
+  onData(paneId: string, cb: (data: string) => void): () => void;
+  onExit(paneId: string, cb: (exitCode: number) => void): () => void;
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;

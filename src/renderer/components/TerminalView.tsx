@@ -34,9 +34,9 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
 
     // Attach listeners BEFORE spawning so the shell's first output (the prompt)
     // is never missed.
-    const offData = window.api.onData((e) => { if (e.paneId === paneId) term.write(e.data); });
-    const offExit = window.api.onExit((e) => {
-      if (e.paneId === paneId) term.write(`\r\n[Process exited — code ${e.exitCode}]\r\n`);
+    const offData = window.api.onData(paneId, (data) => term.write(data));
+    const offExit = window.api.onExit(paneId, (exitCode) => {
+      term.write(`\r\n[Process exited — code ${exitCode}]\r\n`);
     });
     const inputDisp = term.onData((data) => window.api.input({ paneId, data }));
 
