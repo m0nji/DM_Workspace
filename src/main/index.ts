@@ -40,16 +40,16 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    show: false, // shown on ready-to-show, after the acrylic repaint nudge below
+    show: false, // shown on ready-to-show to avoid a blank flash during load
     icon: iconPath,
-    // macOS vibrancy and Windows 11 acrylic both reveal a frosted-glass backdrop
-    // where the terminals are translucent (terminalOpacity). Both need a fully
-    // transparent backgroundColor so the material shows through.
-    backgroundColor: isMac || isWin ? '#00000000' : '#0d0d0d',
+    // macOS keeps the vibrancy frosted backdrop. Windows uses a solid dark base:
+    // the acrylic backdrop was too strong, and a transparent backgroundColor also
+    // greys out the maximize button, so Windows stays fully opaque and maximizable.
+    backgroundColor: isMac ? '#00000000' : '#0d0d0d',
     vibrancy: isMac ? 'under-window' : undefined,
-    backgroundMaterial: isWin ? 'acrylic' : undefined,
     visualEffectState: isMac ? 'active' : undefined,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    maximizable: true,
     // Hide the native menu bar on Windows/Linux (Alt still reveals it); macOS
     // keeps its global menu bar. Avoids the stray File/Edit/View bar in-window.
     autoHideMenuBar: true,
@@ -61,21 +61,7 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.once('ready-to-show', () => {
-    const win = mainWindow;
-    if (!win) return;
-    win.show();
-    // Windows bug: backgroundMaterial (acrylic) isn't applied on the first paint —
-    // it only kicks in after a DWM repaint (which a manual resize triggers). Re-set
-    // the material and nudge the height by 1px so the frosted backdrop appears right
-    // away instead of only after the user resizes the window.
-    if (isWin) {
-      win.setBackgroundMaterial('acrylic');
-      const b = win.getBounds();
-      win.setBounds({ ...b, height: b.height + 1 });
-      win.setBounds(b);
-    }
-  });
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
