@@ -35,6 +35,16 @@ function shellArgs(): string[] {
   return ['-l'];
 }
 
+// The zsh integration files are deterministic, so generate them once per process
+// instead of re-writing on every pane spawn (which would block the main thread).
+let zshIntegrationDir: string | null = null;
+function ensureZshIntegrationDir(): string {
+  if (zshIntegrationDir === null) {
+    zshIntegrationDir = writeZshIntegrationDir(join(app.getPath('userData'), 'shell-integration', 'zsh'));
+  }
+  return zshIntegrationDir;
+}
+
 // Build the spawn env for the cwd-reporting hook without echoing anything into
 // the terminal: bash inherits PROMPT_COMMAND; zsh gets ZDOTDIR pointed at the
 // generated integration dir (with _DMWS_USER_ZDOTDIR preserving the original).
@@ -42,13 +52,15 @@ function cwdHookEnv(shell: string): Record<string, string> {
   const base = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>;
   if (process.platform === 'win32') return base;
   if (/zsh$/.test(shell)) {
-    const dir = writeZshIntegrationDir(join(app.getPath('userData'), 'shell-integration', 'zsh'));
+    const dir = ensureZshIntegrationDir();
     base._DMWS_USER_ZDOTDIR = process.env.ZDOTDIR || process.env.HOME || '';
     base.ZDOTDIR = dir;
     return base;
   }
-  // bash / other POSIX shells
-  base.PROMPT_COMMAND = bashPromptCommand();
+  // bash / other POSIX shells — prepend our hook to any inherited PROMPT_COMMAND
+  // rather than discarding it.
+  const inherited = process.env.PROMPT_COMMAND;
+  base.PROMPT_COMMAND = inherited ? `${bashPromptCommand()};${inherited}` : bashPromptCommand();
   return base;
 }
 
