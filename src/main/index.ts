@@ -80,13 +80,16 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
-  mainWindow.on('closed', () => { mainWindow = null; });
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
+  mainWindow.on('closed', () => {
+    if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
+    mainWindow = null;
+  });
   mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));
   mainWindow.on('blur', () => mainWindow?.webContents.send('window:focus', false));
 
   // Persist size/position shortly after the user stops dragging/resizing, and
   // immediately on (un)maximize. Debounced so a resize drag writes once, not per frame.
-  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   const scheduleBoundsSave = (): void => {
     if (boundsTimer) clearTimeout(boundsTimer);
     boundsTimer = setTimeout(() => {
