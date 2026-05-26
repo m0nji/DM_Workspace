@@ -1,0 +1,118 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Dark base background -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f1f24"/>
+      <stop offset="1" stop-color="#08080a"/>
+    </linearGradient>
+    <!-- Subtle radial vibrancy glow behind tiles -->
+    <radialGradient id="vibrancy" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#5b6cff" stop-opacity="0.16"/>
+      <stop offset="0.55" stop-color="#2a2f55" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Translucent glass tile fill -->
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a4a55" stop-opacity="0.92"/>
+      <stop offset="0.5" stop-color="#2a2a32" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#141418" stop-opacity="0.9"/>
+    </linearGradient>
+    <!-- Specular gloss highlight, strong at top -->
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Top-edge background sheen -->
+    <linearGradient id="bgGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Soft drop shadow for tile depth -->
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="12" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <!-- Inner shadow for glass recess on each tile -->
+    <filter id="inner" x="-25%" y="-25%" width="150%" height="150%">
+      <feOffset dx="0" dy="3"/>
+      <feGaussianBlur stdDeviation="4" result="off"/>
+      <feComposite in="SourceGraphic" in2="off" operator="out" result="inv"/>
+      <feFlood flood-color="#000000" flood-opacity="0.4"/>
+      <feComposite in2="inv" operator="in"/>
+      <feComposite in2="SourceGraphic" operator="over"/>
+    </filter>
+    <!-- Soft glow under wordmark -->
+    <filter id="textGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- Background plate -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#vibrancy)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bgGloss)"/>
+  <!-- Subtle hairline rim -->
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+
+  <!-- Glass tiles (2x2) with drop shadow + inner recess -->
+  <g filter="url(#soft)">
+    <rect x="178" y="178" width="312" height="312" rx="58" fill="url(#tile)"/>
+    <rect x="534" y="178" width="312" height="312" rx="58" fill="url(#tile)"/>
+    <rect x="178" y="534" width="312" height="312" rx="58" fill="url(#tile)"/>
+    <rect x="534" y="534" width="312" height="312" rx="58" fill="url(#tile)"/>
+  </g>
+
+  <!-- Hairline highlight on each tile rim -->
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2.5">
+    <rect x="179.5" y="179.5" width="309" height="309" rx="56.5"/>
+    <rect x="535.5" y="179.5" width="309" height="309" rx="56.5"/>
+    <rect x="179.5" y="535.5" width="309" height="309" rx="56.5"/>
+    <rect x="535.5" y="535.5" width="309" height="309" rx="56.5"/>
+  </g>
+
+  <!-- Specular gloss across upper half of each tile -->
+  <g>
+    <rect x="178" y="178" width="312" height="162" rx="58" fill="url(#gloss)"/>
+    <rect x="534" y="178" width="312" height="162" rx="58" fill="url(#gloss)"/>
+    <rect x="178" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
+    <rect x="534" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
+  </g>
+
+  <!-- "DM" wordmark as vector paths (font-independent, reproducible) -->
+  <!-- Designed bold geometric letters, optically centered around x=512, y=512 -->
+  <g fill="#ffffff" fill-opacity="0.97" filter="url(#textGlow)">
+    <!-- D : left stem + bowl. Outer left x=300. Total glyph height 220 (y 402..622) -->
+    <path d="
+      M 300 402
+      L 300 622
+      L 386 622
+      C 458 622 510 575 510 512
+      C 510 449 458 402 386 402
+      Z
+      M 372 466
+      L 386 466
+      C 414 466 436 486 436 512
+      C 436 538 414 558 386 558
+      L 372 558
+      Z
+    "/>
+    <!-- M : bold, x=548..728, y=402..622. Outer stems + deep central V for clear reading at small sizes -->
+    <path d="
+      M 548 622
+      L 548 402
+      L 596 402
+      L 638 528
+      L 680 402
+      L 728 402
+      L 728 622
+      L 684 622
+      L 684 486
+      L 654 576
+      L 622 576
+      L 592 486
+      L 592 622
+      Z
+    "/>
+  </g>
+</svg>
