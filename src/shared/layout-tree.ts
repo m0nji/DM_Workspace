@@ -61,3 +61,41 @@ export function setRatio(node: LayoutNode, splitId: string, ratio: number): Layo
     children: [setRatio(node.children[0], splitId, ratio), setRatio(node.children[1], splitId, ratio)]
   };
 }
+
+function split(id: string, direction: Direction, a: LayoutNode, b: LayoutNode): SplitNode {
+  return { type: 'split', id, direction, ratio: 0.5, children: [a, b] };
+}
+
+/** Build a row of `n` panes (must be a power of two) arranged left/right. */
+function row(n: number, nextPaneId: () => string, nextSplitId: () => string): LayoutNode {
+  if (n === 1) return makePane(nextPaneId());
+  const half = n / 2;
+  const left = row(half, nextPaneId, nextSplitId);
+  const right = row(half, nextPaneId, nextSplitId);
+  return split(nextSplitId(), 'h', left, right);
+}
+
+export function makePreset(
+  kind: PresetKind,
+  nextPaneId: () => string,
+  nextSplitId: () => string
+): LayoutNode {
+  switch (kind) {
+    case '1':
+      return makePane(nextPaneId());
+    case '2h':
+      return split(nextSplitId(), 'h', makePane(nextPaneId()), makePane(nextPaneId()));
+    case '2v':
+      return split(nextSplitId(), 'v', makePane(nextPaneId()), makePane(nextPaneId()));
+    case '4': {
+      const top = row(2, nextPaneId, nextSplitId);
+      const bottom = row(2, nextPaneId, nextSplitId);
+      return split(nextSplitId(), 'v', top, bottom);
+    }
+    case '8': {
+      const top = row(4, nextPaneId, nextSplitId);
+      const bottom = row(4, nextPaneId, nextSplitId);
+      return split(nextSplitId(), 'v', top, bottom);
+    }
+  }
+}

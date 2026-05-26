@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, splitPane, closePane, setRatio } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
 
 describe('createIdGenerator', () => {
   it('produces unique sequential ids with a prefix', () => {
@@ -96,5 +96,37 @@ describe('setRatio', () => {
     const result = setRatio(tree, 's2', 0.7);
     expect((result as any).ratio).toBe(0.5);
     expect((result as any).children[1].ratio).toBe(0.7);
+  });
+});
+
+describe('makePreset', () => {
+  it('1 => single pane', () => {
+    const next = (() => { let n = 0; return () => `id${++n}`; })();
+    const tree = makePreset('1', next, next);
+    expect(tree.type).toBe('pane');
+    expect(collectPaneIds(tree)).toHaveLength(1);
+  });
+
+  it('2h => one horizontal split, two panes', () => {
+    const next = (() => { let n = 0; return () => `id${++n}`; })();
+    const tree = makePreset('2h', next, next);
+    expect(tree.type).toBe('split');
+    expect((tree as any).direction).toBe('h');
+    expect(collectPaneIds(tree)).toHaveLength(2);
+  });
+
+  it('2v => vertical split', () => {
+    const next = (() => { let n = 0; return () => `id${++n}`; })();
+    expect((makePreset('2v', next, next) as any).direction).toBe('v');
+  });
+
+  it('4 => four panes (2x2)', () => {
+    const next = (() => { let n = 0; return () => `id${++n}`; })();
+    expect(collectPaneIds(makePreset('4', next, next))).toHaveLength(4);
+  });
+
+  it('8 => eight panes (2x4)', () => {
+    const next = (() => { let n = 0; return () => `id${++n}`; })();
+    expect(collectPaneIds(makePreset('8', next, next))).toHaveLength(8);
   });
 });
