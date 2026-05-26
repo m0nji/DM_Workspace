@@ -1,5 +1,5 @@
 import { homedir } from 'os';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import type { AppState } from '../shared/types';
 
@@ -18,7 +18,9 @@ export function serialize(state: AppState): string {
 function isValid(obj: unknown): obj is AppState {
   if (typeof obj !== 'object' || obj === null) return false;
   const s = obj as Record<string, unknown>;
-  return s.version === 1 && Array.isArray(s.workspaces);
+  return s.version === 1
+    && Array.isArray(s.workspaces)
+    && (typeof s.activeWorkspaceId === 'string' || s.activeWorkspaceId === null);
 }
 
 export function deserialize(json: string): AppState {
@@ -31,7 +33,6 @@ export function deserialize(json: string): AppState {
 }
 
 export function loadStateFromFile(file: string): AppState {
-  if (!existsSync(file)) return defaultState();
   try {
     return deserialize(readFileSync(file, 'utf8'));
   } catch {
@@ -40,6 +41,10 @@ export function loadStateFromFile(file: string): AppState {
 }
 
 export function saveStateToFile(file: string, state: AppState): void {
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, serialize(state), 'utf8');
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, serialize(state), 'utf8');
+  } catch (err) {
+    console.error(`Failed to save state to ${file}:`, err);
+  }
 }

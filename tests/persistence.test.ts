@@ -26,6 +26,14 @@ describe('persistence serialize/deserialize', () => {
     expect(deserialize(JSON.stringify({ workspaces: [] }))).toEqual(defaultState());
   });
 
+  it('returns defaultState when version is an unknown number', () => {
+    expect(deserialize(JSON.stringify({ version: 2, workspaces: [], activeWorkspaceId: null }))).toEqual(defaultState());
+  });
+
+  it('returns defaultState when activeWorkspaceId is missing', () => {
+    expect(deserialize(JSON.stringify({ version: 1, workspaces: [] }))).toEqual(defaultState());
+  });
+
   it('defaultState has one workspace with a null layout (welcome screen)', () => {
     const s = defaultState();
     expect(s.workspaces).toHaveLength(1);
@@ -47,5 +55,21 @@ describe('persistence file IO', () => {
 
   it('returns defaultState when file is missing', () => {
     expect(loadStateFromFile('/nonexistent/path/state.json')).toEqual(defaultState());
+  });
+
+  it('creates nested directories recursively when saving', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dmws-'));
+    const file = join(dir, 'sub', 'deep', 'state.json');
+    const state = defaultState();
+    state.workspaces[0].name = 'Nested';
+    saveStateToFile(file, state);
+    expect(loadStateFromFile(file)).toEqual(state);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns defaultState when read fails (path is a directory)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dmws-'));
+    expect(loadStateFromFile(dir)).toEqual(defaultState());
+    rmSync(dir, { recursive: true, force: true });
   });
 });
