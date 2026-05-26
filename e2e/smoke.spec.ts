@@ -16,5 +16,8 @@ test('launches, shows welcome, applies a preset', async () => {
   // Four panes should appear
   await expect(win.locator('.pane')).toHaveCount(4);
 
+  // Confirm a real terminal initialized inside a pane (xterm always renders .xterm-screen)
+  await expect(win.locator('.pane .xterm-screen').first()).toBeVisible();
+
   await app.close();
 });
