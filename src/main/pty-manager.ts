@@ -1,5 +1,8 @@
 import * as pty from 'node-pty';
 import { resolveCwd } from './resolve-cwd';
+import { app } from 'electron';
+import { join } from 'path';
+import { bashPromptCommand, writeZshIntegrationDir } from './shell-integration';
 
 export interface SpawnOptions {
   cwd: string;
@@ -32,17 +35,21 @@ function shellArgs(): string[] {
   return ['-l'];
 }
 
-// POSIX cwd reporting: a precmd/PROMPT_COMMAND hook that prints OSC 7 with the
-// current path on each prompt. Injected into the live shell after spawn (there
-// is no clean env-var hook that works for both zsh and bash). \e = ESC, \a = BEL.
-function posixCwdHook(shell: string): string {
-  const emit = String.raw`printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"`;
+// Build the spawn env for the cwd-reporting hook without echoing anything into
+// the terminal: bash inherits PROMPT_COMMAND; zsh gets ZDOTDIR pointed at the
+// generated integration dir (with _DMWS_USER_ZDOTDIR preserving the original).
+function cwdHookEnv(shell: string): Record<string, string> {
+  const base = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>;
+  if (process.platform === 'win32') return base;
   if (/zsh$/.test(shell)) {
-    // zsh has no $HOSTNAME by default; use $HOST. precmd_functions runs each prompt.
-    return `__dmws_cwd(){ printf '\\e]7;file://%s%s\\a' "$HOST" "$PWD"; }; precmd_functions+=(__dmws_cwd)`;
+    const dir = writeZshIntegrationDir(join(app.getPath('userData'), 'shell-integration', 'zsh'));
+    base._DMWS_USER_ZDOTDIR = process.env.ZDOTDIR || process.env.HOME || '';
+    base.ZDOTDIR = dir;
+    return base;
   }
-  // bash and other POSIX shells: prepend to PROMPT_COMMAND.
-  return `__dmws_cwd(){ ${emit}; }; PROMPT_COMMAND="__dmws_cwd;$PROMPT_COMMAND"`;
+  // bash / other POSIX shells
+  base.PROMPT_COMMAND = bashPromptCommand();
+  return base;
 }
 
 type DataListener = (paneId: string, data: string) => void;
@@ -66,7 +73,7 @@ export class PtyManager {
       cols: opts.cols,
       rows: opts.rows,
       cwd: resolveCwd(opts.cwd),
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>
+      env: cwdHookEnv(shell)
     });
     proc.onData((data) => this.dataListeners.forEach((l) => l(paneId, data)));
     proc.onExit(({ exitCode }) => {
@@ -74,12 +81,6 @@ export class PtyManager {
       this.exitListeners.forEach((l) => l(paneId, exitCode));
     });
     this.procs.set(paneId, proc);
-    // POSIX shells need the cwd-reporting hook injected into the live session
-    // (Windows gets it via the -Command bootstrap above). The leading newline
-    // keeps it off the user's first prompt line.
-    if (process.platform !== 'win32') {
-      proc.write(`${posixCwdHook(shell)}\r`);
-    }
   }
 
   write(paneId: string, data: string): void {
