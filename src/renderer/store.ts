@@ -8,7 +8,7 @@ import {
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 
-const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75 };
+const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, showDoneBadge: false };
 
 export type UpdateStatus =
   | 'idle' | 'checking' | 'available' | 'downloading'

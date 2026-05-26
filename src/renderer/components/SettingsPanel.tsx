@@ -150,6 +150,22 @@ export function SettingsPanel(): JSX.Element | null {
           Lower opacity reveals a blurred backdrop behind the terminals (macOS).
         </p>
 
+        <div className="modal-section-label">Sidebar</div>
+
+        <div className="setting-row">
+          <label htmlFor="done-badge-toggle">Show "terminals ready" badge</label>
+          <input
+            id="done-badge-toggle"
+            type="checkbox"
+            checked={settings.showDoneBadge ?? false}
+            onChange={(e) => updateSettings({ showDoneBadge: e.target.checked })}
+          />
+        </div>
+
+        <p className="modal-hint">
+          Shows a green count on inactive workspaces when their terminals finish working.
+        </p>
+
         <UpdateSection />
       </div>
     </div>

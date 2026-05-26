@@ -26,15 +26,25 @@ let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
+  const isWin = process.platform === 'win32';
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    // On macOS use a vibrancy (blurred) backdrop so the terminal-transparency
-    // setting reveals a frosted-glass effect like the native Terminal app.
-    backgroundColor: isMac ? '#00000000' : '#0d0d0d',
+    // Explicit window icon so the title bar / taskbar show the app icon even in
+    // dev and unpackaged runs (the installer icon alone doesn't cover those).
+    icon: join(__dirname, '../../build/icon.ico'),
+    // On macOS use a vibrancy (blurred) backdrop and on Windows 11 an acrylic
+    // backgroundMaterial, so the terminal-transparency setting reveals a
+    // frosted-glass effect like the native Terminal app. Both need a fully
+    // transparent backgroundColor so the material shows through.
+    backgroundColor: isMac || isWin ? '#00000000' : '#0d0d0d',
     vibrancy: isMac ? 'under-window' : undefined,
+    backgroundMaterial: isWin ? 'acrylic' : undefined,
     visualEffectState: isMac ? 'active' : undefined,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    // Hide the native menu bar on Windows/Linux (Alt still reveals it); macOS
+    // keeps its global menu bar. Avoids the stray File/Edit/View bar in-window.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
