@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, splitPane, closePane } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane, setRatio } from '../src/shared/layout-tree';
 
 describe('createIdGenerator', () => {
   it('produces unique sequential ids with a prefix', () => {
@@ -74,5 +74,27 @@ describe('closePane', () => {
   it('returns tree unchanged when pane not found', () => {
     const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
     expect(closePane(tree, 'zzz')).toEqual(tree);
+  });
+});
+
+describe('setRatio', () => {
+  it('updates ratio of the matching split', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    const result = setRatio(tree, 's1', 0.3);
+    expect((result as any).ratio).toBe(0.3);
+  });
+
+  it('clamps ratio into [0.1, 0.9]', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect((setRatio(tree, 's1', 0) as any).ratio).toBe(0.1);
+    expect((setRatio(tree, 's1', 1) as any).ratio).toBe(0.9);
+  });
+
+  it('updates a nested split without touching others', () => {
+    let tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    tree = splitPane(tree, 'b', 'v', 'c', 's2');
+    const result = setRatio(tree, 's2', 0.7);
+    expect((result as any).ratio).toBe(0.5);
+    expect((result as any).children[1].ratio).toBe(0.7);
   });
 });

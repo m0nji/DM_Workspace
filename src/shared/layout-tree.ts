@@ -49,3 +49,15 @@ export function closePane(node: LayoutNode, targetPaneId: string): LayoutNode | 
   if (a === node.children[0] && b === node.children[1]) return node; // unchanged
   return { ...node, children: [a, b] };
 }
+
+export function setRatio(node: LayoutNode, splitId: string, ratio: number): LayoutNode {
+  if (node.type === 'pane') return node;
+  if (node.id === splitId) {
+    const clamped = Math.min(0.9, Math.max(0.1, ratio));
+    return { ...node, ratio: clamped };
+  }
+  return {
+    ...node,
+    children: [setRatio(node.children[0], splitId, ratio), setRatio(node.children[1], splitId, ratio)]
+  };
+}
