@@ -22,8 +22,8 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     term.open(host);
     try { term.loadAddon(new WebglAddon()); } catch { /* fallback to canvas */ }
 
-    // Inactive workspaces stay mounted but hidden (display:none → 0×0). Only fit
-    // when the host actually has a size, otherwise xterm/fit compute garbage dims.
+    // Only fit when the host actually has a size. Inactive workspaces are mounted
+    // but hidden (display:none → 0×0), where fit would compute garbage dims.
     const safeFit = (): boolean => {
       if (host.clientWidth > 0 && host.clientHeight > 0) {
         fit.fit();
@@ -31,20 +31,37 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       }
       return false;
     };
-    safeFit();
 
-    // Guard against spawning a PTY at 0 columns when mounted hidden; the
-    // ResizeObserver resizes it to the real size as soon as it becomes visible.
-    void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
-
+    // Attach listeners BEFORE spawning so the shell's first output (the prompt)
+    // is never missed.
     const offData = window.api.onData((e) => { if (e.paneId === paneId) term.write(e.data); });
     const offExit = window.api.onExit((e) => {
       if (e.paneId === paneId) term.write(`\r\n[Process exited — code ${e.exitCode}]\r\n`);
     });
     const inputDisp = term.onData((data) => window.api.input({ paneId, data }));
 
+    let spawned = false;
+    const spawnOnce = () => {
+      if (spawned) return;
+      spawned = true;
+      void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+    };
+
+    // Fit + spawn AFTER the browser has applied the flex layout (two animation
+    // frames), so the PTY starts at the real terminal size and the first prompt
+    // renders correctly instead of leaving the pane blank.
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        safeFit();
+        spawnOnce();
+      });
+    });
+
     const resize = () => {
       if (safeFit()) {
+        spawnOnce();
         window.api.resize({ paneId, cols: term.cols, rows: term.rows });
       }
     };
@@ -52,6 +69,8 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     ro.observe(host);
 
     return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       ro.disconnect();
       offData();
       offExit();
