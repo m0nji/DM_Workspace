@@ -1,4 +1,6 @@
 import { homedir } from 'os';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { dirname } from 'path';
 import type { AppState } from '../shared/types';
 
 export function defaultState(): AppState {
@@ -26,4 +28,18 @@ export function deserialize(json: string): AppState {
   } catch {
     return defaultState();
   }
+}
+
+export function loadStateFromFile(file: string): AppState {
+  if (!existsSync(file)) return defaultState();
+  try {
+    return deserialize(readFileSync(file, 'utf8'));
+  } catch {
+    return defaultState();
+  }
+}
+
+export function saveStateToFile(file: string, state: AppState): void {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, serialize(state), 'utf8');
 }

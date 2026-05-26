@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { serialize, deserialize, defaultState } from '../src/main/persistence';
+import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile } from '../src/main/persistence';
 import type { AppState } from '../src/shared/types';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('persistence serialize/deserialize', () => {
   const sample: AppState = {
@@ -28,5 +31,21 @@ describe('persistence serialize/deserialize', () => {
     expect(s.workspaces).toHaveLength(1);
     expect(s.workspaces[0].layout).toBeNull();
     expect(s.activeWorkspaceId).toBe(s.workspaces[0].id);
+  });
+});
+
+describe('persistence file IO', () => {
+  it('saves then loads identical state', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dmws-'));
+    const file = join(dir, 'state.json');
+    const state = defaultState();
+    state.workspaces[0].name = 'Renamed';
+    saveStateToFile(file, state);
+    expect(loadStateFromFile(file)).toEqual(state);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns defaultState when file is missing', () => {
+    expect(loadStateFromFile('/nonexistent/path/state.json')).toEqual(defaultState());
   });
 });
