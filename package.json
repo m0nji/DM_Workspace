@@ -45,7 +45,6 @@
     "asarUnpack": [
       "**/node_modules/node-pty/**"
     ],
-    "afterSign": "build/notarize.cjs",
     "mac": {
       "target": [
         "dmg"
@@ -55,7 +54,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": {
+        "teamId": "FLG4M553XP"
+      }
     },
     "win": {
       "target": [

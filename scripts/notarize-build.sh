@@ -27,9 +27,10 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# electron-builder reads the Team ID from package.json (build.mac.notarize.teamId);
+# the notary service needs APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD from the environment.
 : "${APPLE_ID:?set APPLE_ID in build/.notarize.env}"
 : "${APPLE_APP_SPECIFIC_PASSWORD:?set APPLE_APP_SPECIFIC_PASSWORD in build/.notarize.env}"
-: "${APPLE_TEAM_ID:?set APPLE_TEAM_ID in build/.notarize.env}"
 
 echo "→ Confirming a Developer ID Application signing identity is available..."
 if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
