@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../store';
 import { TerminalView } from './TerminalView';
+import { SearchBar } from './SearchBar';
 
 interface Props { paneId: string; cwd: string; }
 
@@ -68,10 +69,17 @@ export function Pane({ paneId, cwd }: Props): JSX.Element {
   const closeActivePane = useStore((s) => s.closeActivePane);
   const toggleMaximize = useStore((s) => s.toggleMaximize);
   const maximized = useStore((s) => s.maximizedPaneId === paneId);
+  const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
+  const focused = useStore((s) => s.focusedPaneId === paneId);
+  const setFocusedPane = useStore((s) => s.setFocusedPane);
 
   return (
-    <div className="pane">
+    <div
+      className={`pane ${focused ? 'focused' : ''}`}
+      onMouseDownCapture={() => setFocusedPane(paneId)}
+    >
       <div className="pane-header">
+        <span className={`status-dot ${status}`} title={status} />
         <span className="pane-title">{cwd}</span>
         <button className="pane-btn" title="Split into left & right"
                 onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
@@ -83,6 +91,7 @@ export function Pane({ paneId, cwd }: Props): JSX.Element {
                 onClick={() => closeActivePane(paneId)}><Close /></button>
       </div>
       <div className="pane-body">
+        <SearchBar paneId={paneId} />
         <TerminalView paneId={paneId} cwd={cwd} />
       </div>
     </div>

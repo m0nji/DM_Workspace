@@ -12,7 +12,7 @@ describe('persistence serialize/deserialize', () => {
     workspaces: [
       { id: 'w1', name: 'Workspace 1', cwd: '/home/x', layout: { type: 'pane', id: 'p1' } }
     ],
-    settings: { terminalBackground: '#101418', terminalOpacity: 0.8 }
+    settings: { themeId: 'default', terminalOpacity: 0.8 }
   };
 
   it('round-trips state through serialize/deserialize', () => {
@@ -25,7 +25,7 @@ describe('persistence serialize/deserialize', () => {
       activeWorkspaceId: 'w1',
       workspaces: []
     }));
-    expect(result.settings).toEqual({ terminalBackground: '#1e1e1e', terminalOpacity: 0.75 });
+    expect(result.settings).toEqual({ themeId: 'default', terminalOpacity: 0.75 });
   });
 
   it('returns defaultState for invalid JSON', () => {

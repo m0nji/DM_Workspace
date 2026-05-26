@@ -58,7 +58,8 @@ body {
   display: flex; align-items: center; justify-content: center; z-index: 100;
   -webkit-app-region: no-drag; }
 .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  max-height: 85vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
 .modal-close { background: none; border: none; color: var(--muted); cursor: pointer;
@@ -138,3 +139,75 @@ body {
 .xterm-host { height: 100%; }
 
 .maximized-host { position: absolute; inset: 8px; }
+
+/* --- v0.2 --- */
+
+/* Pane focus ring */
+.pane.focused { border-color: var(--accent); }
+
+/* Agent status dot in the pane header */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
+.status-dot.idle { background: #555; }
+.status-dot.busy { background: #e5c100; animation: status-pulse 1.2s ease-in-out infinite; }
+.status-dot.done { background: #3fb950; }
+@keyframes status-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Sidebar "terminals ready" badge */
+.ws-item .done-badge {
+  background: #3fb950; color: #07130b; font-size: 10px; font-weight: 600;
+  border-radius: 8px; padding: 0 5px; line-height: 15px; min-width: 15px; text-align: center;
+}
+
+/* Workspace rename + color picker (stacked, so the swatches are fully visible) */
+.ws-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ws-edit .ws-rename-input { width: 100%; }
+.ws-colors { display: flex; gap: 6px; align-items: center; }
+.ws-color { width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25); flex-shrink: 0; }
+.ws-color:hover { transform: scale(1.15); }
+.ws-color.active { outline: 2px solid var(--text); outline-offset: 1px; }
+
+/* Terminal host wrapper holds the floating scroll-to-bottom button */
+.xterm-host-wrap { position: relative; height: 100%; }
+.scroll-bottom-btn {
+  position: absolute; right: 12px; bottom: 12px; z-index: 5;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  background: #2a2a2acc; color: var(--text); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.scroll-bottom-btn:hover { border-color: var(--accent); }
+
+/* Per-pane find overlay */
+.search-bar {
+  position: absolute; top: 6px; right: 6px; z-index: 6;
+  display: flex; gap: 4px; align-items: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px;
+}
+.search-input {
+  background: #00000033; border: 1px solid var(--border); color: var(--text);
+  border-radius: 4px; padding: 2px 6px; width: 140px; outline: none; font-size: 12px;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-btn {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  padding: 2px 5px; border-radius: 4px; font-size: 12px;
+}
+.search-btn:hover { color: var(--text); background: #ffffff14; }
+
+/* pane-body must be a positioning context so the search overlay anchors to it */
+.pane-body { position: relative; }
+
+/* Theme gallery */
+.theme-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.theme-tile {
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px; cursor: pointer; color: var(--text);
+}
+.theme-tile:hover { border-color: var(--accent); }
+.theme-tile.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.theme-swatch {
+  height: 34px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  gap: 5px; font-family: monospace; font-size: 14px; font-weight: 700;
+}
+.theme-name { font-size: 11px; color: var(--muted); text-align: center; }

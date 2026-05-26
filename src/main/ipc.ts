@@ -1,11 +1,11 @@
-import { ipcMain, BrowserWindow, dialog, app } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, Notification } from 'electron';
 import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { collectPaneIds } from '../shared/layout-tree';
 import type {
-  AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent
+  AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload
 } from '../shared/types';
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
@@ -49,6 +49,23 @@ export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
     if (!win) return null;
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     return res.canceled ? null : res.filePaths[0];
+  });
+
+  ipcMain.on('notify:agentDone', (_e, payload: AgentDonePayload) => {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({
+      title: payload.workspaceName,
+      body: `A terminal is ready: ${payload.paneTitle}`
+    });
+    n.on('click', () => {
+      const win = getWindow();
+      if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+        win.webContents.send('notify:activateWorkspace', payload.workspaceId);
+      }
+    });
+    n.show();
   });
 
   return pty;

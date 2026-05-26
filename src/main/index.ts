@@ -5,6 +5,9 @@ import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
 import { registerUpdater } from './updater';
 
+// Required so Windows shows the app name/icon on notification toasts.
+app.setAppUserModelId('de.dmworkspace.app');
+
 // E2E isolation: when DMWS_E2E is set, redirect userData to a fresh temp dir
 // so each test run starts from defaultState (welcome screen) instead of any
 // previously persisted layout. Must run before app.whenReady().
@@ -47,6 +50,8 @@ function createWindow(): void {
   }
 
   mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));
+  mainWindow.on('blur', () => mainWindow?.webContents.send('window:focus', false));
 }
 
 const pty = registerIpc(() => mainWindow);

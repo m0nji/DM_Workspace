@@ -2,9 +2,27 @@ import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import type { AppState, Settings } from '../shared/types';
+import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 
 export function defaultSettings(): Settings {
-  return { terminalBackground: '#1e1e1e', terminalOpacity: 0.75 };
+  return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75 };
+}
+
+// Migrate a raw persisted settings blob to the current shape. Pre-v0.2 states
+// stored `terminalBackground` (a hex color) with no themeId; those map to the
+// default theme while preserving the custom background as an override. Opacity
+// is preserved when present.
+export function migrateSettings(raw: unknown): Settings {
+  const d = defaultSettings();
+  if (typeof raw !== 'object' || raw === null) return d;
+  const r = raw as Record<string, unknown>;
+  const themeId = typeof r.themeId === 'string' && getTheme(r.themeId).id === r.themeId
+    ? r.themeId
+    : d.themeId;
+  const terminalOpacity = typeof r.terminalOpacity === 'number' ? r.terminalOpacity : d.terminalOpacity;
+  const out: Settings = { themeId, terminalOpacity };
+  if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
+  return out;
 }
 
 export function defaultState(): AppState {
@@ -32,8 +50,8 @@ export function deserialize(json: string): AppState {
   try {
     const parsed = JSON.parse(json);
     if (!isValid(parsed)) return defaultState();
-    // Fill in settings for states persisted before settings existed / partial settings.
-    return { ...parsed, settings: { ...defaultSettings(), ...(parsed.settings ?? {}) } };
+    // Migrate persisted settings to the current shape.
+    return { ...parsed, settings: migrateSettings(parsed.settings) };
   } catch {
     return defaultState();
   }

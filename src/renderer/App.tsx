@@ -3,12 +3,17 @@ import { useStore } from './store';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): JSX.Element {
   const hydrated = useStore((s) => s.hydrated);
   const hydrate = useStore((s) => s.hydrate);
   const applyUpdateEvent = useStore((s) => s.applyUpdateEvent);
   const checkForUpdates = useStore((s) => s.checkForUpdates);
+  const setWindowFocused = useStore((s) => s.setWindowFocused);
+  const selectWorkspace = useStore((s) => s.selectWorkspace);
+
+  useKeyboardShortcuts();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
 
@@ -18,6 +23,14 @@ export function App(): JSX.Element {
     checkForUpdates();
     return off;
   }, [applyUpdateEvent, checkForUpdates]);
+
+  // Track window focus (gates notifications) and handle notification clicks
+  // that ask to jump to a specific workspace.
+  useEffect(() => {
+    const offFocus = window.api.onWindowFocus(setWindowFocused);
+    const offActivate = window.api.onActivateWorkspace(selectWorkspace);
+    return () => { offFocus(); offActivate(); };
+  }, [setWindowFocused, selectWorkspace]);
 
   if (!hydrated) {
     return (
