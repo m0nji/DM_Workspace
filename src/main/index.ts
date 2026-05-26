@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
 import { registerUpdater } from './updater';
+import { installAppMenu } from './menu';
 
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
@@ -90,7 +91,10 @@ function createWindow(): void {
 const pty = registerIpc(() => mainWindow);
 registerUpdater(() => mainWindow);
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  installAppMenu();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   pty.killAll();
