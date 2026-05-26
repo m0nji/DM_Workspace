@@ -49,11 +49,12 @@ body {
 
 .workspace-view { flex: 1; position: relative; overflow: hidden; }
 /* Each workspace is mounted and absolutely fills the view; only the active one is
-   shown (display toggled inline). Keeps terminals alive across switches. */
-.ws-host { position: absolute; inset: 0; }
+   shown (display toggled inline). The opaque background guarantees the active
+   workspace fully covers the other (still-mounted) workspaces behind it. */
+.ws-host { position: absolute; inset: 0; background: var(--bg); }
 
-.welcome { display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100%; gap: 20px; }
+.welcome { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px; }
 .welcome h2 { font-weight: 500; opacity: .85; }
 .welcome-cwd { display: flex; align-items: center; gap: 10px;
   background: var(--panel); border: 1px solid var(--border);
