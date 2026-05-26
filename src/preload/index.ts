@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
-  PtyDataEvent, PtyExitEvent, AppState, UpdateEvent
+  PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -51,6 +51,17 @@ const api: RendererApi = {
     const handler = (_e: unknown, payload: UpdateEvent) => cb(payload);
     ipcRenderer.on('updates:event', handler);
     return () => ipcRenderer.removeListener('updates:event', handler);
+  },
+  notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
+  onWindowFocus: (cb: (focused: boolean) => void) => {
+    const handler = (_e: unknown, focused: boolean) => cb(focused);
+    ipcRenderer.on('window:focus', handler);
+    return () => ipcRenderer.removeListener('window:focus', handler);
+  },
+  onActivateWorkspace: (cb: (workspaceId: string) => void) => {
+    const handler = (_e: unknown, workspaceId: string) => cb(workspaceId);
+    ipcRenderer.on('notify:activateWorkspace', handler);
+    return () => ipcRenderer.removeListener('notify:activateWorkspace', handler);
   }
 };
 
