@@ -27,15 +27,19 @@ jobs:
       - run: npm ci
       - name: Decode signing certificate (.p12) and API key (.p8)
         run: |
-          # Decode to files ourselves (tolerates the line wrapping that `base64`
-          # adds), then point electron-builder at the file paths. Passing the
-          # base64 string directly via CSC_LINK fails with "Unknown format".
+          # APPLE_CERTIFICATE must be a base64-encoded Developer ID Application
+          # .p12 (certificate + private key). APPLE_API_KEY is the App Store
+          # Connect .p8 used for notarization only — a different credential.
           echo "${{ secrets.APPLE_CERTIFICATE }}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          if ! file -b "$RUNNER_TEMP/cert.p12" | grep -qiE 'data|DER|PKCS'; then
+            echo "::error::APPLE_CERTIFICATE is not a binary .p12. Export the 'Developer ID Application' certificate (with its private key) from Keychain Access as a .p12 and store its base64 in APPLE_CERTIFICATE. (A .p8 is the notarization API key, not a signing certificate.)"
+            echo "decoded type: $(file -b "$RUNNER_TEMP/cert.p12")"
+            exit 1
+          fi
           echo "CSC_LINK=$RUNNER_TEMP/cert.p12" >> "$GITHUB_ENV"
           mkdir -p "$HOME/private_keys"
           echo "${{ secrets.APPLE_API_KEY }}" | base64 --decode > "$HOME/private_keys/AuthKey.p8"
           echo "APPLE_API_KEY=$HOME/private_keys/AuthKey.p8" >> "$GITHUB_ENV"
-          echo "cert: $(file -b "$RUNNER_TEMP/cert.p12")"
       - name: Build, sign, notarize & publish (macOS)
         env:
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
