@@ -1,55 +1,78 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
+import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import { useStore } from '../store';
+import { getTheme } from '../../shared/themes';
+import { createPaneActivity } from '../pane-activity';
+import { registerSearch, unregisterSearch } from '../search-registry';
 
 interface Props { paneId: string; cwd: string; }
 
-interface XtermTheme { background: string; foreground: string; cursor: string; }
-
-// Build an xterm theme from a hex background + opacity. The foreground (and cursor)
-// flip to dark on light backgrounds so text stays readable (e.g. white / light gray).
-function themeFor(hex: string, opacity: number): XtermTheme {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return { background: hex, foreground: '#dddddd', cursor: '#dddddd' };
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
+// Build an xterm ITheme from a theme id + opacity. Opacity is applied to the
+// background color only (so a translucent terminal reveals the window vibrancy).
+function buildTheme(themeId: string, opacity: number): ITheme {
+  const t = getTheme(themeId);
   const a = Math.min(1, Math.max(0, opacity));
-  // Perceived luminance (0..255); >150 counts as "light".
-  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-  const light = luminance > 150;
+  let background = t.background;
+  const m = /^#?([0-9a-f]{6})$/i.exec(t.background.trim());
+  if (m) {
+    const n = parseInt(m[1], 16);
+    background = `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  }
+  const [
+    black, red, green, yellow, blue, magenta, cyan, white,
+    brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite
+  ] = t.ansi;
   return {
-    background: `rgba(${r}, ${g}, ${b}, ${a})`,
-    foreground: light ? '#1a1a1a' : '#dddddd',
-    cursor: light ? '#1a1a1a' : '#dddddd'
+    background, foreground: t.foreground, cursor: t.cursor,
+    black, red, green, yellow, blue, magenta, cyan, white,
+    brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite
   };
 }
 
 export function TerminalView({ paneId, cwd }: Props): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
-  const background = useStore((s) => s.settings.terminalBackground);
+  const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
+  const setPaneStatus = useStore((s) => s.setPaneStatus);
+  const [atBottom, setAtBottom] = useState(true);
 
   useEffect(() => {
     const host = hostRef.current!;
     const term = new Terminal({
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
       fontSize: 13,
-      // allowTransparency lets the terminal background blend with the window
-      // vibrancy when opacity < 1. (We use the default renderer, which supports
-      // transparency — the WebGL renderer forces an opaque background.)
       allowTransparency: true,
-      theme: themeFor(background, opacity),
+      theme: buildTheme(useStore.getState().settings.themeId, useStore.getState().settings.terminalOpacity),
       cursorBlink: true
     });
     termRef.current = term;
     const fit = new FitAddon();
     term.loadAddon(fit);
+    const search = new SearchAddon();
+    term.loadAddon(search);
+    registerSearch(paneId, search);
     term.open(host);
+
+    // Track whether the viewport is scrolled to the bottom (controls the
+    // floating scroll-to-bottom button). baseY is the topmost scrollback row;
+    // viewportY === baseY means we are at the bottom.
+    const updateAtBottom = (): void => {
+      const b = term.buffer.active;
+      setAtBottom(b.viewportY >= b.baseY);
+    };
+    const scrollDisp = term.onScroll(updateAtBottom);
+
+    // Per-pane activity machine: drive status from the raw output/input streams.
+    const activity = createPaneActivity({
+      onChange: (status) => setPaneStatus(paneId, status),
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
+    });
 
     const safeFit = (): boolean => {
       if (host.clientWidth > 0 && host.clientHeight > 0) {
@@ -82,11 +105,18 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     };
 
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
-    const offData = window.api.onData(paneId, (data) => { term.write(data); capture(data); });
+    const offData = window.api.onData(paneId, (data) => {
+      term.write(data, updateAtBottom);
+      capture(data);
+      activity.onOutput();
+    });
     const offExit = window.api.onExit(paneId, (exitCode) => {
       term.write(`\r\n[Process exited — code ${exitCode}]\r\n`);
     });
-    const inputDisp = term.onData((data) => window.api.input({ paneId, data }));
+    const inputDisp = term.onData((data) => {
+      window.api.input({ paneId, data });
+      activity.onInput();
+    });
 
     // Replay any saved scrollback once, before the fresh shell starts writing, so
     // restored history appears above the new prompt rather than interleaved with it.
@@ -138,6 +168,9 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       offData();
       offExit();
       inputDisp.dispose();
+      scrollDisp.dispose();
+      activity.dispose();
+      unregisterSearch(paneId);
       term.dispose();
       termRef.current = null;
     };
@@ -145,13 +178,28 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paneId]);
 
-  // Apply theme changes live (background color / opacity) without recreating the terminal.
+  // Apply theme changes live (theme / opacity) without recreating the terminal.
   useEffect(() => {
     const term = termRef.current;
     if (term) {
-      term.options.theme = themeFor(background, opacity);
+      term.options.theme = buildTheme(themeId, opacity);
     }
-  }, [background, opacity]);
+  }, [themeId, opacity]);
 
-  return <div className="xterm-host" ref={hostRef} />;
+  const scrollToBottom = (): void => { termRef.current?.scrollToBottom(); };
+
+  return (
+    <div className="xterm-host-wrap">
+      <div className="xterm-host" ref={hostRef} />
+      {!atBottom && (
+        <button className="scroll-bottom-btn" title="Scroll to bottom" onClick={scrollToBottom}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6l4 4 4-4" />
+            <path d="M4 11h8" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 }
