@@ -7,6 +7,18 @@ test-results/
 playwright-report/
 build/icon.iconset/
 
+# internal design/planning docs — not published
+docs/
+
+# editor / OS noise
+.DS_Store
+.vscode/
+.idea/
+
+# environment / secrets
+.env
+.env.*
+
 # local signing credentials (never commit)
 build/.notarize.env
 
