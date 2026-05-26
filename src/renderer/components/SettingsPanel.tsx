@@ -147,7 +147,8 @@ export function SettingsPanel(): JSX.Element | null {
         </div>
 
         <p className="modal-hint">
-          Lower opacity reveals a blurred backdrop behind the terminals (macOS).
+          Lower opacity reveals the blurred backdrop behind the terminals
+          (macOS vibrancy / Windows&nbsp;11 acrylic).
         </p>
 
         <div className="modal-section-label">Sidebar</div>

@@ -1,6 +1,6 @@
 {
   "name": "dm-workspace",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Cross-platform tiling terminal multiplexer",
   "main": "out/main/index.js",
   "author": "DM Workspace",
@@ -44,6 +44,12 @@
     ],
     "asarUnpack": [
       "**/node_modules/node-pty/**"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
     ],
     "publish": [
       {

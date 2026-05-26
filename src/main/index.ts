@@ -27,19 +27,22 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
   const isWin = process.platform === 'win32';
-  // Force the dark color scheme so the Windows 11 acrylic backdrop uses its dark
-  // tint. Without this, acrylic follows the system theme and renders a washed-out
-  // light tint over the desktop, making the dark terminals look bright.
+  // Keep the window chrome dark on Windows (title bar, native menus) and make the
+  // Windows 11 acrylic backdrop use its dark tint regardless of the system theme.
   if (isWin) nativeTheme.themeSource = 'dark';
+  // Packaged builds bundle the icon as an extraResource (see package.json); in dev
+  // it lives in the repo's build/ dir. The installer's win.icon doesn't cover the
+  // in-window title-bar icon, so set it explicitly.
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'icon.ico')
+    : join(__dirname, '../../build/icon.ico');
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    // Explicit window icon so the title bar / taskbar show the app icon even in
-    // dev and unpackaged runs (the installer icon alone doesn't cover those).
-    icon: join(__dirname, '../../build/icon.ico'),
-    // On macOS use a vibrancy (blurred) backdrop and on Windows 11 an acrylic
-    // backgroundMaterial, so the terminal-transparency setting reveals a
-    // frosted-glass effect like the native Terminal app. Both need a fully
+    show: false, // shown on ready-to-show, after the acrylic repaint nudge below
+    icon: iconPath,
+    // macOS vibrancy and Windows 11 acrylic both reveal a frosted-glass backdrop
+    // where the terminals are translucent (terminalOpacity). Both need a fully
     // transparent backgroundColor so the material shows through.
     backgroundColor: isMac || isWin ? '#00000000' : '#0d0d0d',
     vibrancy: isMac ? 'under-window' : undefined,
@@ -54,6 +57,22 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false // required so preload can use Node-built IPC bridge
+    }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    const win = mainWindow;
+    if (!win) return;
+    win.show();
+    // Windows bug: backgroundMaterial (acrylic) isn't applied on the first paint —
+    // it only kicks in after a DWM repaint (which a manual resize triggers). Re-set
+    // the material and nudge the height by 1px so the frosted backdrop appears right
+    // away instead of only after the user resizes the window.
+    if (isWin) {
+      win.setBackgroundMaterial('acrylic');
+      const b = win.getBounds();
+      win.setBounds({ ...b, height: b.height + 1 });
+      win.setBounds(b);
     }
   });
 
