@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "@electron/rebuild": "^4.0.4",
     "@playwright/test": "^1.60.0",
     "@types/node": "^20.11.0",
@@ -33,6 +34,38 @@
     "typescript": "^5.4.0",
     "vite": "^5.1.0",
     "vitest": "^1.4.0"
+  },
+  "build": {
+    "appId": "de.dmworkspace.app",
+    "productName": "DM Workspace",
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/node-pty/**"
+    ],
+    "afterSign": "build/notarize.cjs",
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "directories": {
+      "output": "dist"
+    }
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
