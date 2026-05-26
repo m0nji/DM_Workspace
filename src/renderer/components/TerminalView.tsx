@@ -14,6 +14,8 @@ import { ContextMenu, type MenuItem } from './ContextMenu';
 
 interface Props { paneId: string; cwd: string; }
 
+const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
+
 // Build an xterm ITheme from a theme id + opacity. The background can be
 // overridden (customBg) while the theme still supplies foreground/cursor/ANSI.
 // Opacity is applied to the background only (so a translucent terminal reveals
@@ -115,7 +117,12 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     const SCROLLBACK_LINES = 1000;
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
     const doSave = (): void => {
-      window.api.saveScrollback(paneId, serializeAddon.serialize({ scrollback: SCROLLBACK_LINES }));
+      const data = serializeAddon.serialize({ scrollback: SCROLLBACK_LINES });
+      // Never persist the restore separator — serialize captures the rendered
+      // buffer, so without this each restart's separator would be saved and they
+      // would accumulate across restarts.
+      const cleaned = data.split('\n').filter((line) => !line.includes(RESTORE_MARKER_TEXT)).join('\n');
+      window.api.saveScrollback(paneId, cleaned);
     };
     const flushSave = (): void => {
       if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
@@ -148,7 +155,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
         restorePromise = window.api.getScrollback(paneId).then((saved) => {
           if (saved) {
             term.write(saved);
-            term.write('\r\n\x1b[2m── vorherige Sitzung wiederhergestellt (Prozess neu gestartet) ──\x1b[0m\r\n');
+            term.write(`\r\n\x1b[2m── ${RESTORE_MARKER_TEXT} ──\x1b[0m\r\n`);
           }
         });
       }
