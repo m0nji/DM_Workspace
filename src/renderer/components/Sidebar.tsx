@@ -12,6 +12,7 @@ export function Sidebar(): JSX.Element {
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const updateAvailable = useStore((s) => s.update.status === 'available');
   const paneStatus = useStore((s) => s.paneStatus);
+  const showDoneBadge = useStore((s) => s.settings.showDoneBadge ?? false);
   const activeId2 = useStore((s) => s.activeWorkspaceId);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
 
@@ -47,7 +48,7 @@ export function Sidebar(): JSX.Element {
         const paneIds = collectPaneIds(w.layout);
         const count = paneIds.length;
         // Badge: number of "done" panes in INACTIVE workspaces (where you can't see them).
-        const doneCount = w.id === activeId2
+        const doneCount = !showDoneBadge || w.id === activeId2
           ? 0
           : paneIds.filter((pid) => paneStatus[pid] === 'done').length;
         const editing = editingId === w.id;
