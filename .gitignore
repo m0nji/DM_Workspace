@@ -9,3 +9,6 @@ build/icon.iconset/
 
 # local signing credentials (never commit)
 build/.notarize.env
+
+# Apple App Store Connect API key (never commit)
+build/*.p8

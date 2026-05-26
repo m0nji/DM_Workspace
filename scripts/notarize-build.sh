@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Build, sign (Developer ID Application), notarize and staple the macOS app.
+# Build, sign (Developer ID Application), notarize and staple the macOS app
+# using an App Store Connect API key (.p8 + Key ID + Issuer ID).
 #
 # One-time setup:
 #   cp build/.notarize.env.example build/.notarize.env
-#   # then edit build/.notarize.env and fill in your credentials
+#   # then edit build/.notarize.env and point it at your .p8 key
 #
 # Run:
 #   ./scripts/notarize-build.sh
@@ -16,21 +17,31 @@ ENV_FILE="$ROOT/build/.notarize.env"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "✗ Missing $ENV_FILE"
-  echo "  Copy the template and fill in your credentials:"
+  echo "  Copy the template and fill in your API-key details:"
   echo "    cp build/.notarize.env.example build/.notarize.env"
   exit 1
 fi
 
-# Load credentials (exported into the environment for electron-builder + the afterSign hook).
+# Load credentials into the environment (electron-builder reads them).
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
 
-# electron-builder reads the Team ID from package.json (build.mac.notarize.teamId);
-# the notary service needs APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD from the environment.
-: "${APPLE_ID:?set APPLE_ID in build/.notarize.env}"
-: "${APPLE_APP_SPECIFIC_PASSWORD:?set APPLE_APP_SPECIFIC_PASSWORD in build/.notarize.env}"
+# Force the API-key path: if APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD are present
+# (in the env file or the shell), electron-builder would use the password path
+# instead of the API key. Remove them so the API key is always used.
+unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD || true
+
+: "${APPLE_API_KEY:?set APPLE_API_KEY (path to your .p8) in build/.notarize.env}"
+: "${APPLE_API_KEY_ID:?set APPLE_API_KEY_ID in build/.notarize.env}"
+: "${APPLE_API_ISSUER:?set APPLE_API_ISSUER in build/.notarize.env}"
+
+if [[ ! -f "$APPLE_API_KEY" ]]; then
+  echo "✗ APPLE_API_KEY points to a file that does not exist: $APPLE_API_KEY"
+  echo "  Set it to the absolute path of your AuthKey_${APPLE_API_KEY_ID}.p8."
+  exit 1
+fi
 
 echo "→ Confirming a Developer ID Application signing identity is available..."
 if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
@@ -39,30 +50,27 @@ if ! security find-identity -v -p codesigning | grep -q "Developer ID Applicatio
   exit 1
 fi
 
-TEAM_ID="${APPLE_TEAM_ID:-FLG4M553XP}"
-
-echo "→ Pre-flight: verifying notary credentials with Apple (team $TEAM_ID)..."
+echo "→ Pre-flight: verifying the API key with Apple's notary service..."
 # electron-builder/@electron/notarize hides the real notarytool error by trying to
 # JSON.parse a plain-text "Error: HTTP ..." response. We query notarytool directly
-# first so any auth/account problem surfaces with Apple's real message, fast.
+# first so any auth/key problem surfaces with Apple's real message, fast.
 if ! PREFLIGHT="$(xcrun notarytool history \
-      --apple-id "$APPLE_ID" \
-      --team-id "$TEAM_ID" \
-      --password "$APPLE_APP_SPECIFIC_PASSWORD" 2>&1)"; then
-  echo "✗ Notary credential check FAILED. Apple's actual response:"
+      --key "$APPLE_API_KEY" \
+      --key-id "$APPLE_API_KEY_ID" \
+      --issuer "$APPLE_API_ISSUER" 2>&1)"; then
+  echo "✗ Notary API-key check FAILED. Apple's actual response:"
   echo "------------------------------------------------------------"
   echo "$PREFLIGHT"
   echo "------------------------------------------------------------"
   echo "Common causes:"
-  echo "  • APPLE_ID is not a member of team $TEAM_ID (the cert belongs to that team)."
-  echo "  • The app-specific password was created under a DIFFERENT Apple ID."
-  echo "  • A pending agreement must be accepted at developer.apple.com / App Store Connect."
-  echo "  • Wrong/expired app-specific password (regenerate at appleid.apple.com)."
+  echo "  • Wrong Key ID / Issuer ID, or the .p8 does not match the Key ID."
+  echo "  • The key lacks the required role (needs at least 'Developer')."
+  echo "  • A pending agreement must be accepted at App Store Connect / developer.apple.com."
   exit 1
 fi
-echo "✓ Notary credentials OK."
+echo "✓ API key OK."
 
-echo "→ Building, signing and notarizing (team $TEAM_ID). This can take several minutes..."
+echo "→ Building, signing and notarizing. This can take several minutes..."
 cd "$ROOT"
 npm run dist:mac
 
