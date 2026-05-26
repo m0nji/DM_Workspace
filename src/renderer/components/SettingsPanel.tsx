@@ -1,14 +1,6 @@
 import React from 'react';
 import { useStore } from '../store';
-
-const COLOR_PRESETS: { label: string; value: string }[] = [
-  { label: 'Black', value: '#000000' },
-  { label: 'Dark gray', value: '#1e1e1e' },
-  { label: 'Gray', value: '#3c3c43' },
-  { label: 'Light gray', value: '#c7c7cc' },
-  { label: 'White', value: '#ffffff' },
-  { label: 'Dark purple', value: '#2d1b46' }
-];
+import { BUILTIN_THEMES } from '../../shared/themes';
 
 function UpdateSection(): JSX.Element {
   const update = useStore((s) => s.update);
@@ -80,28 +72,25 @@ export function SettingsPanel(): JSX.Element | null {
           <button className="modal-close" title="Close" onClick={() => setOpen(false)}>✕</button>
         </div>
 
-        <div className="modal-section-label">Terminal appearance</div>
+        <div className="modal-section-label">Theme</div>
 
-        <div className="setting-row">
-          <label>Background color</label>
-          <input
-            type="color"
-            value={settings.terminalBackground}
-            onChange={(e) => updateSettings({ terminalBackground: e.target.value })}
-          />
-        </div>
-
-        <div className="swatch-row">
-          {COLOR_PRESETS.map((p) => {
-            const active = settings.terminalBackground.toLowerCase() === p.value.toLowerCase();
+        <div className="theme-gallery">
+          {BUILTIN_THEMES.map((t) => {
+            const active = settings.themeId === t.id;
             return (
               <button
-                key={p.value}
-                className={`swatch ${active ? 'active' : ''}`}
-                title={p.label}
-                style={{ background: p.value }}
-                onClick={() => updateSettings({ terminalBackground: p.value })}
-              />
+                key={t.id}
+                className={`theme-tile ${active ? 'active' : ''}`}
+                title={t.name}
+                onClick={() => updateSettings({ themeId: t.id })}
+              >
+                <span className="theme-swatch" style={{ background: t.background }}>
+                  <span style={{ color: t.ansi[1] }}>A</span>
+                  <span style={{ color: t.ansi[2] }}>a</span>
+                  <span style={{ color: t.ansi[4] }}>#</span>
+                </span>
+                <span className="theme-name">{t.name}</span>
+              </button>
             );
           })}
         </div>
