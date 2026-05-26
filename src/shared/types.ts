@@ -28,8 +28,9 @@ export interface Workspace {
 export type PaneStatus = 'idle' | 'busy' | 'done';
 
 export interface Settings {
-  themeId: string;         // id from BUILTIN_THEMES (src/shared/themes.ts)
-  terminalOpacity: number; // 0..1 (1 = fully opaque)
+  themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
+  terminalOpacity: number;     // 0..1 (1 = fully opaque)
+  terminalBackground?: string; // optional hex override of the theme's background color
 }
 
 export interface AppState {

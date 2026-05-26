@@ -60,7 +60,7 @@ export function Sidebar(): JSX.Element {
           >
             <span className="dot" style={w.color ? { background: w.color } : undefined} />
             {editing ? (
-              <>
+              <div className="ws-edit" onMouseDown={(e) => e.stopPropagation()}>
                 <input
                   ref={inputRef}
                   className="ws-rename-input"
@@ -72,20 +72,19 @@ export function Sidebar(): JSX.Element {
                     else if (e.key === 'Escape') cancel();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                 />
-                <span className="ws-colors" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="ws-colors" onMouseDown={(e) => e.preventDefault()}>
                   {WS_COLORS.map((c) => (
                     <span
                       key={c}
-                      className="ws-color"
+                      className={`ws-color ${w.color === c ? 'active' : ''}`}
                       style={{ background: c }}
                       title="Set color"
                       onClick={(e) => { e.stopPropagation(); setWorkspaceColor(w.id, c); }}
                     />
                   ))}
-                </span>
-              </>
+                </div>
+              </div>
             ) : (
               <>
                 <span className="name">{w.name}</span>

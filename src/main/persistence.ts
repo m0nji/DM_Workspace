@@ -10,7 +10,8 @@ export function defaultSettings(): Settings {
 
 // Migrate a raw persisted settings blob to the current shape. Pre-v0.2 states
 // stored `terminalBackground` (a hex color) with no themeId; those map to the
-// default theme. Opacity is preserved when present.
+// default theme while preserving the custom background as an override. Opacity
+// is preserved when present.
 export function migrateSettings(raw: unknown): Settings {
   const d = defaultSettings();
   if (typeof raw !== 'object' || raw === null) return d;
@@ -19,7 +20,9 @@ export function migrateSettings(raw: unknown): Settings {
     ? r.themeId
     : d.themeId;
   const terminalOpacity = typeof r.terminalOpacity === 'number' ? r.terminalOpacity : d.terminalOpacity;
-  return { themeId, terminalOpacity };
+  const out: Settings = { themeId, terminalOpacity };
+  if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
+  return out;
 }
 
 export function defaultState(): AppState {

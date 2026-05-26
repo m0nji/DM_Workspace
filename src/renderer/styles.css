@@ -58,7 +58,8 @@ body {
   display: flex; align-items: center; justify-content: center; z-index: 100;
   -webkit-app-region: no-drag; }
 .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  max-height: 85vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
 .modal-close { background: none; border: none; color: var(--muted); cursor: pointer;
@@ -157,10 +158,14 @@ body {
   border-radius: 8px; padding: 0 5px; line-height: 15px; min-width: 15px; text-align: center;
 }
 
-/* Workspace color picker (shown while renaming) */
-.ws-colors { display: flex; gap: 4px; align-items: center; }
-.ws-color { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; border: 1px solid #0006; }
-.ws-color:hover { outline: 1px solid var(--text); }
+/* Workspace rename + color picker (stacked, so the swatches are fully visible) */
+.ws-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ws-edit .ws-rename-input { width: 100%; }
+.ws-colors { display: flex; gap: 6px; align-items: center; }
+.ws-color { width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25); flex-shrink: 0; }
+.ws-color:hover { transform: scale(1.15); }
+.ws-color.active { outline: 2px solid var(--text); outline-offset: 1px; }
 
 /* Terminal host wrapper holds the floating scroll-to-bottom button */
 .xterm-host-wrap { position: relative; height: 100%; }

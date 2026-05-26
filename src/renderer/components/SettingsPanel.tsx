@@ -1,6 +1,15 @@
 import React from 'react';
 import { useStore } from '../store';
-import { BUILTIN_THEMES } from '../../shared/themes';
+import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
+
+const COLOR_PRESETS: { label: string; value: string }[] = [
+  { label: 'Black', value: '#000000' },
+  { label: 'Dark gray', value: '#1e1e1e' },
+  { label: 'Gray', value: '#3c3c43' },
+  { label: 'Light gray', value: '#c7c7cc' },
+  { label: 'White', value: '#ffffff' },
+  { label: 'Dark purple', value: '#2d1b46' }
+];
 
 function UpdateSection(): JSX.Element {
   const update = useStore((s) => s.update);
@@ -63,6 +72,8 @@ export function SettingsPanel(): JSX.Element | null {
   if (!open) return null;
 
   const pct = Math.round(settings.terminalOpacity * 100);
+  // The effective background is the override if set, otherwise the theme's own.
+  const activeBg = settings.terminalBackground ?? getTheme(settings.themeId).background;
 
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -82,7 +93,7 @@ export function SettingsPanel(): JSX.Element | null {
                 key={t.id}
                 className={`theme-tile ${active ? 'active' : ''}`}
                 title={t.name}
-                onClick={() => updateSettings({ themeId: t.id })}
+                onClick={() => updateSettings({ themeId: t.id, terminalBackground: t.background })}
               >
                 <span className="theme-swatch" style={{ background: t.background }}>
                   <span style={{ color: t.ansi[1] }}>A</span>
@@ -94,6 +105,34 @@ export function SettingsPanel(): JSX.Element | null {
             );
           })}
         </div>
+
+        <div className="modal-section-label">Background color</div>
+
+        <div className="setting-row">
+          <label>Custom color</label>
+          <input
+            type="color"
+            value={activeBg}
+            onChange={(e) => updateSettings({ terminalBackground: e.target.value })}
+          />
+        </div>
+
+        <div className="swatch-row">
+          {COLOR_PRESETS.map((p) => {
+            const active = activeBg.toLowerCase() === p.value.toLowerCase();
+            return (
+              <button
+                key={p.value}
+                className={`swatch ${active ? 'active' : ''}`}
+                title={p.label}
+                style={{ background: p.value }}
+                onClick={() => updateSettings({ terminalBackground: p.value })}
+              />
+            );
+          })}
+        </div>
+
+        <p className="modal-hint">Overrides the selected theme's background. Pick a theme again to reset it.</p>
 
         <div className="setting-row">
           <label>Opacity</label>

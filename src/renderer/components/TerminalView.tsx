@@ -11,13 +11,16 @@ import { registerSearch, unregisterSearch } from '../search-registry';
 
 interface Props { paneId: string; cwd: string; }
 
-// Build an xterm ITheme from a theme id + opacity. Opacity is applied to the
-// background color only (so a translucent terminal reveals the window vibrancy).
-function buildTheme(themeId: string, opacity: number): ITheme {
+// Build an xterm ITheme from a theme id + opacity. The background can be
+// overridden (customBg) while the theme still supplies foreground/cursor/ANSI.
+// Opacity is applied to the background only (so a translucent terminal reveals
+// the window vibrancy).
+function buildTheme(themeId: string, opacity: number, customBg?: string): ITheme {
   const t = getTheme(themeId);
   const a = Math.min(1, Math.max(0, opacity));
-  let background = t.background;
-  const m = /^#?([0-9a-f]{6})$/i.exec(t.background.trim());
+  const bgHex = customBg ?? t.background;
+  let background = bgHex;
+  const m = /^#?([0-9a-f]{6})$/i.exec(bgHex.trim());
   if (m) {
     const n = parseInt(m[1], 16);
     background = `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
@@ -38,6 +41,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
   const termRef = useRef<Terminal | null>(null);
   const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
+  const customBg = useStore((s) => s.settings.terminalBackground);
   const setPaneStatus = useStore((s) => s.setPaneStatus);
   const [atBottom, setAtBottom] = useState(true);
 
@@ -47,7 +51,11 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
       fontSize: 13,
       allowTransparency: true,
-      theme: buildTheme(useStore.getState().settings.themeId, useStore.getState().settings.terminalOpacity),
+      theme: buildTheme(
+        useStore.getState().settings.themeId,
+        useStore.getState().settings.terminalOpacity,
+        useStore.getState().settings.terminalBackground
+      ),
       cursorBlink: true
     });
     termRef.current = term;
@@ -178,13 +186,14 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paneId]);
 
-  // Apply theme changes live (theme / opacity) without recreating the terminal.
+  // Apply theme changes live (theme / opacity / background override) without
+  // recreating the terminal.
   useEffect(() => {
     const term = termRef.current;
     if (term) {
-      term.options.theme = buildTheme(themeId, opacity);
+      term.options.theme = buildTheme(themeId, opacity, customBg);
     }
-  }, [themeId, opacity]);
+  }, [themeId, opacity, customBg]);
 
   const scrollToBottom = (): void => { termRef.current?.scrollToBottom(); };
 

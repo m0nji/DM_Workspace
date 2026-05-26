@@ -3,9 +3,9 @@ import { migrateSettings, defaultSettings } from '../src/main/persistence';
 import { DEFAULT_THEME_ID } from '../src/shared/themes';
 
 describe('migrateSettings', () => {
-  it('maps a pre-theme state (terminalBackground only) to the default theme, keeping opacity', () => {
-    const out = migrateSettings({ terminalBackground: '#1e1e1e', terminalOpacity: 0.5 });
-    expect(out).toEqual({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.5 });
+  it('maps a pre-theme state to the default theme, keeping opacity and preserving the custom background as an override', () => {
+    const out = migrateSettings({ terminalBackground: '#101418', terminalOpacity: 0.5 });
+    expect(out).toEqual({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.5, terminalBackground: '#101418' });
   });
 
   it('keeps a valid themeId', () => {
