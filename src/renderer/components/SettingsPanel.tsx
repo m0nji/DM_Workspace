@@ -34,7 +34,7 @@ export function SettingsPanel(): JSX.Element | null {
           <label>Opacity</label>
           <input
             type="range"
-            min={30}
+            min={10}
             max={100}
             value={pct}
             onChange={(e) => updateSettings({ terminalOpacity: Number(e.target.value) / 100 })}

@@ -88,8 +88,12 @@ export function Sidebar(): JSX.Element {
         <button className="settings-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="8" cy="8" r="2.2" />
-            <path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4" />
+            <line x1="2.5" y1="4" x2="13.5" y2="4" />
+            <line x1="2.5" y1="8" x2="13.5" y2="8" />
+            <line x1="2.5" y1="12" x2="13.5" y2="12" />
+            <circle cx="6" cy="4" r="1.7" fill="currentColor" stroke="none" />
+            <circle cx="10.5" cy="8" r="1.7" fill="currentColor" stroke="none" />
+            <circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" />
           </svg>
         </button>
       </div>

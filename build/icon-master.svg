@@ -42,10 +42,6 @@
       <feComposite in2="inv" operator="in"/>
       <feComposite in2="SourceGraphic" operator="over"/>
     </filter>
-    <!-- Soft glow under wordmark -->
-    <filter id="textGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.55"/>
-    </filter>
   </defs>
 
   <!-- Background plate -->
@@ -77,42 +73,5 @@
     <rect x="534" y="178" width="312" height="162" rx="58" fill="url(#gloss)"/>
     <rect x="178" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
     <rect x="534" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
-  </g>
-
-  <!-- "DM" wordmark as vector paths (font-independent, reproducible) -->
-  <!-- Designed bold geometric letters, optically centered around x=512, y=512 -->
-  <g fill="#ffffff" fill-opacity="0.97" filter="url(#textGlow)">
-    <!-- D : left stem + bowl. Outer left x=300. Total glyph height 220 (y 402..622) -->
-    <path d="
-      M 300 402
-      L 300 622
-      L 386 622
-      C 458 622 510 575 510 512
-      C 510 449 458 402 386 402
-      Z
-      M 372 466
-      L 386 466
-      C 414 466 436 486 436 512
-      C 436 538 414 558 386 558
-      L 372 558
-      Z
-    "/>
-    <!-- M : bold, x=548..728, y=402..622. Outer stems + deep central V for clear reading at small sizes -->
-    <path d="
-      M 548 622
-      L 548 402
-      L 596 402
-      L 638 528
-      L 680 402
-      L 728 402
-      L 728 622
-      L 684 622
-      L 684 486
-      L 654 576
-      L 622 576
-      L 592 486
-      L 592 622
-      Z
-    "/>
   </g>
 </svg>
