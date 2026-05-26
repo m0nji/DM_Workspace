@@ -101,6 +101,9 @@ export interface RendererApi {
   downloadUpdate(): void;
   quitAndInstall(): void;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
+  // clipboard (routed through the main process for reliability under contextIsolation)
+  clipboardRead(): Promise<string>;
+  clipboardWrite(text: string): void;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;

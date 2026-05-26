@@ -30,6 +30,7 @@ interface StoreState extends AppState {
   hydrated: boolean;
   settingsOpen: boolean;
   paneStatus: Record<string, PaneStatus>;
+  paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   focusedPaneId: string | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
@@ -52,6 +53,7 @@ interface StoreState extends AppState {
   updateSettings: (patch: Partial<Settings>) => void;
   setSettingsOpen: (open: boolean) => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
+  setPaneCwd: (paneId: string, cwd: string) => void;
   setFocusedPane: (paneId: string) => void;
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
@@ -82,6 +84,7 @@ export const useStore = create<StoreState>((set, get) => ({
   hydrated: false,
   settingsOpen: false,
   paneStatus: {},
+  paneCwd: {},
   focusedPaneId: null,
   windowFocused: true,
   searchOpenPaneId: null,
@@ -131,12 +134,15 @@ export const useStore = create<StoreState>((set, get) => ({
   deleteWorkspace: (id) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === id);
     const paneStatus = { ...s.paneStatus };
-    if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => { window.api.kill(pid); delete paneStatus[pid]; });
+    const paneCwd = { ...s.paneCwd };
+    if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
+      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid];
+    });
     const workspaces = s.workspaces.filter((w) => w.id !== id);
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneCwd, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -163,6 +169,7 @@ export const useStore = create<StoreState>((set, get) => ({
   closeActivePane: (paneId) => set((s) => {
     window.api.kill(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
+    const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const workspaces = s.workspaces.map((w) => {
       if (w.id !== s.activeWorkspaceId || !w.layout) return w;
       return { ...w, layout: closePane(w.layout, paneId) };
@@ -171,6 +178,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...s,
       workspaces,
       paneStatus,
+      paneCwd,
       focusedPaneId: s.focusedPaneId === paneId ? null : s.focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId
     };
@@ -214,6 +222,11 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }
     return { ...s, paneStatus };
+  }),
+
+  setPaneCwd: (paneId, cwd) => set((s) => {
+    if (s.paneCwd[paneId] === cwd) return s;
+    return { ...s, paneCwd: { ...s.paneCwd, [paneId]: cwd } };
   }),
 
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),

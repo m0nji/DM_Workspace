@@ -189,6 +189,23 @@ body {
 }
 .scroll-bottom-btn:hover { border-color: var(--accent); }
 
+/* Right-click context menu (terminal) */
+.context-menu-backdrop { position: fixed; inset: 0; z-index: 200; }
+.context-menu {
+  position: fixed; z-index: 201; min-width: 160px;
+  background: #1e1e1e; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column;
+}
+.context-menu-item {
+  background: none; border: none; color: var(--text); text-align: left;
+  font-size: 13px; padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  white-space: nowrap;
+}
+.context-menu-item:hover:not(:disabled) { background: #2a2a2a; }
+.context-menu-item:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
+.context-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
 /* Per-pane find overlay */
 .search-bar {
   position: absolute; top: 6px; right: 6px; z-index: 6;

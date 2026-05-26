@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog, app, Notification } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
 import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
@@ -43,6 +43,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): PtyManager {
   ipcMain.on('scrollback:save', (_e, req: { paneId: string; data: string }) =>
     scrollback.set(req.paneId, req.data)
   );
+
+  ipcMain.handle('clipboard:read', () => clipboard.readText());
+  ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
 
   ipcMain.handle('dialog:pickDirectory', async () => {
     const win = getWindow();

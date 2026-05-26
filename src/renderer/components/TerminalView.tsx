@@ -8,6 +8,8 @@ import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
+import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
+import { ContextMenu, type MenuItem } from './ContextMenu';
 
 interface Props { paneId: string; cwd: string; }
 
@@ -43,7 +45,10 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
   const opacity = useStore((s) => s.settings.terminalOpacity);
   const customBg = useStore((s) => s.settings.terminalBackground);
   const setPaneStatus = useStore((s) => s.setPaneStatus);
+  const setSearchOpen = useStore((s) => s.setSearchOpen);
+  const closeActivePane = useStore((s) => s.closeActivePane);
   const [atBottom, setAtBottom] = useState(true);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const host = hostRef.current!;
@@ -74,6 +79,15 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       setAtBottom(b.viewportY >= b.baseY);
     };
     const scrollDisp = term.onScroll(updateAtBottom);
+
+    // Live cwd reporting from the shell: OSC 9;9 (PowerShell) or OSC 7 (POSIX).
+    // Update the pane title via the store; return true to mark the OSC handled.
+    const reportCwd = (path: string | null): boolean => {
+      if (path) useStore.getState().setPaneCwd(paneId, path);
+      return true;
+    };
+    term.parser.registerOscHandler(9, (data) => reportCwd(parseOsc9(data)));
+    term.parser.registerOscHandler(7, (data) => reportCwd(parseOsc7(data)));
 
     // Per-pane activity machine: drive status from the raw output/input streams.
     const activity = createPaneActivity({
@@ -197,9 +211,36 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
 
   const scrollToBottom = (): void => { termRef.current?.scrollToBottom(); };
 
+  const menuItems = (): MenuItem[] => {
+    const term = termRef.current;
+    const hasSelection = !!term?.hasSelection();
+    return [
+      {
+        label: 'Copy',
+        disabled: !hasSelection,
+        onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(sel); }
+      },
+      {
+        label: 'Paste',
+        onClick: async () => {
+          const text = await window.api.clipboardRead();
+          if (text) window.api.input({ paneId, data: text });
+        }
+      },
+      { label: 'Select All', onClick: () => term?.selectAll() },
+      { label: '-' },
+      { label: 'Search', onClick: () => setSearchOpen(paneId) },
+      { label: 'Close Terminal', onClick: () => closeActivePane(paneId) }
+    ];
+  };
+
   return (
-    <div className="xterm-host-wrap">
+    <div
+      className="xterm-host-wrap"
+      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
+    >
       <div className="xterm-host" ref={hostRef} />
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
       {!atBottom && (
         <button className="scroll-bottom-btn" title="Scroll to bottom" onClick={scrollToBottom}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"

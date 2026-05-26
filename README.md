@@ -1,65 +1,57 @@
-# DM Workspace
+<p align="center">
+  <img src="build/icon.png" alt="DM Workspace" width="120" />
+</p>
 
-A cross-platform tiling terminal multiplexer for macOS (and Windows next), built with
-Electron, React and TypeScript. Open multiple real shells in a tiled grid, organize them
-into named workspaces, and rearrange them with the mouse.
+<h1 align="center">DM Workspace</h1>
 
-![App icon](build/icon.png)
+<p align="center">
+  A cross-platform tiling terminal app that puts several real shells side by side,
+  organized into named workspaces.
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Opening a 2×2 workspace and running commands in each pane" width="820" />
+</p>
+
+---
+
+## What it is
+
+DM Workspace lets you open many terminals at once in a single, tidy window. Instead of
+juggling tabs, you pick a layout and get a grid of **real system shells** — zsh on macOS,
+PowerShell on Windows — each one a fully working terminal. Group them into **workspaces**
+you can name, switch between, and come back to later exactly as you left them.
+
+It's built for anyone who runs several things in parallel: a dev server here, a build
+watcher there, logs in a third pane, and a free shell in a fourth.
+
+## How you use it
+
+1. **Create a workspace** from the sidebar and choose where its terminals should start.
+2. **Pick a layout** on the welcome screen — a single pane, two side by side, two stacked,
+   four in a 2×2 grid, or eight in a 2×4 grid.
+3. **Work in every pane** — each is a live shell, so run a command (or two) in each: start a
+   server in one, watch tests in another, check `git` status in a third, and so on.
+
+The animation above shows a fresh **2×2** workspace where a command is run in each of the
+four panes.
 
 ## Features
 
-- **Workspace manager** — multiple named workspaces in the sidebar; switch, rename, delete.
-  Each workspace keeps its terminals alive in the background.
-- **Welcome screen** — pick a layout when a workspace is empty: 1, 2 side‑by‑side,
-  2 stacked, 4 (2×2) or 8 (2×4).
-- **Tiling panes** — every pane is a real system shell (zsh on macOS, PowerShell on Windows).
-  Split a pane left/right or top/bottom, drag the dividers to resize, maximize/restore,
-  and close — all with the mouse.
-- **Per‑workspace working directory** — choose the folder new terminals start in.
-- **Terminal theme** — set the terminal background color and opacity; lower opacity reveals
-  a blurred backdrop (macOS vibrancy), like the native Terminal app.
-- **Persistence** — workspaces, names, layouts, sizes and settings are restored on restart.
+- **Workspaces** — keep multiple named workspaces in the sidebar; switch, rename and delete
+  them. Each one keeps its terminals running in the background while you're away.
+- **Layouts at a glance** — start a workspace with 1, 2 (side by side), 2 (stacked),
+  4 (2×2) or 8 (2×4) panes.
+- **Real tiling terminals** — every pane is a genuine system shell. Split any pane
+  left/right or top/bottom, drag the dividers to resize, maximize and restore, or close it —
+  all with the mouse.
+- **Per-workspace starting folder** — choose the directory new terminals open in.
+- **Your own look** — set the terminal background color and opacity; turn the opacity down
+  and a blurred backdrop shows through, like the native Terminal app.
+- **Remembers everything** — workspaces, names, layouts, pane sizes and your settings are all
+  restored the next time you open the app.
+- **Stays up to date** — checks for new versions on startup and updates itself in one click.
 
-## Tech stack
+## Platforms
 
-- [Electron](https://www.electronjs.org/) + [electron-vite](https://electron-vite.org/)
-- [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- [xterm.js](https://xtermjs.org/) for terminal rendering, [node-pty](https://github.com/microsoft/node-pty) for real shells
-- [zustand](https://github.com/pmndrs/zustand) for renderer state
-- [Vitest](https://vitest.dev/) (unit) and [Playwright](https://playwright.dev/) (E2E)
-
-## Development
-
-```bash
-npm install      # installs deps and rebuilds node-pty for Electron
-npm run dev      # launch the app with hot reload
-npm test         # run unit tests
-npm run e2e      # build + run the Playwright smoke test
-npm run build    # production bundle into out/
-```
-
-## Packaging (macOS)
-
-```bash
-npm run dist:mac     # build a .dmg (signed + notarized when credentials are set)
-```
-
-Code signing uses a Developer ID Application certificate from the keychain.
-Notarization uses an App Store Connect API key — see `scripts/notarize-build.sh`
-and `build/.notarize.env.example`. Secrets are never committed.
-
-## Releases & auto-update
-
-The app checks GitHub Releases for updates on startup and from **Settings → Updates**
-(via [electron-updater](https://www.electron.build/auto-update)). When an update is
-available the user downloads and installs it in one click.
-
-Releases are built by the **Release** GitHub Actions workflow (`.github/workflows/release.yml`)
-on a `v*` tag or manual dispatch: it builds the signed + notarized macOS app and the
-Windows app and publishes them to a draft GitHub Release. Required repository secrets:
-`APPLE_CERTIFICATE` (base64 .p12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_API_KEY` (base64 .p8),
-`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
-
-## License
-
-Private project.
+Available for **macOS** and **Windows**.

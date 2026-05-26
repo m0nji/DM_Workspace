@@ -52,6 +52,8 @@ const api: RendererApi = {
     ipcRenderer.on('updates:event', handler);
     return () => ipcRenderer.removeListener('updates:event', handler);
   },
+  clipboardRead: () => ipcRenderer.invoke('clipboard:read') as Promise<string>,
+  clipboardWrite: (text: string) => ipcRenderer.send('clipboard:write', text),
   notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
   onWindowFocus: (cb: (focused: boolean) => void) => {
     const handler = (_e: unknown, focused: boolean) => cb(focused);

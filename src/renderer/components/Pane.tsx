@@ -72,6 +72,10 @@ export function Pane({ paneId, cwd }: Props): JSX.Element {
   const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
   const focused = useStore((s) => s.focusedPaneId === paneId);
   const setFocusedPane = useStore((s) => s.setFocusedPane);
+  // Live working directory reported by the shell; falls back to the workspace cwd
+  // until the shell emits its first prompt.
+  const liveCwd = useStore((s) => s.paneCwd[paneId]);
+  const title = liveCwd ?? cwd;
 
   return (
     <div
@@ -80,7 +84,7 @@ export function Pane({ paneId, cwd }: Props): JSX.Element {
     >
       <div className="pane-header">
         <span className={`status-dot ${status}`} title={status} />
-        <span className="pane-title">{cwd}</span>
+        <span className="pane-title" title={title}>{title}</span>
         <button className="pane-btn" title="Split into left & right"
                 onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
         <button className="pane-btn" title="Split into top & bottom"
