@@ -36,3 +36,16 @@ export function splitPane(
     ]
   };
 }
+
+export function closePane(node: LayoutNode, targetPaneId: string): LayoutNode | null {
+  if (node.type === 'pane') {
+    return node.id === targetPaneId ? null : node;
+  }
+  const a = closePane(node.children[0], targetPaneId);
+  const b = closePane(node.children[1], targetPaneId);
+  if (a === null && b === null) return null;
+  if (a === null) return b;
+  if (b === null) return a;
+  if (a === node.children[0] && b === node.children[1]) return node; // unchanged
+  return { ...node, children: [a, b] };
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, splitPane } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane } from '../src/shared/layout-tree';
 
 describe('createIdGenerator', () => {
   it('produces unique sequential ids with a prefix', () => {
@@ -49,5 +49,30 @@ describe('splitPane', () => {
   it('returns the tree unchanged when target pane not found', () => {
     const tree = makePane('a');
     expect(splitPane(tree, 'zzz', 'h', 'b', 's1')).toEqual(tree);
+  });
+});
+
+describe('closePane', () => {
+  it('returns null when the only pane is closed', () => {
+    expect(closePane(makePane('a'), 'a')).toBeNull();
+  });
+
+  it('collapses parent split so sibling takes the space', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(closePane(tree, 'b')).toEqual({ type: 'pane', id: 'a' });
+    expect(closePane(tree, 'a')).toEqual({ type: 'pane', id: 'b' });
+  });
+
+  it('collapses correctly in a nested tree', () => {
+    let tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    tree = splitPane(tree, 'b', 'v', 'c', 's2');
+    const result = closePane(tree, 'c');
+    expect(collectPaneIds(result!)).toEqual(['a', 'b']);
+    expect((result as any).children[1]).toEqual({ type: 'pane', id: 'b' });
+  });
+
+  it('returns tree unchanged when pane not found', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(closePane(tree, 'zzz')).toEqual(tree);
   });
 });
