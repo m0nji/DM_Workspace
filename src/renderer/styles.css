@@ -90,9 +90,10 @@ body {
   background: #141414; border-bottom: 1px solid var(--border); }
 .pane-title { flex: 1; color: var(--muted); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
-.pane-btn { color: var(--muted); cursor: pointer; padding: 0 3px; background: none;
-  border: none; font-size: 13px; }
-.pane-btn:hover { color: var(--text); }
+.pane-btn { color: var(--muted); cursor: pointer; padding: 2px 4px; background: none;
+  border: none; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; }
+.pane-btn:hover { color: var(--text); background: #2a2a2a; }
 .pane-body { flex: 1; min-height: 0; }
 .pane-body .xterm { height: 100%; padding: 4px; }
 .xterm-host { height: 100%; }
