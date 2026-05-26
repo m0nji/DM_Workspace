@@ -4,14 +4,16 @@ import { dirname } from 'path';
 // Per-pane terminal scrollback, keyed by the (restart-stable) pane id.
 export type ScrollbackMap = Record<string, string>;
 
-// Cap stored scrollback per pane so scrollback.json can't grow without bound.
-// This is characters, not bytes; xterm output is overwhelmingly ASCII so the two
-// are close, and a generous cap keeps several screens of history per pane.
+// Backstop cap so scrollback.json can't grow without bound. The primary cap is
+// in the renderer (SerializeAddon's `scrollback: 1000` line limit); this is a
+// generous secondary guard in case the terminal's scrollback depth is raised.
+// The stored data is the renderer's serialized buffer — rows of text with inline
+// SGR color escapes, separated by newlines.
 export const MAX_SCROLLBACK_CHARS = 256 * 1024;
 
 // Keep the most recent tail of `data`. When trimming, drop the (now partial)
-// first line so we don't start replay in the middle of an ANSI escape sequence
-// — escape sequences don't span newlines, so cutting on a newline is safe.
+// first line so we cut on a row boundary: serialized rows are newline-separated
+// and SGR escapes stay within a row, so cutting on a newline never splits one.
 export function truncateScrollback(data: string, maxChars = MAX_SCROLLBACK_CHARS): string {
   if (data.length <= maxChars) return data;
   const tail = data.slice(data.length - maxChars);
