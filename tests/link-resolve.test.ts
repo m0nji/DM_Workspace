@@ -11,9 +11,9 @@ vi.mock('electron', () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, basename } from 'node:path';
+import { join } from 'node:path';
 import { resolveLinkPath } from '../src/main/ipc';
 
 let root: string;
@@ -62,14 +62,58 @@ describe('resolveLinkPath', () => {
     expect(resolveLinkPath('r.md', root, [])).toBe(join(root, 'r.md'));
   });
 
-  it('does not escape the base via ../ traversal', () => {
+  it('never ascends out of cwd (a ../ rel cannot reach files above cwd)', () => {
     writeFileSync(join(root, 'secret.md'), 'x');
-    const cwd = mkdtempSync(join(tmpdir(), 'cwd-'));
+    const cwd = join(root, 'inner');
+    mkdirSync(cwd, { recursive: true });
+    // secret.md liegt OBERHALB von cwd → der reine Abwärts-Walk darf es nie finden
+    expect(resolveLinkPath('../secret.md', cwd, [])).toBeNull();
+    expect(resolveLinkPath('secret.md', cwd, [])).toBeNull();
+  });
+
+  it('finds a bare filename several levels deep', () => {
+    mkdirSync(join(root, 'DM_Workspace', 'docs', 'superpowers', 'specs'), { recursive: true });
+    const target = join(root, 'DM_Workspace', 'docs', 'superpowers', 'specs', 'deep.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('deep.md', root, [])).toBe(target);
+  });
+
+  it('finds a partial path deep in the tree', () => {
+    mkdirSync(join(root, 'a', 'b', 'specs'), { recursive: true });
+    const target = join(root, 'a', 'b', 'specs', 'p.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('specs/p.md', root, [])).toBe(target);
+  });
+
+  it('prefers the shallowest match when the name exists at two depths', () => {
+    mkdirSync(join(root, 'shallow', 'deeper'), { recursive: true });
+    const near = join(root, 'shallow', 'dup.md');
+    writeFileSync(near, 'near');
+    writeFileSync(join(root, 'shallow', 'deeper', 'dup.md'), 'far');
+    expect(resolveLinkPath('dup.md', root, [])).toBe(near);
+  });
+
+  it('returns null for a file beyond maxDepth', () => {
+    mkdirSync(join(root, 'a', 'b', 'c'), { recursive: true });
+    writeFileSync(join(root, 'a', 'b', 'c', 'x.md'), '# hi');
+    expect(resolveLinkPath('x.md', root, [], { maxDepth: 1 })).toBeNull();
+  });
+
+  it('stops after maxDirs without finding and returns null', () => {
+    for (const d of ['d1', 'd2', 'd3']) mkdirSync(join(root, d), { recursive: true });
+    writeFileSync(join(root, 'd3', 'late.md'), '# hi');
+    // maxDirs=1 → only the start base is visited, subdirs are not
+    expect(resolveLinkPath('late.md', root, [], { maxDirs: 1 })).toBeNull();
+  });
+
+  it('does not traverse into a symlinked directory', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'outside-'));
+    writeFileSync(join(outside, 'sl.md'), '# hi');
     try {
-      // ../<basename>/secret.md from cwd would point back into root; must be rejected
-      expect(resolveLinkPath(`../${basename(root)}/secret.md`, cwd, [])).toBeNull();
+      symlinkSync(outside, join(root, 'link'), 'dir');
+      expect(resolveLinkPath('sl.md', root, [])).toBeNull();
     } finally {
-      rmSync(cwd, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 
