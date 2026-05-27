@@ -1,6 +1,6 @@
 // tests/link-detect.test.ts
 import { describe, it, expect } from 'vitest';
-import { findLinks, resolveSource, fileTarget, candidateBases } from '../src/shared/link-detect';
+import { findLinks, resolveSource, fileTarget, candidateBases, pathEndsWith } from '../src/shared/link-detect';
 
 describe('findLinks', () => {
   it('finds an http(s) URL in a line', () => {
@@ -77,5 +77,27 @@ describe('candidateBases', () => {
   });
   it('works with no subdirs and no roots', () => {
     expect(candidateBases('/p', [], [])).toEqual(['/p']);
+  });
+});
+
+describe('pathEndsWith', () => {
+  it('matches a bare filename', () => {
+    expect(pathEndsWith('/a/b/c/foo.md', 'foo.md')).toBe(true);
+  });
+  it('matches a multi-segment suffix at a segment boundary', () => {
+    expect(pathEndsWith('/a/docs/specs/foo.md', 'specs/foo.md')).toBe(true);
+  });
+  it('does not match a partial segment', () => {
+    expect(pathEndsWith('/a/myspecs/foo.md', 'specs/foo.md')).toBe(false);
+  });
+  it('does not match when rel is longer than abs', () => {
+    expect(pathEndsWith('/foo.md', 'a/b/foo.md')).toBe(false);
+  });
+  it('tolerates leading/trailing slashes and backslashes', () => {
+    expect(pathEndsWith('/a/b/foo.md', '/foo.md')).toBe(true);
+    expect(pathEndsWith('C:\\a\\b\\foo.md', 'b/foo.md')).toBe(true);
+  });
+  it('returns false for empty rel', () => {
+    expect(pathEndsWith('/a/foo.md', '')).toBe(false);
   });
 });
