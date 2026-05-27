@@ -3,6 +3,7 @@ import { useStore } from './store';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
+import { PreviewPanel } from './components/PreviewPanel';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): JSX.Element {
@@ -48,6 +49,7 @@ export function App(): JSX.Element {
       <div className="app">
         <Sidebar />
         <WorkspaceView />
+        <PreviewPanel />
       </div>
       <SettingsPanel />
     </div>
