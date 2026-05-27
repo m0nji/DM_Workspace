@@ -315,6 +315,6 @@ body {
 .markdown-body table { border-collapse: collapse; }
 .markdown-body th, .markdown-body td { border: 1px solid rgba(255,255,255,0.15); padding: 4px 8px; }
 .markdown-body img { max-width: 100%; }
-.preview-toggle-btn { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
-.preview-toggle-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.preview-toggle-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+.preview-toggle-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
 .preview-toggle-btn.active { color: #6cb6ff; }
