@@ -102,6 +102,8 @@ export interface RendererApi {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;
+  // read a UTF-8 text file (used by the markdown preview)
+  readFile(path: string): Promise<string>;
   // terminal scrollback persistence (replayed on restart; the process itself is fresh)
   getScrollback(paneId: string): Promise<string | null>;
   saveScrollback(paneId: string, data: string): void;

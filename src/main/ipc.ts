@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
+import { readFileSync } from 'node:fs';
 import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
@@ -49,6 +50,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('clipboard:read', () => clipboard.readText());
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
+
+  ipcMain.handle('file:read', (_e, path: string): string => {
+    return readFileSync(path, 'utf8');
+  });
 
   ipcMain.handle('dialog:pickDirectory', async () => {
     const win = getWindow();

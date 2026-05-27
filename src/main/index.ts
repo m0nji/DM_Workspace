@@ -65,7 +65,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false // required so preload can use Node-built IPC bridge
+      sandbox: false, // required so preload can use Node-built IPC bridge
+      webviewTag: true,
     }
   });
 
