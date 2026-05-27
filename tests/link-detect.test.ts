@@ -1,6 +1,6 @@
 // tests/link-detect.test.ts
 import { describe, it, expect } from 'vitest';
-import { findLinks, resolveSource, fileTarget, candidateBases, pathEndsWith } from '../src/shared/link-detect';
+import { findLinks, resolveSource, fileTarget, pathEndsWith } from '../src/shared/link-detect';
 
 describe('findLinks', () => {
   it('finds an http(s) URL in a line', () => {
@@ -63,20 +63,6 @@ describe('fileTarget', () => {
   });
   it('adds a leading slash before file:// when missing', () => {
     expect(fileTarget('web', 'a/b.html')).toBe('file:///a/b.html');
-  });
-});
-
-describe('candidateBases', () => {
-  it('orders cwd, then direct subdirs, then roots', () => {
-    expect(candidateBases('/p', ['DM_Workspace', 'other'], ['/r1'])).toEqual([
-      '/p', '/p/DM_Workspace', '/p/other', '/r1'
-    ]);
-  });
-  it('strips a trailing slash from cwd and roots and dedups', () => {
-    expect(candidateBases('/p/', ['sub'], ['/p', '/r/'])).toEqual(['/p', '/p/sub', '/r']);
-  });
-  it('works with no subdirs and no roots', () => {
-    expect(candidateBases('/p', [], [])).toEqual(['/p']);
   });
 });
 

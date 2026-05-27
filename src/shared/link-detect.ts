@@ -65,15 +65,6 @@ export function pathEndsWith(abs: string, rel: string): boolean {
   return true;
 }
 
-// Ordered, deduped list of base dirs to try when resolving a relative link:
-// the cwd itself, then each direct subdir of the cwd, then known workspace roots.
-/** @param subdirs Plain directory names as returned by readdir — must not contain slashes. */
-export function candidateBases(cwd: string, subdirs: string[], roots: string[]): string[] {
-  const base = cwd.replace(/\/+$/, '');
-  const out = [base, ...subdirs.map((d) => `${base}/${d}`), ...roots.map((r) => r.replace(/\/+$/, ''))];
-  return [...new Set(out)];
-}
-
 export function resolveSource(raw: string, cwd: string): PreviewSource | null {
   if (/^https?:\/\//i.test(raw)) return { kind: 'web', target: raw, resolved: true };
 
