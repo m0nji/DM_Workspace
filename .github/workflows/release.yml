@@ -52,6 +52,12 @@ jobs:
           npx electron-builder --mac --publish always
 
   windows:
+    # Run after macOS so only one job publishes first: electron-builder creates
+    # the GitHub release if it's missing, and parallel jobs would each create a
+    # separate draft for the same tag (splitting mac/win assets + the two
+    # electron-updater yml files across two releases). Serializing lets Windows
+    # find the existing draft and upload into it.
+    needs: macos
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
