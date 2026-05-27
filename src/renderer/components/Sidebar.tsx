@@ -94,6 +94,7 @@ export function Sidebar(): JSX.Element {
                 <div className="ws-cwd" onMouseDown={(e) => e.preventDefault()}>
                   <code className="ws-cwd-path" title={w.cwd}>{w.cwd}</code>
                   <button
+                    type="button"
                     className="ws-cwd-btn"
                     title="Change base folder"
                     onClick={(e) => { e.stopPropagation(); void chooseFolder(w.id); }}
