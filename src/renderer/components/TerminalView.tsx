@@ -80,8 +80,10 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.
     const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
+    let latestPreviewCall = 0; // guards against an older click's async result overwriting a newer one
     const openInPreview = async (raw: string): Promise<void> => {
-      const liveCwd = useStore.getState().paneCwd[paneId] ?? cwd0;
+      const { paneCwd, workspaces } = useStore.getState();
+      const liveCwd = paneCwd[paneId] ?? cwd0;
       const src = resolveSource(raw, liveCwd);
       if (!src) return;
       if (!src.rel) {
@@ -90,10 +92,17 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
         return;
       }
       // relative path — verify against candidate bases in the main process
-      const roots = useStore.getState().workspaces.map((w) => w.cwd);
-      const abs = await window.api.resolveLink(src.rel, liveCwd, roots);
+      const roots = workspaces.map((w) => w.cwd);
+      const callId = ++latestPreviewCall;
+      let abs: string | null = null;
+      try {
+        abs = await window.api.resolveLink(src.rel, liveCwd, roots);
+      } catch {
+        abs = null; // IPC failed → fall back to the not-found fix UI
+      }
+      if (callId !== latestPreviewCall) return; // a newer click superseded this one
       if (abs) {
-        useStore.getState().openPreview({ kind: src.kind, target: fileTarget(src.kind, abs), rel: src.rel, resolved: true });
+        useStore.getState().openPreview({ ...src, target: fileTarget(src.kind, abs), resolved: true });
       } else {
         useStore.getState().openPreview({ ...src, resolved: false });
       }
