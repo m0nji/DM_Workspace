@@ -98,7 +98,12 @@ export function Sidebar(): JSX.Element {
                     className="ws-cwd-btn"
                     title="Change base folder"
                     onClick={(e) => { e.stopPropagation(); void chooseFolder(w.id); }}
-                  >📁</button>
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5Z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             ) : (
