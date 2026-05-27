@@ -15,6 +15,7 @@ export function Sidebar(): JSX.Element {
   const showDoneBadge = useStore((s) => s.settings.showDoneBadge ?? false);
   const activeId2 = useStore((s) => s.activeWorkspaceId);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
+  const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
 
   const WS_COLORS = ['#c97b4a', '#4a90c9', '#5cb85c', '#c95a5a', '#a05ac9', '#c9b34a'];
 
@@ -40,6 +41,11 @@ export function Sidebar(): JSX.Element {
     setEditingId(null);
   };
   const cancel = () => setEditingId(null);
+
+  const chooseFolder = async (id: string) => {
+    const dir = await window.api.pickDirectory();
+    if (dir) setWorkspaceCwd(id, dir);
+  };
 
   return (
     <div className="sidebar">
@@ -84,6 +90,14 @@ export function Sidebar(): JSX.Element {
                       onClick={(e) => { e.stopPropagation(); setWorkspaceColor(w.id, c); }}
                     />
                   ))}
+                </div>
+                <div className="ws-cwd" onMouseDown={(e) => e.preventDefault()}>
+                  <code className="ws-cwd-path" title={w.cwd}>{w.cwd}</code>
+                  <button
+                    className="ws-cwd-btn"
+                    title="Change base folder"
+                    onClick={(e) => { e.stopPropagation(); void chooseFolder(w.id); }}
+                  >📁</button>
                 </div>
               </div>
             ) : (
