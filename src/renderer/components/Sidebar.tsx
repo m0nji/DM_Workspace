@@ -16,6 +16,8 @@ export function Sidebar(): JSX.Element {
   const activeId2 = useStore((s) => s.activeWorkspaceId);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
+  const togglePreview = useStore((s) => s.togglePreview);
+  const previewOpen = useStore((s) => s.previewPanel.open);
 
   const WS_COLORS = ['#c97b4a', '#4a90c9', '#5cb85c', '#c95a5a', '#a05ac9', '#c9b34a'];
 
@@ -138,6 +140,14 @@ export function Sidebar(): JSX.Element {
 
       <div className="sidebar-footer">
         <span className="app-version">v{__APP_VERSION__}</span>
+        <button
+          type="button"
+          className={`preview-toggle-btn ${previewOpen ? 'active' : ''}`}
+          title="Vorschau / Browser umschalten"
+          onClick={togglePreview}
+        >
+          ▥
+        </button>
         <button className="settings-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
