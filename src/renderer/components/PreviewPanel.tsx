@@ -72,30 +72,35 @@ export function PreviewPanel(): JSX.Element | null {
 
   const reload = useCallback(() => {
     if (isMarkdown) {
-      if (source) window.api.readFile(source.target).then((t) => setMdHtml(renderMarkdown(t))).catch(() => {});
+      if (source?.resolved) window.api.readFile(source.target).then((t) => setMdHtml(renderMarkdown(t))).catch(() => {});
     } else {
       webviewRef.current?.reload();
     }
   }, [isMarkdown, source]);
 
   // Enter in the address bar: treat the typed value as an absolute path / url and open it.
+  // Relative input is ignored — the panel has no cwd to resolve it against.
   const submitAddr = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
-    const s = resolveSource(addr.trim(), '/');
+    const v = addr.trim();
+    if (!v || (!v.startsWith('/') && !/^https?:\/\//i.test(v) && !/^[A-Za-z]:[\\/]/.test(v))) return;
+    const s = resolveSource(v, '/');
     if (s) openPreview(s);
   }, [addr, openPreview]);
 
   // Pick a folder and re-resolve the original relative path against it.
   const pickAndResolve = useCallback(async () => {
-    const rel = source?.rel;
-    if (!rel) return;
+    const snap = source;
+    if (!snap?.rel) return;
+    const rel = snap.rel;
     const dir = await window.api.pickDirectory();
     if (!dir) return;
-    const abs = await window.api.resolveLink(rel, dir, []);
+    const base = dir.replace(/\/+$/, '');
+    const abs = await window.api.resolveLink(rel, base, []);
     if (abs) {
-      openPreview({ kind: source!.kind, target: fileTarget(source!.kind, abs), rel, resolved: true });
+      openPreview({ ...snap, target: fileTarget(snap.kind, abs), resolved: true });
     } else {
-      openPreview({ kind: source!.kind, target: `${dir.replace(/\/+$/, '')}/${rel}`, rel, resolved: false });
+      openPreview({ ...snap, target: fileTarget(snap.kind, `${base}/${rel}`), resolved: false });
     }
   }, [source, openPreview]);
 
@@ -119,9 +124,11 @@ export function PreviewPanel(): JSX.Element | null {
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           onKeyDown={submitAddr}
+          readOnly={!notFound}
+          aria-label="Vorschau-Adresse"
           title={addr}
         />
-        {notFound && <button type="button" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}>📁</button>}
+        {notFound && <button type="button" aria-label="Ordner wählen" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}>📁</button>}
         <button type="button" title="Schließen" onClick={closePreview}>✕</button>
       </div>
       <div className="preview-body">
