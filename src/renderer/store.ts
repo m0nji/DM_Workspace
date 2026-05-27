@@ -3,7 +3,7 @@ import type {
   AppState, PresetKind, Direction, Workspace, Settings, UpdateEvent, PaneStatus
 } from '../shared/types';
 import {
-  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
+  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, reassignIds
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
@@ -125,8 +125,29 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
+  // Change a workspace's base directory. If it already has running panes, restart
+  // them in the new directory: kill the old PTYs and remount the same layout with
+  // fresh pane ids so each terminal respawns with the new cwd. (For a workspace
+  // still on the welcome screen there are no panes, so this just sets the cwd.)
   setWorkspaceCwd: (id, cwd) => set((s) => {
-    const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, cwd } : w) };
+    const ws = s.workspaces.find((w) => w.id === id);
+    if (!ws?.layout) {
+      const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, cwd } : w) };
+      persist(next);
+      return next;
+    }
+    const paneStatus = { ...s.paneStatus };
+    const paneCwd = { ...s.paneCwd };
+    collectPaneIds(ws.layout).forEach((pid) => {
+      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid];
+    });
+    const layout = reassignIds(ws.layout, nextPaneId, nextSplitId);
+    const workspaces = s.workspaces.map((w) => w.id === id ? { ...w, cwd, layout } : w);
+    const next = {
+      ...s, workspaces, paneStatus, paneCwd,
+      maximizedPaneId: null,
+      focusedPaneId: null
+    };
     persist(next);
     return next;
   }),

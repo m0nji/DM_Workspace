@@ -44,7 +44,15 @@ export function Sidebar(): JSX.Element {
 
   const chooseFolder = async (id: string) => {
     const dir = await window.api.pickDirectory();
-    if (dir) setWorkspaceCwd(id, dir);
+    if (!dir) return;
+    // Changing the folder restarts the workspace's open terminals in the new
+    // directory, so confirm first when there are running panes to lose.
+    const ws = workspaces.find((w) => w.id === id);
+    const hasPanes = collectPaneIds(ws?.layout ?? null).length > 0;
+    if (hasPanes && !window.confirm(
+      'Diesen Workspace im neuen Ordner neu starten? Die laufenden Terminals werden beendet.'
+    )) return;
+    setWorkspaceCwd(id, dir);
   };
 
   return (
