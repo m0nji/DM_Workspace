@@ -1,12 +1,12 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, sep } from 'path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
-import { candidateBases } from '../shared/link-detect';
+import { pathEndsWith } from '../shared/link-detect';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
@@ -14,28 +14,69 @@ import type {
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
 const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
 
-// Resolve a relative link target by trying, in order: the pane cwd, each direct
-// subdir of the cwd, then known workspace roots. Returns the first base where
-// base/rel exists as a file, else null. Extracted from the IPC handler so it is
-// testable without Electron. Candidates whose resolved path escapes their base
-// directory (e.g. via ../ traversal) are silently rejected.
-export function resolveLinkPath(rel: string, cwd: string, roots: string[]): string | null {
-  let subdirs: string[] = [];
-  try {
-    subdirs = readdirSync(cwd, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
-      .map((d) => d.name);
-  } catch {
-    // cwd unreadable → still try cwd-join and roots
-  }
-  for (const base of candidateBases(cwd, subdirs, roots)) {
-    const p = join(base, rel);
-    if (p !== base && !p.startsWith(base + sep)) continue; // reject ../ traversal outside base
-    try {
-      if (statSync(p).isFile()) return p;
-    } catch {
-      // not present at this base → try next
+const MAX_DEPTH = 5;   // levels below the start base
+const MAX_DIRS = 2000; // total dirs visited before giving up
+const SKIP = new Set(['node_modules', '.git']);
+
+// Resolve a relative link target via a bounded breadth-first walk of the file
+// tree, starting at the pane cwd and then each known workspace root. Returns the
+// first file whose path ends (segment-aligned) with `rel`; BFS yields the
+// shallowest match. Skips node_modules/.git/dot dirs and symlinked dirs, and is
+// hard-capped by maxDepth/maxDirs. Extracted from the IPC handler so it is
+// testable without Electron; opts override the caps for tests.
+export function resolveLinkPath(
+  rel: string,
+  cwd: string,
+  roots: string[],
+  opts: { maxDepth?: number; maxDirs?: number } = {}
+): string | null {
+  const maxDepth = opts.maxDepth ?? MAX_DEPTH;
+  const maxDirs = opts.maxDirs ?? MAX_DIRS;
+  const norm = (p: string) => p.replace(/\/+$/, '');
+  const starts = [norm(cwd), ...roots.map(norm)];
+  // Only skip a nested start if its ancestor completed its BFS WITHOUT hitting
+  // the budget cap — if the ancestor was capped, the nested start may not have
+  // been reached and must run its own BFS with a fresh budget.
+  const fullyWalked: string[] = [];
+
+  for (const start of starts) {
+    // Skip starts that are nested under a start that was fully walked (not
+    // capped), because the whole subtree was already visited exhaustively.
+    if (fullyWalked.some((s) => start === s || start.startsWith(s + '/'))) continue;
+
+    // Each start gets its own fresh budget so a large cwd subtree cannot
+    // exhaust the quota before any workspace root is ever searched.
+    let visited = 0;
+    let capped = false;
+
+    let head = 0;
+    const queue: Array<{ dir: string; depth: number }> = [{ dir: start, depth: 0 }];
+    while (head < queue.length) {
+      if (visited >= maxDirs) { capped = true; break; }
+      visited++;
+      const { dir, depth } = queue[head++];
+      let entries;
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue; // unreadable dir -> skip
+      }
+      // Files first: a match at the current depth beats anything deeper.
+      for (const e of entries) {
+        const fp = join(dir, e.name);
+        if (e.isFile() && pathEndsWith(fp, rel)) return fp;
+      }
+      if (depth < maxDepth) {
+        for (const e of entries) {
+          // isDirectory() is false for symlinked dirs (withFileTypes does not
+          // follow symlinks), so those are never enqueued.
+          if (e.isDirectory() && !e.name.startsWith('.') && !SKIP.has(e.name)) {
+            queue.push({ dir: join(dir, e.name), depth: depth + 1 });
+          }
+        }
+      }
     }
+    if (!capped) fullyWalked.push(start);
   }
   return null;
 }

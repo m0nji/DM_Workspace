@@ -51,13 +51,18 @@ export function fileTarget(kind: PreviewKind, abs: string): string {
   return abs;
 }
 
-// Ordered, deduped list of base dirs to try when resolving a relative link:
-// the cwd itself, then each direct subdir of the cwd, then known workspace roots.
-/** @param subdirs Plain directory names as returned by readdir — must not contain slashes. */
-export function candidateBases(cwd: string, subdirs: string[], roots: string[]): string[] {
-  const base = cwd.replace(/\/+$/, '');
-  const out = [base, ...subdirs.map((d) => `${base}/${d}`), ...roots.map((r) => r.replace(/\/+$/, ''))];
-  return [...new Set(out)];
+// True when `abs` ends with the relative path `rel` at a segment boundary.
+// "specs/foo.md" matches ".../specs/foo.md" but not ".../myspecs/foo.md".
+export function pathEndsWith(abs: string, rel: string): boolean {
+  const segs = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean);
+  const a = segs(abs);
+  const r = segs(rel);
+  if (r.length === 0 || r.length > a.length) return false;
+  const offset = a.length - r.length;
+  for (let i = 0; i < r.length; i++) {
+    if (a[offset + i] !== r[i]) return false;
+  }
+  return true;
 }
 
 export function resolveSource(raw: string, cwd: string): PreviewSource | null {
