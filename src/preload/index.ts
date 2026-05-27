@@ -42,6 +42,8 @@ const api: RendererApi = {
   loadState: () => ipcRenderer.invoke('state:load') as Promise<AppState>,
   saveState: (state: AppState) => ipcRenderer.invoke('state:save', state),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory') as Promise<string | null>,
+  resolveLink: (rel: string, cwd: string, roots: string[]) =>
+    ipcRenderer.invoke('link:resolve', { rel, cwd, roots }) as Promise<string | null>,
   readFile: (path: string) => ipcRenderer.invoke('file:read', path) as Promise<string>,
   getScrollback: (paneId: string) => ipcRenderer.invoke('scrollback:get', paneId) as Promise<string | null>,
   saveScrollback: (paneId: string, data: string) => ipcRenderer.send('scrollback:save', { paneId, data }),
