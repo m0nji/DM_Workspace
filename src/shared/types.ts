@@ -102,6 +102,8 @@ export interface RendererApi {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;
+  // resolve a relative link target against cwd / its subdirs / workspace roots; null if not found
+  resolveLink(rel: string, cwd: string, roots: string[]): Promise<string | null>;
   // read a UTF-8 text file (used by the markdown preview)
   readFile(path: string): Promise<string>;
   // terminal scrollback persistence (replayed on restart; the process itself is fresh)
