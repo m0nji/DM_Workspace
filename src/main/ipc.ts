@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
@@ -17,7 +17,8 @@ const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
 // Resolve a relative link target by trying, in order: the pane cwd, each direct
 // subdir of the cwd, then known workspace roots. Returns the first base where
 // base/rel exists as a file, else null. Extracted from the IPC handler so it is
-// testable without Electron.
+// testable without Electron. Candidates whose resolved path escapes their base
+// directory (e.g. via ../ traversal) are silently rejected.
 export function resolveLinkPath(rel: string, cwd: string, roots: string[]): string | null {
   let subdirs: string[] = [];
   try {
@@ -29,6 +30,7 @@ export function resolveLinkPath(rel: string, cwd: string, roots: string[]): stri
   }
   for (const base of candidateBases(cwd, subdirs, roots)) {
     const p = join(base, rel);
+    if (p !== base && !p.startsWith(base + sep)) continue; // reject ../ traversal outside base
     try {
       if (statSync(p).isFile()) return p;
     } catch {

@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { resolveLinkPath } from '../src/main/ipc';
 
 let root: string;
@@ -47,6 +47,30 @@ describe('resolveLinkPath', () => {
     mkdirSync(join(root, 'node_modules', 'pkg'), { recursive: true });
     writeFileSync(join(root, 'node_modules', 'pkg', 'r.md'), '# hi');
     expect(resolveLinkPath('pkg/r.md', root, [])).toBeNull();
+  });
+
+  it('skips dot directories when scanning subdirs', () => {
+    mkdirSync(join(root, '.hidden', 'docs'), { recursive: true });
+    writeFileSync(join(root, '.hidden', 'docs', 'r.md'), '# hi');
+    expect(resolveLinkPath('docs/r.md', root, [])).toBeNull();
+  });
+
+  it('prefers the file directly under cwd over a copy in a subdir', () => {
+    writeFileSync(join(root, 'r.md'), 'top');
+    mkdirSync(join(root, 'sub'), { recursive: true });
+    writeFileSync(join(root, 'sub', 'r.md'), 'nested');
+    expect(resolveLinkPath('r.md', root, [])).toBe(join(root, 'r.md'));
+  });
+
+  it('does not escape the base via ../ traversal', () => {
+    writeFileSync(join(root, 'secret.md'), 'x');
+    const cwd = mkdtempSync(join(tmpdir(), 'cwd-'));
+    try {
+      // ../<basename>/secret.md from cwd would point back into root; must be rejected
+      expect(resolveLinkPath(`../${basename(root)}/secret.md`, cwd, [])).toBeNull();
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it('returns null when nothing matches', () => {
