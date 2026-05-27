@@ -51,8 +51,8 @@ export function fileTarget(kind: PreviewKind, abs: string): string {
   return abs;
 }
 
-// True wenn `abs` segment-aligned auf den relativen Pfad `rel` endet.
-// "specs/foo.md" matcht ".../specs/foo.md", aber nicht ".../myspecs/foo.md".
+// True when `abs` ends with the relative path `rel` at a segment boundary.
+// "specs/foo.md" matches ".../specs/foo.md" but not ".../myspecs/foo.md".
 export function pathEndsWith(abs: string, rel: string): boolean {
   const segs = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean);
   const a = segs(abs);

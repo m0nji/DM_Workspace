@@ -33,24 +33,28 @@ export function resolveLinkPath(
   const maxDepth = opts.maxDepth ?? MAX_DEPTH;
   const maxDirs = opts.maxDirs ?? MAX_DIRS;
   const norm = (p: string) => p.replace(/\/+$/, '');
-  const starts = [...new Set([norm(cwd), ...roots.map(norm)])];
-  const processed: string[] = [];
+  const starts = [norm(cwd), ...roots.map(norm)];
+  // Only skip a nested start if its ancestor completed its BFS WITHOUT hitting
+  // the budget cap — if the ancestor was capped, the nested start may not have
+  // been reached and must run its own BFS with a fresh budget.
+  const fullyWalked: string[] = [];
 
   for (const start of starts) {
-    // Skip starts that are nested under an already-processed start to avoid
-    // walking a subtree twice (e.g. when a workspace root is inside cwd).
-    if (processed.some((s) => start === s || start.startsWith(s + '/'))) continue;
-    processed.push(start);
+    // Skip starts that are nested under a start that was fully walked (not
+    // capped), because the whole subtree was already visited exhaustively.
+    if (fullyWalked.some((s) => start === s || start.startsWith(s + '/'))) continue;
 
     // Each start gets its own fresh budget so a large cwd subtree cannot
     // exhaust the quota before any workspace root is ever searched.
     let visited = 0;
+    let capped = false;
 
+    let head = 0;
     const queue: Array<{ dir: string; depth: number }> = [{ dir: start, depth: 0 }];
-    while (queue.length > 0) {
-      if (visited >= maxDirs) break;
+    while (head < queue.length) {
+      if (visited >= maxDirs) { capped = true; break; }
       visited++;
-      const { dir, depth } = queue.shift()!;
+      const { dir, depth } = queue[head++];
       let entries;
       try {
         entries = readdirSync(dir, { withFileTypes: true });
@@ -72,6 +76,7 @@ export function resolveLinkPath(
         }
       }
     }
+    if (!capped) fullyWalked.push(start);
   }
   return null;
 }

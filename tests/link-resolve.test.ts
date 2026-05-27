@@ -63,13 +63,13 @@ describe('resolveLinkPath', () => {
   });
 
   it('never ascends out of cwd (a ../ rel cannot reach files above cwd)', () => {
-    writeFileSync(join(root, 'secret.md'), 'x');
+    writeFileSync(join(root, 'secret.md'), 'x'); // lives ABOVE cwd
     const cwd = join(root, 'inner');
     mkdirSync(cwd, { recursive: true });
-    // secret.md liegt OBERHALB von cwd → der reine Abwärts-Walk darf es nie finden
+    writeFileSync(join(cwd, 'present.md'), 'y'); // proves the BFS actually ran
+    expect(resolveLinkPath('present.md', cwd, [])).toBe(join(cwd, 'present.md'));
+    // secret.md is above cwd; the downward-only walk must never reach it
     expect(resolveLinkPath('../secret.md', cwd, [])).toBeNull();
-    // root/inner (cwd) is intentionally empty, so null proves the walk never
-    // climbed to the parent directory rather than simply not finding the file in cwd.
     expect(resolveLinkPath('secret.md', cwd, [])).toBeNull();
   });
 
@@ -106,6 +106,18 @@ describe('resolveLinkPath', () => {
     writeFileSync(join(root, 'd3', 'late.md'), '# hi');
     // maxDirs=1 → only the start base is visited, subdirs are not
     expect(resolveLinkPath('late.md', root, [], { maxDirs: 1 })).toBeNull();
+  });
+
+  it('still searches a nested root when the cwd BFS exhausts its own budget', () => {
+    // cwd has sibling dirs that consume its tiny budget before reaching the nested root
+    for (const d of ['s1', 's2', 's3']) mkdirSync(join(root, d), { recursive: true });
+    const nested = join(root, 'workspace');
+    mkdirSync(nested, { recursive: true });
+    const target = join(nested, 'inside.md');
+    writeFileSync(target, '# hi');
+    // nested root is inside cwd; with maxDirs:1 the cwd BFS is capped before finding it,
+    // so the nested root must still be walked under its own budget
+    expect(resolveLinkPath('inside.md', root, [nested], { maxDirs: 1 })).toBe(target);
   });
 
   it('still searches a root after a cwd subtree exhausts its own maxDirs budget', () => {
