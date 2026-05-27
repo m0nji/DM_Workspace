@@ -4,7 +4,9 @@ import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { findLinks, resolveSource } from '../../shared/link-detect';
 import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
@@ -75,6 +77,36 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
     const serializeAddon = new SerializeAddon();
     term.loadAddon(serializeAddon);
     term.open(host);
+
+    // Clicking a link opens the right-hand preview panel instead of the OS browser.
+    const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
+    const openInPreview = (raw: string): void => {
+      const liveCwd = useStore.getState().paneCwd[paneId] ?? cwd0;
+      const src = resolveSource(raw, liveCwd);
+      if (src) useStore.getState().openPreview(src);
+    };
+
+    // http(s) URLs.
+    term.loadAddon(new WebLinksAddon((_event: MouseEvent | undefined, uri: string) => openInPreview(uri)));
+
+    // Bare *.md / *.html / *.htm paths in the output.
+    term.registerLinkProvider({
+      provideLinks(lineNo, callback) {
+        const line = term.buffer.active.getLine(lineNo - 1);
+        if (!line) { callback(undefined); return; }
+        const text = line.translateToString(true);
+        const matches = findLinks(text).filter((m) => !/^https?:\/\//i.test(m.text));
+        if (matches.length === 0) { callback(undefined); return; }
+        callback(matches.map((m) => ({
+          range: {
+            start: { x: m.startIndex + 1, y: lineNo },
+            end: { x: m.startIndex + m.length, y: lineNo }
+          },
+          text: m.text,
+          activate: () => openInPreview(m.text)
+        })));
+      }
+    });
 
     // Track whether the viewport is scrolled to the bottom (controls the
     // floating scroll-to-bottom button). baseY is the topmost scrollback row;
