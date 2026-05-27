@@ -1,6 +1,6 @@
 // tests/link-detect.test.ts
 import { describe, it, expect } from 'vitest';
-import { findLinks, resolveSource } from '../src/shared/link-detect';
+import { findLinks, resolveSource, fileTarget, candidateBases } from '../src/shared/link-detect';
 
 describe('findLinks', () => {
   it('finds an http(s) URL in a line', () => {
@@ -33,23 +33,49 @@ describe('findLinks', () => {
 });
 
 describe('resolveSource', () => {
-  it('classifies an http URL as web with the raw target', () => {
-    expect(resolveSource('https://example.com', '/home/me')).toEqual({ kind: 'web', target: 'https://example.com' });
+  it('classifies an http URL as web, resolved, with the raw target', () => {
+    expect(resolveSource('https://example.com', '/home/me')).toEqual({ kind: 'web', target: 'https://example.com', resolved: true });
   });
 
-  it('resolves a relative .md path against the cwd to an absolute fs path', () => {
-    expect(resolveSource('./report.md', '/home/me/proj')).toEqual({ kind: 'markdown', target: '/home/me/proj/report.md' });
+  it('resolves a relative .md path against the cwd and records rel', () => {
+    expect(resolveSource('./report.md', '/home/me/proj')).toEqual({ kind: 'markdown', target: '/home/me/proj/report.md', rel: './report.md', resolved: true });
   });
 
-  it('keeps an absolute .md path as-is', () => {
-    expect(resolveSource('/tmp/a.md', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/a.md' });
+  it('keeps an absolute .md path as-is, no rel', () => {
+    expect(resolveSource('/tmp/a.md', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/a.md', resolved: true });
   });
 
-  it('resolves a relative .html path to a file:// url', () => {
-    expect(resolveSource('out/index.html', '/home/me')).toEqual({ kind: 'web', target: 'file:///home/me/out/index.html' });
+  it('resolves a relative .html path to a file:// url and records rel', () => {
+    expect(resolveSource('out/index.html', '/home/me')).toEqual({ kind: 'web', target: 'file:///home/me/out/index.html', rel: 'out/index.html', resolved: true });
   });
 
   it('returns null for an unsupported target', () => {
     expect(resolveSource('notes.txt', '/home/me')).toBeNull();
+  });
+});
+
+describe('fileTarget', () => {
+  it('returns an absolute path unchanged for markdown', () => {
+    expect(fileTarget('markdown', '/a/b.md')).toBe('/a/b.md');
+  });
+  it('wraps a path in a file:// url for web', () => {
+    expect(fileTarget('web', '/a/b.html')).toBe('file:///a/b.html');
+  });
+  it('adds a leading slash before file:// when missing', () => {
+    expect(fileTarget('web', 'a/b.html')).toBe('file:///a/b.html');
+  });
+});
+
+describe('candidateBases', () => {
+  it('orders cwd, then direct subdirs, then roots', () => {
+    expect(candidateBases('/p', ['DM_Workspace', 'other'], ['/r1'])).toEqual([
+      '/p', '/p/DM_Workspace', '/p/other', '/r1'
+    ]);
+  });
+  it('strips a trailing slash from cwd and roots and dedups', () => {
+    expect(candidateBases('/p/', ['sub'], ['/p', '/r/'])).toEqual(['/p', '/p/sub', '/r']);
+  });
+  it('works with no subdirs and no roots', () => {
+    expect(candidateBases('/p', [], [])).toEqual(['/p']);
   });
 });

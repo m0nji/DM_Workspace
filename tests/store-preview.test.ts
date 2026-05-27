@@ -7,18 +7,18 @@ describe('preview panel store', () => {
   });
 
   it('openPreview sets the source and opens the panel', () => {
-    useStore.getState().openPreview({ kind: 'markdown', target: '/tmp/a.md' });
+    useStore.getState().openPreview({ kind: 'markdown', target: '/tmp/a.md', resolved: true });
     const p = useStore.getState().previewPanel;
     expect(p.open).toBe(true);
-    expect(p.source).toEqual({ kind: 'markdown', target: '/tmp/a.md' });
+    expect(p.source).toEqual({ kind: 'markdown', target: '/tmp/a.md', resolved: true });
   });
 
   it('closePreview closes but keeps the source', () => {
-    useStore.getState().openPreview({ kind: 'web', target: 'https://x.com' });
+    useStore.getState().openPreview({ kind: 'web', target: 'https://x.com', resolved: true });
     useStore.getState().closePreview();
     const p = useStore.getState().previewPanel;
     expect(p.open).toBe(false);
-    expect(p.source).toEqual({ kind: 'web', target: 'https://x.com' });
+    expect(p.source).toEqual({ kind: 'web', target: 'https://x.com', resolved: true });
   });
 
   it('togglePreview flips the open flag', () => {
