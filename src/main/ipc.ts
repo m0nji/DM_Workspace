@@ -34,12 +34,21 @@ export function resolveLinkPath(
   const maxDirs = opts.maxDirs ?? MAX_DIRS;
   const norm = (p: string) => p.replace(/\/+$/, '');
   const starts = [...new Set([norm(cwd), ...roots.map(norm)])];
-  let visited = 0;
+  const processed: string[] = [];
 
   for (const start of starts) {
+    // Skip starts that are nested under an already-processed start to avoid
+    // walking a subtree twice (e.g. when a workspace root is inside cwd).
+    if (processed.some((s) => start === s || start.startsWith(s + '/'))) continue;
+    processed.push(start);
+
+    // Each start gets its own fresh budget so a large cwd subtree cannot
+    // exhaust the quota before any workspace root is ever searched.
+    let visited = 0;
+
     const queue: Array<{ dir: string; depth: number }> = [{ dir: start, depth: 0 }];
     while (queue.length > 0) {
-      if (visited >= maxDirs) return null;
+      if (visited >= maxDirs) break;
       visited++;
       const { dir, depth } = queue.shift()!;
       let entries;
@@ -50,9 +59,10 @@ export function resolveLinkPath(
       }
       // Files first: a match at the current depth beats anything deeper.
       for (const e of entries) {
-        if (e.isFile() && pathEndsWith(join(dir, e.name), rel)) return join(dir, e.name);
+        const fp = join(dir, e.name);
+        if (e.isFile() && pathEndsWith(fp, rel)) return fp;
       }
-      if (depth + 1 <= maxDepth) {
+      if (depth < maxDepth) {
         for (const e of entries) {
           // isDirectory() is false for symlinked dirs (withFileTypes does not
           // follow symlinks), so those are never enqueued.

@@ -68,6 +68,8 @@ describe('resolveLinkPath', () => {
     mkdirSync(cwd, { recursive: true });
     // secret.md liegt OBERHALB von cwd → der reine Abwärts-Walk darf es nie finden
     expect(resolveLinkPath('../secret.md', cwd, [])).toBeNull();
+    // root/inner (cwd) is intentionally empty, so null proves the walk never
+    // climbed to the parent directory rather than simply not finding the file in cwd.
     expect(resolveLinkPath('secret.md', cwd, [])).toBeNull();
   });
 
@@ -106,6 +108,18 @@ describe('resolveLinkPath', () => {
     expect(resolveLinkPath('late.md', root, [], { maxDirs: 1 })).toBeNull();
   });
 
+  it('still searches a root after a cwd subtree exhausts its own maxDirs budget', () => {
+    for (const d of ['x1', 'x2', 'x3']) mkdirSync(join(root, d), { recursive: true });
+    const ws = mkdtempSync(join(tmpdir(), 'ws-'));
+    writeFileSync(join(ws, 'r.md'), '# hi');
+    try {
+      // maxDirs:1 exhausts cwd's budget immediately, but the root gets its own budget
+      expect(resolveLinkPath('r.md', root, [ws], { maxDirs: 1 })).toBe(join(ws, 'r.md'));
+    } finally {
+      rmSync(ws, { recursive: true, force: true });
+    }
+  });
+
   it('does not traverse into a symlinked directory', () => {
     const outside = mkdtempSync(join(tmpdir(), 'outside-'));
     writeFileSync(join(outside, 'sl.md'), '# hi');
@@ -114,6 +128,7 @@ describe('resolveLinkPath', () => {
       expect(resolveLinkPath('sl.md', root, [])).toBeNull();
     } finally {
       rmSync(outside, { recursive: true, force: true });
+      rmSync(join(root, 'link'), { force: true });
     }
   });
 
