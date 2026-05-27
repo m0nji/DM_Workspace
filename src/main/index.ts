@@ -10,6 +10,18 @@ import { installAppMenu } from './menu';
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
 
+// The preview panel uses a <webview> to show HTML files / URLs the user clicked.
+// Strip every privilege from attached webviews: no preload, no Node access, fully
+// sandboxed and context-isolated, so untrusted page content can't reach the host.
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', (_e, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+  });
+});
+
 // E2E isolation: when DMWS_E2E is set, redirect userData to a fresh temp dir
 // so each test run starts from defaultState (welcome screen) instead of any
 // previously persisted layout. Must run before app.whenReady().

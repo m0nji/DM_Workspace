@@ -51,7 +51,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('clipboard:read', () => clipboard.readText());
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
 
+  // Used by the markdown preview panel. The path comes from a link the user
+  // clicked in terminal output, so restrict reads to text/markdown files — the
+  // panel never needs anything else, and this avoids slurping arbitrary files
+  // (e.g. a malicious agent printing a clickable ~/.ssh/id_rsa path).
   ipcMain.handle('file:read', (_e, path: string): string => {
+    if (!/\.(md|markdown|mdx|txt)$/i.test(path)) {
+      throw new Error('file:read is restricted to text/markdown files');
+    }
     return readFileSync(path, 'utf8');
   });
 
