@@ -166,6 +166,22 @@ export function SettingsPanel(): JSX.Element | null {
           Shows a green count on inactive workspaces when their terminals finish working.
         </p>
 
+        <div className="modal-section-label">Notifications</div>
+
+        <div className="setting-row">
+          <label htmlFor="notifications-toggle">Desktop notifications</label>
+          <input
+            id="notifications-toggle"
+            type="checkbox"
+            checked={settings.notificationsEnabled ?? false}
+            onChange={(e) => updateSettings({ notificationsEnabled: e.target.checked })}
+          />
+        </div>
+
+        <p className="modal-hint">
+          Show an OS notification when a terminal finishes in a background workspace. Off by default.
+        </p>
+
         <UpdateSection />
       </div>
     </div>

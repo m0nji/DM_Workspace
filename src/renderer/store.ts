@@ -9,7 +9,7 @@ import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 import type { PreviewSource } from '../shared/link-detect';
 
-const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, showDoneBadge: false };
+const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, showDoneBadge: false, notificationsEnabled: false };
 
 export type UpdateStatus =
   | 'idle' | 'checking' | 'available' | 'downloading'
@@ -241,8 +241,9 @@ export const useStore = create<StoreState>((set, get) => ({
     // Notify only when the pane is NOT visible (inactive workspace) OR the window
     // is unfocused — otherwise the user is already looking at it. The transition
     // into 'done' happens once until the user reacts (input resets to idle), which
-    // debounces repeat notifications for the same pane.
-    if (status === 'done') {
+    // debounces repeat notifications for the same pane. Gated on an opt-in setting
+    // (default off) since OS notifications can be noisy.
+    if (status === 'done' && s.settings.notificationsEnabled) {
       const ws = s.workspaces.find((w) => collectPaneIds(w.layout).includes(paneId));
       const visible = ws != null && ws.id === s.activeWorkspaceId;
       if (ws && (!visible || !s.windowFocused)) {

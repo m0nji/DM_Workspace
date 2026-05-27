@@ -22,6 +22,8 @@ export function migrateSettings(raw: unknown): Settings {
   const terminalOpacity = typeof r.terminalOpacity === 'number' ? r.terminalOpacity : d.terminalOpacity;
   const out: Settings = { themeId, terminalOpacity };
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
+  if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
+  if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
   return out;
 }
 

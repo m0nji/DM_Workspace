@@ -32,6 +32,7 @@ export interface Settings {
   terminalOpacity: number;     // 0..1 (1 = fully opaque)
   terminalBackground?: string; // optional hex override of the theme's background color
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
+  notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
 }
 
 export interface WindowBounds {
