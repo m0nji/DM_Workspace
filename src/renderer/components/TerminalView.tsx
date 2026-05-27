@@ -6,7 +6,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import { findLinks, resolveSource } from '../../shared/link-detect';
+import { findLinks, resolveSource, fileTarget } from '../../shared/link-detect';
 import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
@@ -80,14 +80,27 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.
     const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
-    const openInPreview = (raw: string): void => {
+    const openInPreview = async (raw: string): Promise<void> => {
       const liveCwd = useStore.getState().paneCwd[paneId] ?? cwd0;
       const src = resolveSource(raw, liveCwd);
-      if (src) useStore.getState().openPreview(src);
+      if (!src) return;
+      if (!src.rel) {
+        // url or absolute path — open the provisional target directly
+        useStore.getState().openPreview(src);
+        return;
+      }
+      // relative path — verify against candidate bases in the main process
+      const roots = useStore.getState().workspaces.map((w) => w.cwd);
+      const abs = await window.api.resolveLink(src.rel, liveCwd, roots);
+      if (abs) {
+        useStore.getState().openPreview({ kind: src.kind, target: fileTarget(src.kind, abs), rel: src.rel, resolved: true });
+      } else {
+        useStore.getState().openPreview({ ...src, resolved: false });
+      }
     };
 
     // http(s) URLs.
-    term.loadAddon(new WebLinksAddon((_event: MouseEvent | undefined, uri: string) => openInPreview(uri)));
+    term.loadAddon(new WebLinksAddon((_event: MouseEvent | undefined, uri: string) => { void openInPreview(uri); }));
 
     // Bare *.md / *.html / *.htm paths in the output.
     term.registerLinkProvider({
@@ -103,7 +116,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
             end: { x: m.startIndex + m.length, y: lineNo }
           },
           text: m.text,
-          activate: () => openInPreview(m.text)
+          activate: () => { void openInPreview(m.text); }
         })));
       }
     });
