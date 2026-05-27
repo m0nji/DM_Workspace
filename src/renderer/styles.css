@@ -138,10 +138,13 @@ body {
 .pane-body .xterm { height: 100%; padding: 4px; }
 .xterm-host { height: 100%; }
 
-/* Terminal scrollbar: xterm hard-codes the viewport background to black, which
-   shows as a bright/odd bar on Windows. Make it blend with the dark layout —
-   transparent track, subtle thumb in the border color. */
-.xterm .xterm-viewport { background-color: transparent !important; }
+/* Terminal scrollbar: style the track/thumb to blend with the dark layout —
+   transparent track (so the terminal's themed background shows through), subtle
+   thumb in the border color. Do NOT override the viewport's background-color
+   here: xterm sets it at runtime to the theme background (with terminalOpacity
+   baked into the rgba alpha), and forcing it transparent would discard both the
+   theme background and the opacity — leaving only the foreground text colored
+   and killing the macOS vibrancy effect. */
 .xterm-viewport::-webkit-scrollbar { width: 10px; }
 .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
 .xterm-viewport::-webkit-scrollbar-thumb {
