@@ -21,6 +21,15 @@ describe('findLinks', () => {
   it('ignores plain words without a target extension or scheme', () => {
     expect(findLinks('nothing to see here')).toEqual([]);
   });
+
+  it('does not include a wrapping parenthesis (markdown link style)', () => {
+    expect(findLinks('see [docs](report.md) here').map((l) => l.text)).toEqual(['report.md']);
+  });
+
+  it('strips trailing punctuation from a URL', () => {
+    const links = findLinks('visit https://example.com/page.');
+    expect(links).toEqual([{ text: 'https://example.com/page', startIndex: 6, length: 24 }]);
+  });
 });
 
 describe('resolveSource', () => {

@@ -15,15 +15,18 @@ export interface PreviewSource {
 
 // Matches http(s) URLs and bare file paths ending in .md/.html/.htm.
 // Path chars: anything except whitespace and quotes, ending in the extension.
-const LINK_RE = /(https?:\/\/[^\s"'<>]+)|([^\s"'<>]+\.(?:md|html|htm))\b/gi;
+const LINK_RE = /(https?:\/\/[^\s"'<>()\[\]]+)|([^\s"'<>()\[\]]+\.(?:md|html|htm))\b/gi;
 
 export function findLinks(line: string): LinkMatch[] {
   const out: LinkMatch[] = [];
   LINK_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LINK_RE.exec(line)) !== null) {
-    const text = m[0];
-    out.push({ text, startIndex: m.index, length: text.length });
+    let text = m[0];
+    let length = text.length;
+    const trimmed = text.replace(/[.,;:!?)]+$/, '');
+    if (trimmed.length > 0) { length = trimmed.length; text = trimmed; }
+    out.push({ text, startIndex: m.index, length });
   }
   return out;
 }
