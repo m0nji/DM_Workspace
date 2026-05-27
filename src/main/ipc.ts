@@ -1,17 +1,42 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
+import { candidateBases } from '../shared/link-detect';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
 const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
+
+// Resolve a relative link target by trying, in order: the pane cwd, each direct
+// subdir of the cwd, then known workspace roots. Returns the first base where
+// base/rel exists as a file, else null. Extracted from the IPC handler so it is
+// testable without Electron.
+export function resolveLinkPath(rel: string, cwd: string, roots: string[]): string | null {
+  let subdirs: string[] = [];
+  try {
+    subdirs = readdirSync(cwd, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
+      .map((d) => d.name);
+  } catch {
+    // cwd unreadable → still try cwd-join and roots
+  }
+  for (const base of candidateBases(cwd, subdirs, roots)) {
+    const p = join(base, rel);
+    try {
+      if (statSync(p).isFile()) return p;
+    } catch {
+      // not present at this base → try next
+    }
+  }
+  return null;
+}
 
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   const pty = new PtyManager();
@@ -68,6 +93,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     return res.canceled ? null : res.filePaths[0];
   });
+
+  ipcMain.handle('link:resolve', (_e, req: { rel: string; cwd: string; roots: string[] }): string | null =>
+    resolveLinkPath(req.rel, req.cwd, req.roots)
+  );
 
   ipcMain.on('notify:agentDone', (_e, payload: AgentDonePayload) => {
     if (!Notification.isSupported()) return;
