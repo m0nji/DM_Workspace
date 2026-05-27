@@ -7,6 +7,7 @@ import {
 } from '../shared/layout-tree';
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
+import type { PreviewSource } from '../shared/link-detect';
 
 const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, showDoneBadge: false };
 
@@ -34,6 +35,11 @@ interface StoreState extends AppState {
   focusedPaneId: string | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
+  previewPanel: { open: boolean; widthPx: number; source: PreviewSource | null };
+  openPreview: (source: PreviewSource) => void;
+  closePreview: () => void;
+  togglePreview: () => void;
+  setPreviewWidth: (px: number) => void;
   // lifecycle
   hydrate: () => Promise<void>;
   // workspaces
@@ -89,6 +95,7 @@ export const useStore = create<StoreState>((set, get) => ({
   windowFocused: true,
   searchOpenPaneId: null,
   update: { status: 'idle' },
+  previewPanel: { open: false, widthPx: 480, source: null },
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -253,6 +260,13 @@ export const useStore = create<StoreState>((set, get) => ({
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),
+
+  openPreview: (source) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, source } })),
+  closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),
+  togglePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: !s.previewPanel.open } })),
+  setPreviewWidth: (px) => set((s) => ({
+    previewPanel: { ...s.previewPanel, widthPx: Math.min(1200, Math.max(240, px)) }
+  })),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
