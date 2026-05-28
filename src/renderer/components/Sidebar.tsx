@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function Sidebar(): JSX.Element {
   const workspaces = useStore((s) => s.workspaces);
@@ -19,7 +20,12 @@ export function Sidebar(): JSX.Element {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const pendingWs = pendingDeleteId
+    ? workspaces.find((w) => w.id === pendingDeleteId)
+    : undefined;
 
   // Focus + select the field when entering edit mode (more reliable than autoFocus
   // when the input is conditionally rendered inside a list that re-renders).
@@ -125,7 +131,7 @@ export function Sidebar(): JSX.Element {
                 <span
                   className="del"
                   title="Delete workspace"
-                  onClick={(e) => { e.stopPropagation(); deleteWorkspace(w.id); }}
+                  onClick={(e) => { e.stopPropagation(); setPendingDeleteId(w.id); }}
                 >✕</span>
               </>
             )}
@@ -137,6 +143,15 @@ export function Sidebar(): JSX.Element {
       <div className="sidebar-footer">
         <span className="app-version">v{__APP_VERSION__}</span>
       </div>
+
+      {pendingWs && (
+        <ConfirmDialog
+          title="Workspace schließen?"
+          message={`»${pendingWs.name}« wird geschlossen. Laufende Terminals werden beendet.`}
+          onConfirm={() => { deleteWorkspace(pendingWs.id); setPendingDeleteId(null); }}
+          onCancel={() => setPendingDeleteId(null)}
+        />
+      )}
     </div>
   );
 }
