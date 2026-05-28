@@ -17,6 +17,11 @@ describe('migrateSettings', () => {
     expect(migrateSettings({ themeId: 'nope' })).toEqual(defaultSettings());
   });
 
+  it('clamps persisted opacity into the supported range', () => {
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 10 }).terminalOpacity).toBe(1);
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: -1 }).terminalOpacity).toBe(0);
+  });
+
   it('returns defaults for non-object input', () => {
     expect(migrateSettings(null)).toEqual(defaultSettings());
   });

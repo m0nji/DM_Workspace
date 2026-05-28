@@ -22,7 +22,7 @@ export function bashPromptCommand(): string {
 // The integration dir path is embedded as a literal because we generate the file.
 export function zshIntegrationFiles(dir: string): Record<string, string> {
   const source = (name: string) =>
-    `[ -f "$_DMWS_USER_ZDOTDIR/${name}" ] && . "$_DMWS_USER_ZDOTDIR/${name}"\n`;
+    `case "$_DMWS_USER_ZDOTDIR" in ""|"$ZDOTDIR"|*/shell-integration/zsh) ;; *) [ -f "$_DMWS_USER_ZDOTDIR/${name}" ] && . "$_DMWS_USER_ZDOTDIR/${name}" ;; esac\n`;
   // POSIX-safe single-quote escaping for embedding dir inside a '...' literal:
   // a single quote becomes '\'' (close quote, escaped quote, reopen quote).
   const quotedDir = dir.replace(/'/g, `'\\''`);

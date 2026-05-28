@@ -1,5 +1,5 @@
 import { homedir } from 'os';
-import { existsSync } from 'fs';
+import { statSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -16,5 +16,9 @@ export function resolveCwd(cwd: string | undefined | null): string {
   } else if (dir === '~/' || dir.startsWith('~/')) {
     dir = join(home, dir.slice(2));
   }
-  return existsSync(dir) ? dir : home;
+  try {
+    return statSync(dir).isDirectory() ? dir : home;
+  } catch {
+    return home;
+  }
 }

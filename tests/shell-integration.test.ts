@@ -42,4 +42,9 @@ describe('zshIntegrationFiles', () => {
     expect(files['.zlogin']).toContain('.zlogin');
     expect(files['.zprofile']).not.toContain('.zshrc');
   });
+
+  it('guards against sourcing the integration dir as the user zsh dir', () => {
+    expect(files['.zshenv']).toContain('*/shell-integration/zsh');
+    expect(files['.zshenv']).toContain('"$ZDOTDIR"');
+  });
 });

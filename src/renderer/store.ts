@@ -110,7 +110,12 @@ export const useStore = create<StoreState>((set, get) => ({
 
   activeWorkspace: () => get().workspaces.find((w) => w.id === get().activeWorkspaceId),
 
-  selectWorkspace: (id) => set({ activeWorkspaceId: id, maximizedPaneId: null }),
+  selectWorkspace: (id) => set((s) => {
+    if (!s.workspaces.some((w) => w.id === id)) return s;
+    const next = { ...s, activeWorkspaceId: id, maximizedPaneId: null };
+    persist(next);
+    return next;
+  }),
 
   addWorkspace: () => {
     const ws: Workspace = {

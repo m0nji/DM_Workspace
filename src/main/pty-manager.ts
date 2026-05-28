@@ -45,6 +45,14 @@ function ensureZshIntegrationDir(): string {
   return zshIntegrationDir;
 }
 
+function inheritedUserZdotdir(integrationDir: string): string {
+  const inherited = process.env.ZDOTDIR || '';
+  if (inherited === integrationDir || /[/\\]shell-integration[/\\]zsh$/.test(inherited)) {
+    return process.env._DMWS_USER_ZDOTDIR || process.env.HOME || '';
+  }
+  return inherited || process.env.HOME || '';
+}
+
 // Build the spawn env for the cwd-reporting hook without echoing anything into
 // the terminal: bash inherits PROMPT_COMMAND; zsh gets ZDOTDIR pointed at the
 // generated integration dir (with _DMWS_USER_ZDOTDIR preserving the original).
@@ -53,7 +61,7 @@ function cwdHookEnv(shell: string): Record<string, string> {
   if (process.platform === 'win32') return base;
   if (/zsh$/.test(shell)) {
     const dir = ensureZshIntegrationDir();
-    base._DMWS_USER_ZDOTDIR = process.env.ZDOTDIR || process.env.HOME || '';
+    base._DMWS_USER_ZDOTDIR = inheritedUserZdotdir(dir);
     base.ZDOTDIR = dir;
     return base;
   }

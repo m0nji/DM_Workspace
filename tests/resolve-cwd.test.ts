@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { homedir } from 'os';
 import { tmpdir } from 'os';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { resolveCwd } from '../src/main/resolve-cwd';
 
@@ -32,5 +32,13 @@ describe('resolveCwd', () => {
 
   it('falls back to home for a non-existent directory', () => {
     expect(resolveCwd('/no/such/path/should/exist/xyz')).toBe(home);
+  });
+
+  it('falls back to home when the path exists but is not a directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dmws-cwd-'));
+    const file = join(dir, 'not-a-dir');
+    writeFileSync(file, 'x', 'utf8');
+    expect(resolveCwd(file)).toBe(home);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

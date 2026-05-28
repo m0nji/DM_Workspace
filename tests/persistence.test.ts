@@ -26,6 +26,7 @@ describe('persistence serialize/deserialize', () => {
       workspaces: []
     }));
     expect(result.settings).toEqual({ themeId: 'default', terminalOpacity: 0.75 });
+    expect(result.activeWorkspaceId).toBeNull();
   });
 
   it('returns defaultState for invalid JSON', () => {
@@ -68,8 +69,45 @@ describe('persistence serialize/deserialize', () => {
       windowBounds: { width: 'oops' } // ungültig
     }));
     expect(result.windowBounds).toBeUndefined();
-    expect(result.activeWorkspaceId).toBe('w1');
+    expect(result.activeWorkspaceId).toBeNull();
     expect(result.workspaces).toEqual([]);
+  });
+
+  it('drops malformed workspaces instead of returning unsafe layout data', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [
+        { id: 'w1', name: 'Broken', cwd: '/tmp', layout: { type: 'split', id: 's1', direction: 'h', ratio: 0.5, children: [] } },
+        { id: 'w2', name: 'Good', cwd: '/tmp', layout: { type: 'pane', id: 'p1' } }
+      ]
+    }));
+    expect(result.workspaces).toEqual([
+      { id: 'w2', name: 'Good', cwd: '/tmp', layout: { type: 'pane', id: 'p1' } }
+    ]);
+    expect(result.activeWorkspaceId).toBe('w2');
+  });
+
+  it('clamps persisted split ratios into the supported range', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [
+        {
+          id: 'w1',
+          name: 'Workspace 1',
+          cwd: '/tmp',
+          layout: {
+            type: 'split',
+            id: 's1',
+            direction: 'h',
+            ratio: 5,
+            children: [{ type: 'pane', id: 'p1' }, { type: 'pane', id: 'p2' }]
+          }
+        }
+      ]
+    }));
+    expect(result.workspaces[0].layout).toMatchObject({ type: 'split', ratio: 0.9 });
   });
 
   it('preserves a maximized windowBounds flag', () => {
