@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PreviewPanel } from './components/PreviewPanel';
+import { TitlebarActions } from './components/TitlebarActions';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): JSX.Element {
@@ -44,8 +45,10 @@ export function App(): JSX.Element {
 
   return (
     <div className="root">
-      {/* Draggable strip clearing the macOS traffic lights (hiddenInset). */}
-      <div className="titlebar" />
+      {/* Draggable strip clearing the macOS traffic lights (hiddenInset). On
+          Windows it's a custom row below the native window controls, so both
+          platforms have the same titlebar surface for the action buttons. */}
+      <div className="titlebar"><TitlebarActions /></div>
       <div className="app">
         <Sidebar />
         <WorkspaceView />

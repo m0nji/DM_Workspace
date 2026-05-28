@@ -19,12 +19,20 @@ body {
 }
 .root { display: flex; flex-direction: column; height: 100vh; }
 /* macOS hiddenInset: a full-width draggable strip so the window can be moved and
-   the traffic lights have their own space above the sidebar/content. */
+   the traffic lights have their own space above the sidebar/content. On Windows
+   this is a custom row below the native title bar (titleBarStyle: default), so
+   the right edge is free of system controls and can host action buttons. */
 .titlebar {
   height: 38px; flex-shrink: 0;
   background: var(--panel); border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 10px;
 }
+/* Buttons inside the titlebar must opt out of the drag region or clicks get
+   swallowed by the window-move handler. */
+.titlebar-actions { display: flex; align-items: center; gap: 6px;
+  -webkit-app-region: no-drag; }
 .app { display: flex; flex: 1; min-height: 0; }
 /* Everything below the titlebar must stay interactive (no-drag). */
 .app, .sidebar, .workspace-view { -webkit-app-region: no-drag; }
