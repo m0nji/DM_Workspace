@@ -146,8 +146,8 @@ export function Sidebar(): JSX.Element {
 
       {pendingWs && (
         <ConfirmDialog
-          title="Workspace schließen?"
-          message={`»${pendingWs.name}« wird geschlossen. Laufende Terminals werden beendet.`}
+          title="Close workspace?"
+          message={`“${pendingWs.name}” will be closed. Any running terminals will be terminated.`}
           onConfirm={() => { deleteWorkspace(pendingWs.id); setPendingDeleteId(null); }}
           onCancel={() => setPendingDeleteId(null)}
         />

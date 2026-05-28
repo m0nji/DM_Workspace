@@ -17,8 +17,8 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Schließen',
-  cancelLabel = 'Abbrechen',
+  confirmLabel = 'Close',
+  cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps): JSX.Element {
