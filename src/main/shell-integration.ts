@@ -47,3 +47,32 @@ export function writeZshIntegrationDir(dir: string): string {
   }
   return dir;
 }
+
+// macOS ships GNU screen 4.00.03, whose MAXTERMLEN is 20. With our TERM of
+// xterm-256color, screen names each window's TERM "screen.xterm-256color" (21
+// chars), so any screen invoked from *inside* that session — reattaching with
+// `screen -r`, opening a second serial console, or plain nesting — aborts with
+// "$TERM too long - sorry." (the very thing users hit on a long router session).
+// Pointing $SCREENRC at this file forces the standard 15-char `screen-256color`
+// window TERM instead, which stays under the limit and keeps 256 colors inside
+// screen. `term` comes first so a `term ...` in the user's own rc still wins; we
+// then forward their existing screenrc so this stays transparent. `userScreenrc`
+// is the absolute path to forward, or null when the user has none.
+export function screenrcContent(userScreenrc: string | null): string {
+  let out = 'term screen-256color\n';
+  if (userScreenrc) {
+    // screen parses double-quoted strings with backslash escaping.
+    const quoted = userScreenrc.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    out += `source "${quoted}"\n`;
+  }
+  return out;
+}
+
+// Write the screenrc into `dir` (created if needed) and return its path.
+// Idempotent — safe to call once per app launch.
+export function writeScreenIntegration(dir: string, userScreenrc: string | null): string {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, 'screenrc');
+  writeFileSync(path, screenrcContent(userScreenrc), 'utf8');
+  return path;
+}

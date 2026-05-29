@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bashPromptCommand, zshIntegrationFiles } from '../src/main/shell-integration';
+import { bashPromptCommand, zshIntegrationFiles, screenrcContent } from '../src/main/shell-integration';
 
 describe('bashPromptCommand', () => {
   it('emits an OSC 7 file:// sequence using $HOSTNAME and $PWD', () => {
@@ -46,5 +46,29 @@ describe('zshIntegrationFiles', () => {
   it('guards against sourcing the integration dir as the user zsh dir', () => {
     expect(files['.zshenv']).toContain('*/shell-integration/zsh');
     expect(files['.zshenv']).toContain('"$ZDOTDIR"');
+  });
+});
+
+describe('screenrcContent', () => {
+  it('forces the 15-char screen-256color window TERM (under macOS screen MAXTERMLEN 20)', () => {
+    const rc = screenrcContent(null);
+    expect(rc).toContain('term screen-256color');
+    // it must not leave screen to derive the 21-char "screen.xterm-256color"
+    expect('screen-256color'.length).toBeLessThanOrEqual(20);
+  });
+
+  it('omits a source line when the user has no screenrc', () => {
+    expect(screenrcContent(null)).not.toContain('source');
+  });
+
+  it('forwards the user screenrc and sets term before sourcing it (so user term wins)', () => {
+    const rc = screenrcContent('/Users/x/.screenrc');
+    expect(rc).toContain('source "/Users/x/.screenrc"');
+    expect(rc.indexOf('term screen-256color')).toBeLessThan(rc.indexOf('source'));
+  });
+
+  it('escapes backslashes and double quotes in the sourced path', () => {
+    const rc = screenrcContent('/tmp/a"b\\c/.screenrc');
+    expect(rc).toContain('source "/tmp/a\\"b\\\\c/.screenrc"');
   });
 });

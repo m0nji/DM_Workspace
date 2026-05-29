@@ -1,8 +1,9 @@
 import * as pty from 'node-pty';
+import { existsSync } from 'fs';
 import { resolveCwd } from './resolve-cwd';
 import { app } from 'electron';
 import { join } from 'path';
-import { bashPromptCommand, writeZshIntegrationDir } from './shell-integration';
+import { bashPromptCommand, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
 
 export interface SpawnOptions {
   cwd: string;
@@ -45,6 +46,26 @@ function ensureZshIntegrationDir(): string {
   return zshIntegrationDir;
 }
 
+// Generate the managed screenrc once per process (see screenrcContent for why).
+// We forward whichever screenrc screen would otherwise read on its own — an
+// inherited $SCREENRC if set, else ~/.screenrc — but only when it exists, so we
+// never emit a `source` of a missing file (which screen would warn about).
+let screenrcPath: string | null = null;
+function ensureScreenrc(): string {
+  if (screenrcPath === null) {
+    const inherited = process.env.SCREENRC;
+    const userRc =
+      inherited && existsSync(inherited)
+        ? inherited
+        : process.env.HOME
+          ? join(process.env.HOME, '.screenrc')
+          : '';
+    const forward = userRc && existsSync(userRc) ? userRc : null;
+    screenrcPath = writeScreenIntegration(join(app.getPath('userData'), 'shell-integration', 'screen'), forward);
+  }
+  return screenrcPath;
+}
+
 function inheritedUserZdotdir(integrationDir: string): string {
   const inherited = process.env.ZDOTDIR || '';
   if (inherited === integrationDir || /[/\\]shell-integration[/\\]zsh$/.test(inherited)) {
@@ -59,6 +80,11 @@ function inheritedUserZdotdir(integrationDir: string): string {
 function cwdHookEnv(shell: string): Record<string, string> {
   const base = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>;
   if (process.platform === 'win32') return base;
+  // macOS's bundled GNU screen 4.00.03 chokes on the 21-char window TERM it
+  // derives from xterm-256color; redirect it to a screenrc that uses the
+  // 15-char screen-256color instead. Only screen reads $SCREENRC, so this is
+  // inert for every other program.
+  if (process.platform === 'darwin') base.SCREENRC = ensureScreenrc();
   if (/zsh$/.test(shell)) {
     const dir = ensureZshIntegrationDir();
     base._DMWS_USER_ZDOTDIR = inheritedUserZdotdir(dir);
