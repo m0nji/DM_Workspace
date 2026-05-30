@@ -25,4 +25,22 @@ describe('migrateSettings', () => {
   it('returns defaults for non-object input', () => {
     expect(migrateSettings(null)).toEqual(defaultSettings());
   });
+
+  it('keeps valid shortcut overrides and drops unknown/invalid ones', () => {
+    const out = migrateSettings({
+      themeId: DEFAULT_THEME_ID,
+      terminalOpacity: 0.75,
+      shortcutBindings: {
+        commandPalette: 'Mod+Alt+P',
+        missing: 'Mod+X',
+        openSettings: 42
+      }
+    });
+    expect(out.shortcutBindings).toEqual({ commandPalette: 'Mod+Alt+P' });
+  });
+
+  it('omits shortcutBindings entirely when none are valid', () => {
+    const out = migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, shortcutBindings: { nope: 1 } });
+    expect(out.shortcutBindings).toBeUndefined();
+  });
 });

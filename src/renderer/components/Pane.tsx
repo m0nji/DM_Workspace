@@ -72,10 +72,10 @@ export function Pane({ paneId, cwd }: Props): JSX.Element {
   const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
   const focused = useStore((s) => s.focusedPaneId === paneId);
   const setFocusedPane = useStore((s) => s.setFocusedPane);
-  // Live working directory reported by the shell; falls back to the workspace cwd
+  // A custom pane title (from a template) wins when set; otherwise show the live
+  // working directory reported by the shell, falling back to the workspace cwd
   // until the shell emits its first prompt.
-  const liveCwd = useStore((s) => s.paneCwd[paneId]);
-  const title = liveCwd ?? cwd;
+  const title = useStore((s) => s.paneTitle(paneId, s.paneCwd[paneId] ?? cwd));
 
   return (
     <div

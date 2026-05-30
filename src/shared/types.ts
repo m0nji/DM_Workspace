@@ -1,3 +1,5 @@
+import type { ShortcutAction } from './shortcuts';
+
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
 export interface PaneNode {
@@ -23,6 +25,22 @@ export interface Workspace {
   cwd: string;          // default working directory for new panes
   layout: LayoutNode | null; // null => welcome screen
   color?: string;       // optional hex accent shown in the sidebar
+  paneTitles?: Record<string, string>;            // custom pane label keyed by pane id (overrides live cwd when set)
+  pendingStartupCommands?: Record<string, string>; // one-shot commands to send after a pane spawns (created-from-template)
+}
+
+// A reusable workspace blueprint: layout + folder + optional pane titles and
+// startup commands. Templates are managed in Settings and instantiated from the
+// Command Palette / Settings; instantiating clones the layout with fresh ids.
+export interface WorkspaceTemplate {
+  id: string;
+  name: string;
+  cwd: string;
+  layout: LayoutNode;
+  color?: string;
+  paneTitles?: Record<string, string>;
+  startupCommands?: Record<string, string>;
+  confirmStartupCommands: boolean; // ask before running startup commands when creating from this template
 }
 
 export type PaneStatus = 'idle' | 'busy' | 'done';
@@ -33,6 +51,7 @@ export interface Settings {
   terminalBackground?: string; // optional hex override of the theme's background color
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
+  shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts
 }
 
 export interface WindowBounds {
@@ -46,6 +65,7 @@ export interface WindowBounds {
 export interface AppState {
   version: 1;
   workspaces: Workspace[];
+  workspaceTemplates?: WorkspaceTemplate[];
   activeWorkspaceId: string | null;
   settings: Settings;
   windowBounds?: WindowBounds; // vom Main-Prozess verwaltet; fehlt beim Erststart

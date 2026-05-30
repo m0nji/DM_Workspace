@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import type {
-  AppState, PresetKind, Direction, Workspace, Settings, UpdateEvent, PaneStatus
+  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus
 } from '../shared/types';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, reassignIds
 } from '../shared/layout-tree';
+import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
+import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
 
 const DEFAULT_SETTINGS: Settings = { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, showDoneBadge: false, notificationsEnabled: false };
@@ -25,6 +27,21 @@ export interface UpdateState {
 const nextPaneId = createIdGenerator('p');
 const nextSplitId = createIdGenerator('s');
 const nextWsId = createIdGenerator('w');
+const nextTemplateId = createIdGenerator('tpl');
+
+// Fields the wizard collects when saving the active workspace as a template.
+export interface SaveTemplateInput {
+  name: string;
+  cwd?: string; // optional override; defaults to the active workspace's cwd
+  paneTitles?: Record<string, string>;
+  startupCommands?: Record<string, string>;
+  confirmStartupCommands: boolean;
+}
+
+export interface TemplateWizardState {
+  open: boolean;
+  templateId?: string | null; // set => editing an existing template; null/undefined => save current workspace
+}
 
 interface StoreState extends AppState {
   maximizedPaneId: string | null;
@@ -35,6 +52,10 @@ interface StoreState extends AppState {
   focusedPaneId: string | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
+  commandPaletteOpen: boolean;
+  templateWizard: TemplateWizardState;
+  pendingTemplateLaunch: { templateId: string } | null;
+  shortcutRecordingAction: ShortcutAction | null; // set while the editor captures a key; gates global shortcuts
   previewPanel: { open: boolean; widthPx: number; source: PreviewSource | null };
   openPreview: (source: PreviewSource) => void;
   closePreview: () => void;
@@ -56,14 +77,32 @@ interface StoreState extends AppState {
   resizeSplit: (splitId: string, ratio: number) => void;
   toggleMaximize: (paneId: string) => void;
   // settings
+  settingsFocusSection: 'shortcuts' | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
-  setSettingsOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean, focusSection?: 'shortcuts' | null) => void;
+  clearSettingsFocusSection: () => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
   setPaneCwd: (paneId: string, cwd: string) => void;
   setFocusedPane: (paneId: string) => void;
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
   setWorkspaceColor: (id: string, color: string) => void;
+  // command palette
+  setCommandPaletteOpen: (open: boolean) => void;
+  // templates
+  setTemplateWizard: (state: TemplateWizardState) => void;
+  setPendingTemplateLaunch: (value: { templateId: string } | null) => void;
+  saveActiveWorkspaceAsTemplate: (input: SaveTemplateInput) => void;
+  updateWorkspaceTemplate: (id: string, patch: Partial<Omit<WorkspaceTemplate, 'id'>>) => void;
+  deleteWorkspaceTemplate: (id: string) => void;
+  requestTemplateLaunch: (id: string) => void;
+  createWorkspaceFromTemplate: (id: string, includeStartupCommands: boolean) => void;
+  consumeStartupCommand: (paneId: string) => string | null;
+  paneTitle: (paneId: string, fallback: string) => string;
+  // shortcuts
+  updateShortcutBinding: (action: ShortcutAction, binding: string) => void;
+  resetShortcutBinding: (action: ShortcutAction) => void;
+  setShortcutRecordingAction: (action: ShortcutAction | null) => void;
   // updates
   update: UpdateState;
   applyUpdateEvent: (e: UpdateEvent) => void;
@@ -72,10 +111,21 @@ interface StoreState extends AppState {
   installUpdate: () => void;
 }
 
+// Remove a pane-keyed entry from an optional string map, returning undefined when
+// the map becomes empty (so the field can be dropped). Returns the input unchanged
+// when the key is absent.
+function stripKey(map: Record<string, string> | undefined, key: string): Record<string, string> | undefined {
+  if (!map || !(key in map)) return map;
+  const next = { ...map };
+  delete next[key];
+  return Object.keys(next).length ? next : undefined;
+}
+
 function persist(state: AppState): void {
   void window.api.saveState({
     version: 1,
     workspaces: state.workspaces,
+    workspaceTemplates: state.workspaceTemplates ?? [],
     activeWorkspaceId: state.activeWorkspaceId,
     settings: state.settings
   });
@@ -84,28 +134,43 @@ function persist(state: AppState): void {
 export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
+  workspaceTemplates: [],
   activeWorkspaceId: null,
   settings: DEFAULT_SETTINGS,
   maximizedPaneId: null,
   hydrated: false,
   settingsOpen: false,
+  settingsFocusSection: null,
   paneStatus: {},
   paneCwd: {},
   focusedPaneId: null,
   windowFocused: true,
   searchOpenPaneId: null,
+  commandPaletteOpen: false,
+  templateWizard: { open: false, templateId: null },
+  pendingTemplateLaunch: null,
+  shortcutRecordingAction: null,
   update: { status: 'idle' },
   previewPanel: { open: false, widthPx: 480, source: null },
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
+    const templates = loaded.workspaceTemplates ?? [];
     // Seed the id generators past ids already used by the restored layout, so the
     // next split/workspace can't reuse an existing id (which would make two panes
-    // share a paneId — colliding PTYs and duplicated scrollback replay).
-    nextPaneId.seed(loaded.workspaces.flatMap((w) => collectPaneIds(w.layout)));
-    nextSplitId.seed(loaded.workspaces.flatMap((w) => collectSplitIds(w.layout)));
+    // share a paneId — colliding PTYs and duplicated scrollback replay). Template
+    // layouts are seeded too so cloning a template never collides with a live pane.
+    nextPaneId.seed([
+      ...loaded.workspaces.flatMap((w) => collectPaneIds(w.layout)),
+      ...templates.flatMap((t) => collectPaneIds(t.layout))
+    ]);
+    nextSplitId.seed([
+      ...loaded.workspaces.flatMap((w) => collectSplitIds(w.layout)),
+      ...templates.flatMap((t) => collectSplitIds(t.layout))
+    ]);
     nextWsId.seed(loaded.workspaces.map((w) => w.id));
-    set({ ...loaded, hydrated: true });
+    nextTemplateId.seed(templates.map((t) => t.id));
+    set({ ...loaded, workspaceTemplates: templates, hydrated: true });
   },
 
   activeWorkspace: () => get().workspaces.find((w) => w.id === get().activeWorkspaceId),
@@ -205,7 +270,14 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const workspaces = s.workspaces.map((w) => {
       if (w.id !== s.activeWorkspaceId || !w.layout) return w;
-      return { ...w, layout: closePane(w.layout, paneId) };
+      const next: Workspace = { ...w, layout: closePane(w.layout, paneId) };
+      // Drop the closed pane's metadata so it can't orphan in persisted state
+      // (mirrors the paneStatus/paneCwd cleanup above).
+      const titles = stripKey(next.paneTitles, paneId);
+      if (titles) next.paneTitles = titles; else delete next.paneTitles;
+      const pending = stripKey(next.pendingStartupCommands, paneId);
+      if (pending) next.pendingStartupCommands = pending; else delete next.pendingStartupCommands;
+      return next;
     });
     const next = {
       ...s,
@@ -238,7 +310,8 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setSettingsOpen: (open, focusSection = null) => set({ settingsOpen: open, settingsFocusSection: open ? focusSection : null }),
+  clearSettingsFocusSection: () => set({ settingsFocusSection: null }),
 
   setPaneStatus: (paneId, status) => set((s) => {
     if (s.paneStatus[paneId] === status) return s;
@@ -279,6 +352,145 @@ export const useStore = create<StoreState>((set, get) => ({
     persist(next);
     return next;
   }),
+
+  setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+
+  setTemplateWizard: (state) => set({ templateWizard: state }),
+
+  setPendingTemplateLaunch: (value) => set({ pendingTemplateLaunch: value }),
+
+  // Capture the active workspace's layout/folder as a reusable template. The
+  // layout is deep-copied so later edits to the live workspace don't mutate the
+  // stored template; its pane ids become the template's metadata keys.
+  saveActiveWorkspaceAsTemplate: (input) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws || !ws.layout) return s; // can't template the welcome screen
+    const template: WorkspaceTemplate = {
+      id: nextTemplateId(),
+      name: input.name,
+      cwd: input.cwd ?? ws.cwd,
+      layout: JSON.parse(JSON.stringify(ws.layout)),
+      confirmStartupCommands: input.confirmStartupCommands
+    };
+    if (ws.color) template.color = ws.color;
+    if (input.paneTitles && Object.keys(input.paneTitles).length) template.paneTitles = input.paneTitles;
+    if (input.startupCommands && Object.keys(input.startupCommands).length) template.startupCommands = input.startupCommands;
+    const next = { ...s, workspaceTemplates: [...(s.workspaceTemplates ?? []), template] };
+    persist(next);
+    return next;
+  }),
+
+  updateWorkspaceTemplate: (id, patch) => set((s) => {
+    const workspaceTemplates = (s.workspaceTemplates ?? []).map((t) => {
+      if (t.id !== id) return t;
+      const merged: WorkspaceTemplate = { ...t, ...patch };
+      // Keep the in-memory shape identical to what persistence stores: empty
+      // maps are dropped, not kept as {} (so serialize→deserialize round-trips).
+      if (!merged.paneTitles || Object.keys(merged.paneTitles).length === 0) delete merged.paneTitles;
+      if (!merged.startupCommands || Object.keys(merged.startupCommands).length === 0) delete merged.startupCommands;
+      return merged;
+    });
+    const next = { ...s, workspaceTemplates };
+    persist(next);
+    return next;
+  }),
+
+  deleteWorkspaceTemplate: (id) => set((s) => {
+    const workspaceTemplates = (s.workspaceTemplates ?? []).filter((t) => t.id !== id);
+    const next = { ...s, workspaceTemplates };
+    persist(next);
+    return next;
+  }),
+
+  // Entry point for "New workspace from template". Defers to a confirmation
+  // dialog when the template carries startup commands and asks for confirmation;
+  // otherwise creates the workspace (running its commands) right away. Shared by
+  // the Command Palette and Settings so the decision lives in one place.
+  requestTemplateLaunch: (id) => {
+    const tpl = (get().workspaceTemplates ?? []).find((t) => t.id === id);
+    if (!tpl) return;
+    const hasCommands = !!tpl.startupCommands && Object.keys(tpl.startupCommands).length > 0;
+    if (hasCommands && tpl.confirmStartupCommands) {
+      set({ pendingTemplateLaunch: { templateId: id }, commandPaletteOpen: false });
+    } else {
+      get().createWorkspaceFromTemplate(id, true);
+      set({ commandPaletteOpen: false });
+    }
+  },
+
+  // Instantiate a template: clone its layout with fresh ids, remap pane titles,
+  // and (optionally) stage startup commands as one-shot pending commands that
+  // each pane consumes after it spawns.
+  createWorkspaceFromTemplate: (id, includeStartupCommands) => set((s) => {
+    const tpl = (s.workspaceTemplates ?? []).find((t) => t.id === id);
+    if (!tpl) return s;
+    const { layout, paneIdMap } = cloneTemplateLayout(tpl.layout, nextPaneId, nextSplitId);
+    const ws: Workspace = { id: nextWsId(), name: tpl.name, cwd: tpl.cwd, layout };
+    if (tpl.color) ws.color = tpl.color;
+    const paneTitles = remapStringMap(tpl.paneTitles, paneIdMap);
+    if (paneTitles) ws.paneTitles = paneTitles;
+    if (includeStartupCommands) {
+      const pending = remapStringMap(tpl.startupCommands, paneIdMap);
+      if (pending) ws.pendingStartupCommands = pending;
+    }
+    const next = {
+      ...s,
+      workspaces: [...s.workspaces, ws],
+      activeWorkspaceId: ws.id,
+      maximizedPaneId: null,
+      focusedPaneId: null
+    };
+    persist(next);
+    return next;
+  }),
+
+  // Return a pane's pending startup command once, then remove it (persisting so a
+  // restart won't re-run it). Returns null when there's nothing pending.
+  consumeStartupCommand: (paneId) => {
+    const ws = get().workspaces.find((w) => w.pendingStartupCommands?.[paneId]);
+    if (!ws) return null;
+    const command = ws.pendingStartupCommands![paneId];
+    set((s) => {
+      const workspaces = s.workspaces.map((w) => {
+        if (w.id !== ws.id) return w;
+        const rest = { ...w.pendingStartupCommands };
+        delete rest[paneId];
+        const nextWs: Workspace = { ...w };
+        if (Object.keys(rest).length) nextWs.pendingStartupCommands = rest;
+        else delete nextWs.pendingStartupCommands;
+        return nextWs;
+      });
+      const next = { ...s, workspaces };
+      persist(next);
+      return next;
+    });
+    return command;
+  },
+
+  paneTitle: (paneId, fallback) => {
+    const ws = get().workspaces.find((w) => w.paneTitles?.[paneId]);
+    return ws?.paneTitles?.[paneId] ?? fallback;
+  },
+
+  updateShortcutBinding: (action, binding) => set((s) => {
+    const shortcutBindings = { ...(s.settings.shortcutBindings ?? {}), [action]: binding };
+    const next = { ...s, settings: { ...s.settings, shortcutBindings } };
+    persist(next);
+    return next;
+  }),
+
+  resetShortcutBinding: (action) => set((s) => {
+    const shortcutBindings = { ...(s.settings.shortcutBindings ?? {}) };
+    delete shortcutBindings[action];
+    const settings: Settings = { ...s.settings };
+    if (Object.keys(shortcutBindings).length) settings.shortcutBindings = shortcutBindings;
+    else delete settings.shortcutBindings;
+    const next = { ...s, settings };
+    persist(next);
+    return next;
+  }),
+
+  setShortcutRecordingAction: (action) => set({ shortcutRecordingAction: action }),
 
   applyUpdateEvent: (e) => set(() => {
     switch (e.type) {

@@ -236,6 +236,14 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       spawned = true;
       void restoreOnce().then(() => {
         window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+        // One-shot startup command for a pane created from a template. Consuming
+        // clears it (and persists) so it never runs again after a restart. The
+        // PTY buffers the input until the shell is ready to read it.
+        const command = useStore.getState().consumeStartupCommand(paneId);
+        if (command) {
+          window.api.input({ paneId, data: `${command}\r` });
+          activity.onInput();
+        }
       });
     };
 

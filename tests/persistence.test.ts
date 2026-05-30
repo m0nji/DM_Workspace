@@ -120,6 +120,56 @@ describe('persistence serialize/deserialize', () => {
     expect(migrateWindowBounds(null)).toBeUndefined();
     expect(migrateWindowBounds(42)).toBeUndefined();
   });
+
+  it('round-trips workspace pane titles and pending startup commands', () => {
+    const state: AppState = {
+      ...sample,
+      workspaces: [{
+        id: 'w1', name: 'Workspace 1', cwd: '/home/x',
+        layout: { type: 'pane', id: 'p1' },
+        paneTitles: { p1: 'dev server' },
+        pendingStartupCommands: { p1: 'npm run dev' }
+      }]
+    };
+    expect(deserialize(serialize(state))).toEqual(state);
+  });
+
+  it('round-trips valid workspace templates', () => {
+    const state: AppState = {
+      ...sample,
+      workspaceTemplates: [{
+        id: 'tpl1',
+        name: 'Frontend Dev',
+        cwd: '/repo',
+        layout: { type: 'pane', id: 'tp1' },
+        paneTitles: { tp1: 'dev server' },
+        startupCommands: { tp1: 'npm run dev' },
+        confirmStartupCommands: true
+      }]
+    };
+    expect(deserialize(serialize(state))).toEqual(state);
+  });
+
+  it('drops templates with a missing or null layout', () => {
+    const result = deserialize(JSON.stringify({
+      ...sample,
+      workspaceTemplates: [
+        { id: 'bad', name: 'Broken', cwd: '/repo', layout: null, confirmStartupCommands: true },
+        { id: 'ok', name: 'Good', cwd: '/repo', layout: { type: 'pane', id: 'tp1' }, confirmStartupCommands: false }
+      ]
+    }));
+    expect(result.workspaceTemplates).toEqual([
+      { id: 'ok', name: 'Good', cwd: '/repo', layout: { type: 'pane', id: 'tp1' }, confirmStartupCommands: false }
+    ]);
+  });
+
+  it('defaults confirmStartupCommands to true when absent', () => {
+    const result = deserialize(JSON.stringify({
+      ...sample,
+      workspaceTemplates: [{ id: 't', name: 'T', cwd: '/repo', layout: { type: 'pane', id: 'tp1' } }]
+    }));
+    expect(result.workspaceTemplates?.[0].confirmStartupCommands).toBe(true);
+  });
 });
 
 describe('persistence file IO', () => {

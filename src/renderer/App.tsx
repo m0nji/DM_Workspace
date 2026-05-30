@@ -5,6 +5,9 @@ import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PreviewPanel } from './components/PreviewPanel';
 import { TitlebarActions } from './components/TitlebarActions';
+import { CommandPalette } from './components/CommandPalette';
+import { TemplateWizard } from './components/TemplateWizard';
+import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): JSX.Element {
@@ -55,6 +58,9 @@ export function App(): JSX.Element {
         <PreviewPanel />
       </div>
       <SettingsPanel />
+      <CommandPalette />
+      <TemplateWizard />
+      <StartupCommandConfirmDialog />
     </div>
   );
 }

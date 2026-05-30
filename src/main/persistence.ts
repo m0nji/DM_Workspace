@@ -1,8 +1,30 @@
 import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { AppState, LayoutNode, Settings, WindowBounds, Workspace } from '../shared/types';
+import type { AppState, LayoutNode, Settings, WindowBounds, Workspace, WorkspaceTemplate } from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
+import { SHORTCUT_ACTIONS, type ShortcutAction } from '../shared/shortcuts';
+
+// Keep only entries whose value is a non-empty string; returns undefined when the
+// result would be empty so the field can be omitted entirely.
+function migrateStringMap(raw: unknown): Record<string, string> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0) as Array<[string, string]>;
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+// Keep only known shortcut actions mapped to non-empty strings.
+function migrateShortcutBindings(raw: unknown): Partial<Record<ShortcutAction, string>> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: Partial<Record<ShortcutAction, string>> = {};
+  for (const action of SHORTCUT_ACTIONS) {
+    const value = r[action];
+    if (typeof value === 'string' && value.trim().length > 0) out[action] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 export function defaultSettings(): Settings {
   return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75 };
@@ -26,6 +48,8 @@ export function migrateSettings(raw: unknown): Settings {
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
+  const shortcutBindings = migrateShortcutBindings(r.shortcutBindings);
+  if (shortcutBindings) out.shortcutBindings = shortcutBindings;
   return out;
 }
 
@@ -101,6 +125,36 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
   if (layout === undefined) return undefined;
   const out: Workspace = { id: r.id, name: r.name, cwd: r.cwd, layout };
   if (typeof r.color === 'string') out.color = r.color;
+  const paneTitles = migrateStringMap(r.paneTitles);
+  if (paneTitles) out.paneTitles = paneTitles;
+  const pendingStartupCommands = migrateStringMap(r.pendingStartupCommands);
+  if (pendingStartupCommands) out.pendingStartupCommands = pendingStartupCommands;
+  return out;
+}
+
+// A template requires a real (non-null) layout. confirmStartupCommands defaults
+// to the safe value (true) when missing. Optional string maps are kept only when
+// non-empty so a template round-trips to an identical object.
+function migrateWorkspaceTemplate(raw: unknown): WorkspaceTemplate | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || r.id.length === 0) return undefined;
+  if (typeof r.name !== 'string' || r.name.length === 0) return undefined;
+  if (typeof r.cwd !== 'string') return undefined;
+  const layout = migrateLayout(r.layout);
+  if (layout === undefined || layout === null) return undefined;
+  const out: WorkspaceTemplate = {
+    id: r.id,
+    name: r.name,
+    cwd: r.cwd,
+    layout,
+    confirmStartupCommands: typeof r.confirmStartupCommands === 'boolean' ? r.confirmStartupCommands : true
+  };
+  if (typeof r.color === 'string') out.color = r.color;
+  const paneTitles = migrateStringMap(r.paneTitles);
+  if (paneTitles) out.paneTitles = paneTitles;
+  const startupCommands = migrateStringMap(r.startupCommands);
+  if (startupCommands) out.startupCommands = startupCommands;
   return out;
 }
 
@@ -123,6 +177,12 @@ export function deserialize(json: string): AppState {
       activeWorkspaceId,
       settings: migrateSettings(parsed.settings)
     };
+    const rawTemplates = (parsed as unknown as Record<string, unknown>).workspaceTemplates;
+    if (Array.isArray(rawTemplates)) {
+      out.workspaceTemplates = rawTemplates
+        .map(migrateWorkspaceTemplate)
+        .filter((t): t is WorkspaceTemplate => t !== undefined);
+    }
     const wb = migrateWindowBounds((parsed as unknown as Record<string, unknown>).windowBounds);
     if (wb) out.windowBounds = wb; else delete out.windowBounds;
     return out;

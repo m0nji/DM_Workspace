@@ -1,6 +1,140 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
+import {
+  SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, shortcutFromEvent,
+  isShortcutConflict, isReservedTerminalShortcut
+} from '../../shared/shortcuts';
+
+const isMac = navigator.userAgent.includes('Mac');
+
+// Record/reset the binding for each app action. While recording, a window-level
+// capture listener swallows the next key combo; global shortcuts are gated via
+// the store's shortcutRecordingAction so they don't fire mid-recording.
+function ShortcutsSection(): JSX.Element {
+  const bindings = useStore((s) => s.settings.shortcutBindings);
+  const updateBinding = useStore((s) => s.updateShortcutBinding);
+  const resetBinding = useStore((s) => s.resetShortcutBinding);
+  const recording = useStore((s) => s.shortcutRecordingAction);
+  const setRecording = useStore((s) => s.setShortcutRecordingAction);
+  const focusSection = useStore((s) => s.settingsFocusSection);
+  const clearFocusSection = useStore((s) => s.clearSettingsFocusSection);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const resolved = resolveShortcuts(bindings, isMac);
+
+  // Scroll into view when opened via "Open keyboard shortcut settings".
+  useEffect(() => {
+    if (focusSection === 'shortcuts') {
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      clearFocusSection();
+    }
+  }, [focusSection, clearFocusSection]);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = (e: KeyboardEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') { setRecording(null); return; }
+      const binding = shortcutFromEvent(e, isMac);
+      if (!binding) return; // only a modifier is down — wait for the real key
+      const map = resolveShortcuts(useStore.getState().settings.shortcutBindings, isMac);
+      if (isReservedTerminalShortcut(binding, isMac)) {
+        setError(`${formatShortcut(binding, isMac)} is reserved for the terminal`);
+        setRecording(null);
+        return;
+      }
+      if (isShortcutConflict(binding, recording, map)) {
+        setError(`${formatShortcut(binding, isMac)} is already assigned to another action`);
+        setRecording(null);
+        return;
+      }
+      updateBinding(recording, binding);
+      setError(null);
+      setRecording(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [recording, updateBinding, setRecording]);
+
+  // Clear a transient recording flag if the panel unmounts mid-recording.
+  useEffect(() => () => setRecording(null), [setRecording]);
+
+  return (
+    <div ref={sectionRef}>
+      <div className="modal-section-label">Keyboard shortcuts</div>
+      {error && <div className="setting-error">{error}</div>}
+      <div className="shortcut-list">
+        {SHORTCUT_DEFINITIONS.map((def) => {
+          const isRecording = recording === def.action;
+          const overridden = !!bindings?.[def.action];
+          return (
+            <div className={`shortcut-row ${isRecording ? 'recording' : ''}`} key={def.action}>
+              <span className="shortcut-label">{def.label}</span>
+              <kbd className="shortcut-binding">
+                {isRecording ? 'Press keys…' : formatShortcut(resolved[def.action], isMac)}
+              </kbd>
+              <button className="cwd-btn" onClick={() => { setError(null); setRecording(isRecording ? null : def.action); }}>
+                {isRecording ? 'Cancel' : 'Record'}
+              </button>
+              <button className="cwd-btn ghost" disabled={!overridden} onClick={() => { setError(null); resetBinding(def.action); }}>
+                Reset
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="modal-hint">
+        ⌘ on macOS, Ctrl elsewhere. On Windows/Linux a plain Ctrl+letter is reserved so the shell keeps Ctrl+C/D/W.
+      </p>
+    </div>
+  );
+}
+
+// List, run, edit, and delete saved templates; launch the wizard to capture the
+// current workspace.
+function TemplatesSection(): JSX.Element {
+  const templates = useStore((s) => s.workspaceTemplates ?? []);
+  const setWizard = useStore((s) => s.setTemplateWizard);
+  const requestLaunch = useStore((s) => s.requestTemplateLaunch);
+  const deleteTemplate = useStore((s) => s.deleteWorkspaceTemplate);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const hasLayout = useStore((s) => !!s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.layout);
+
+  const run = (id: string): void => { setSettingsOpen(false); requestLaunch(id); };
+  const edit = (id: string): void => { setSettingsOpen(false); setWizard({ open: true, templateId: id }); };
+  const saveCurrent = (): void => { setSettingsOpen(false); setWizard({ open: true, templateId: null }); };
+
+  return (
+    <>
+      <div className="modal-section-label">Workspace templates</div>
+      {templates.length === 0 && (
+        <p className="modal-hint" style={{ marginTop: 0 }}>No templates yet — save a workspace layout to reuse it later.</p>
+      )}
+      <div className="template-list">
+        {templates.map((t) => {
+          const cmdCount = t.startupCommands ? Object.keys(t.startupCommands).length : 0;
+          return (
+            <div className="template-row" key={t.id}>
+              <span className="template-info">
+                <span className="template-name">{t.name}</span>
+                <span className="template-meta">{t.cwd}{cmdCount ? ` · ${cmdCount} startup command${cmdCount === 1 ? '' : 's'}` : ''}</span>
+              </span>
+              <button className="cwd-btn" onClick={() => run(t.id)}>Run</button>
+              <button className="cwd-btn ghost" onClick={() => edit(t.id)}>Edit</button>
+              <button className="cwd-btn ghost danger" onClick={() => deleteTemplate(t.id)}>Delete</button>
+            </div>
+          );
+        })}
+      </div>
+      <button className="add-template" disabled={!hasLayout} onClick={saveCurrent}
+              title={hasLayout ? undefined : 'Open a layout first'}>
+        + Save current workspace as template
+      </button>
+    </>
+  );
+}
 
 const COLOR_PRESETS: { label: string; value: string }[] = [
   { label: 'Black', value: '#000000' },
@@ -181,6 +315,10 @@ export function SettingsPanel(): JSX.Element | null {
         <p className="modal-hint">
           Show an OS notification when a terminal finishes in a background workspace. Off by default.
         </p>
+
+        <ShortcutsSection />
+
+        <TemplatesSection />
 
         <UpdateSection />
       </div>
