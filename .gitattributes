@@ -1,0 +1,11 @@
+# Keep all text files LF in the repository and working tree. Prevents recurring
+# CRLF churn when files are synced from a Windows machine (Syncthing). git
+# auto-detects binary files and leaves them untouched.
+* text=auto eol=lf
+
+# Belt-and-suspenders: never EOL-normalize known binary assets, even if git's
+# auto-detection misclassifies one.
+*.png  binary
+*.gif  binary
+*.ico  binary
+*.icns binary
