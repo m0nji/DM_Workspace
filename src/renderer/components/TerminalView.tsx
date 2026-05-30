@@ -154,6 +154,20 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
     });
+    const handleTerminalPasteShortcut = (e: KeyboardEvent): void => {
+      const isPasteKey = e.key.toLowerCase() === 'v' && (e.ctrlKey || e.metaKey) && !e.altKey;
+      if (!isPasteKey) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      void window.api.clipboardRead().then((text) => {
+        if (!text) return;
+        term.paste(text);
+        activity.onInput();
+      });
+    };
+    host.addEventListener('keydown', handleTerminalPasteShortcut, true);
 
     const safeFit = (): boolean => {
       if (host.clientWidth > 0 && host.clientHeight > 0) {
@@ -247,6 +261,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       ro.disconnect();
+      host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
       offData();
       offExit();
       inputDisp.dispose();
@@ -284,7 +299,7 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
         label: 'Paste',
         onClick: async () => {
           const text = await window.api.clipboardRead();
-          if (text) window.api.input({ paneId, data: text });
+          if (text) term?.paste(text);
         }
       },
       { label: 'Select All', onClick: () => term?.selectAll() },
