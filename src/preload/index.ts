@@ -56,6 +56,7 @@ const api: RendererApi = {
     return () => ipcRenderer.removeListener('updates:event', handler);
   },
   clipboardRead: () => ipcRenderer.invoke('clipboard:read') as Promise<string>,
+  clipboardHasImage: () => ipcRenderer.invoke('clipboard:has-image') as Promise<boolean>,
   clipboardWrite: (text: string) => ipcRenderer.send('clipboard:write', text),
   notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
   onWindowFocus: (cb: (focused: boolean) => void) => {

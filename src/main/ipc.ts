@@ -117,6 +117,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   );
 
   ipcMain.handle('clipboard:read', () => clipboard.readText());
+  // Lets the renderer decide whether an image-paste keystroke should be
+  // forwarded to the PTY (so the running program can read the image itself).
+  ipcMain.handle('clipboard:has-image', () => !clipboard.readImage().isEmpty());
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
 
   // Used by the markdown preview panel. The path comes from a link the user

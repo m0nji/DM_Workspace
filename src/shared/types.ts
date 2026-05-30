@@ -137,6 +137,7 @@ export interface RendererApi {
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
   // clipboard (routed through the main process for reliability under contextIsolation)
   clipboardRead(): Promise<string>;
+  clipboardHasImage(): Promise<boolean>;
   clipboardWrite(text: string): void;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;

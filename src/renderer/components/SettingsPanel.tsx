@@ -211,12 +211,14 @@ export function SettingsPanel(): JSX.Element | null {
 
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span>Settings</span>
           <button className="modal-close" title="Close" onClick={() => setOpen(false)}>✕</button>
         </div>
 
+        <div className="settings-columns">
+        <div className="settings-group">
         <div className="modal-section-label">Theme</div>
 
         <div className="theme-gallery">
@@ -239,7 +241,9 @@ export function SettingsPanel(): JSX.Element | null {
             );
           })}
         </div>
+        </div>
 
+        <div className="settings-group">
         <div className="modal-section-label">Background color</div>
 
         <div className="setting-row">
@@ -283,7 +287,9 @@ export function SettingsPanel(): JSX.Element | null {
         <p className="modal-hint">
           Lower opacity reveals the blurred backdrop behind the terminals (macOS).
         </p>
+        </div>
 
+        <div className="settings-group">
         <div className="modal-section-label">Sidebar</div>
 
         <div className="setting-row">
@@ -299,7 +305,9 @@ export function SettingsPanel(): JSX.Element | null {
         <p className="modal-hint">
           Shows a green count on inactive workspaces when their terminals finish working.
         </p>
+        </div>
 
+        <div className="settings-group">
         <div className="modal-section-label">Notifications</div>
 
         <div className="setting-row">
@@ -315,12 +323,20 @@ export function SettingsPanel(): JSX.Element | null {
         <p className="modal-hint">
           Show an OS notification when a terminal finishes in a background workspace. Off by default.
         </p>
+        </div>
 
-        <ShortcutsSection />
+        <div className="settings-group">
+          <ShortcutsSection />
+        </div>
 
-        <TemplatesSection />
+        <div className="settings-group">
+          <TemplatesSection />
+        </div>
 
-        <UpdateSection />
+        <div className="settings-group">
+          <UpdateSection />
+        </div>
+        </div>
       </div>
     </div>
   );

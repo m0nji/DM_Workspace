@@ -161,10 +161,25 @@ export function TerminalView({ paneId, cwd }: Props): JSX.Element {
       e.preventDefault();
       e.stopPropagation();
 
-      void window.api.clipboardRead().then((text) => {
-        if (!text) return;
-        term.paste(text);
-        activity.onInput();
+      void window.api.clipboardRead().then(async (text) => {
+        if (text) {
+          // Text on the clipboard (e.g. dictated text from the voice app):
+          // paste it directly. Reading the OS clipboard via the main process
+          // works even where the renderer's own clipboard is unavailable.
+          term.paste(text);
+          activity.onInput();
+          return;
+        }
+        // No text — if an image is on the clipboard, forward Ctrl+V (0x16) to
+        // the PTY so the running program (e.g. Claude Code) reads the image
+        // from the OS clipboard itself. Swallowing the keystroke here (the old
+        // behaviour) made image paste impossible. Only forward it when an image
+        // is actually present, so an empty clipboard doesn't trigger a spurious
+        // "no image in clipboard" paste.
+        if (await window.api.clipboardHasImage()) {
+          window.api.input({ paneId, data: '\x16' });
+          activity.onInput();
+        }
       });
     };
     host.addEventListener('keydown', handleTerminalPasteShortcut, true);
