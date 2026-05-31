@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { resolveShortcuts, formatShortcut, type ShortcutAction } from '../../shared/shortcuts';
+import { Icon } from './Icon';
 
 const isMac = navigator.userAgent.includes('Mac');
 
@@ -144,11 +145,7 @@ export function CommandPalette(): JSX.Element | null {
     <div className="command-palette-backdrop" onMouseDown={() => setOpen(false)}>
       <div className="command-palette" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
         <div className="command-input-row">
-          <svg className="command-search-icon" width="15" height="15" viewBox="0 0 16 16" fill="none"
-               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <circle cx="7" cy="7" r="4.2" />
-            <line x1="10.2" y1="10.2" x2="13.5" y2="13.5" />
-          </svg>
+          <span className="command-search-icon"><Icon name="search" /></span>
           <input
             ref={inputRef}
             className="command-input"
