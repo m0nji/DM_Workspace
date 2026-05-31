@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { renderMarkdown } from '../markdown';
 import { resolveSource, fileTarget } from '../../shared/link-detect';
+import { Icon } from './Icon';
 
 // Minimal typing for the Electron <webview> element methods we call.
 interface WebviewEl extends HTMLElement {
@@ -114,11 +115,11 @@ export function PreviewPanel(): JSX.Element | null {
       <div className="preview-chrome">
         {!isMarkdown && !notFound && (
           <>
-            <button type="button" title="Zurück" onClick={() => webviewRef.current?.goBack()}>◀</button>
-            <button type="button" title="Vor" onClick={() => webviewRef.current?.goForward()}>▶</button>
+            <button type="button" className="icon-btn" title="Zurück" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
+            <button type="button" className="icon-btn" title="Vor" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
           </>
         )}
-        <button type="button" title="Neu laden" onClick={reload}>⟳</button>
+        <button type="button" className="icon-btn" title="Neu laden" onClick={reload}><Icon name="reload" /></button>
         <input
           className="preview-addr"
           value={addr}
@@ -128,8 +129,8 @@ export function PreviewPanel(): JSX.Element | null {
           aria-label="Vorschau-Adresse"
           title={addr}
         />
-        {notFound && <button type="button" aria-label="Ordner wählen" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}>📁</button>}
-        <button type="button" title="Schließen" onClick={closePreview}>✕</button>
+        {notFound && <button type="button" className="icon-btn" aria-label="Ordner wählen" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
+        <button type="button" className="icon-btn" title="Schließen" onClick={closePreview}><Icon name="close" /></button>
       </div>
       <div className="preview-body">
         {!source ? (
