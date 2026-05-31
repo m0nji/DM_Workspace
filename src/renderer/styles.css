@@ -58,9 +58,6 @@ body {
 .sidebar-footer { margin-top: auto; display: flex; align-items: center;
   justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); }
 .app-version { color: var(--muted); font-size: 11px; }
-.settings-btn { background: none; border: none; color: var(--muted); cursor: pointer;
-  display: inline-flex; align-items: center; padding: 4px; border-radius: 4px; }
-.settings-btn:hover { color: var(--text); background: #2a2a2a; }
 
 /* One square, consistently-sized clickable target for every chrome icon. */
 .icon-btn {
@@ -133,7 +130,6 @@ body {
 .confirm-btn-danger { background: #c95a5a; border-color: #c95a5a; color: #fff; }
 .confirm-btn-danger:hover { background: #d46666; }
 .update-status { flex: 1; color: var(--muted); font-size: 12px; }
-.settings-btn { position: relative; }
 .update-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px;
   border-radius: 50%; background: var(--accent); border: 1px solid var(--panel); }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
@@ -358,9 +354,6 @@ body {
 .markdown-body table { border-collapse: collapse; }
 .markdown-body th, .markdown-body td { border: 1px solid rgba(255,255,255,0.15); padding: 4px 8px; }
 .markdown-body img { max-width: 100%; }
-.preview-toggle-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
-.preview-toggle-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
-.preview-toggle-btn.active { color: #6cb6ff; }
 
 /* ── Shared button variants ─────────────────────────────────────────────── */
 .cwd-btn:disabled { opacity: .4; cursor: default; }
