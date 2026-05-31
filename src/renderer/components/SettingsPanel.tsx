@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import type { SettingsSection } from '../../shared/types';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
 import {
-  SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, shortcutFromEvent,
+  SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, formatShortcutCaps, shortcutFromEvent,
   isShortcutConflict, isReservedTerminalShortcut
 } from '../../shared/shortcuts';
 
@@ -62,9 +62,11 @@ function ShortcutsSection(): JSX.Element {
           return (
             <div className={`shortcut-row ${isRecording ? 'recording' : ''}`} key={def.action}>
               <span className="shortcut-label">{def.label}</span>
-              <kbd className="shortcut-binding">
-                {isRecording ? 'Press keys…' : formatShortcut(resolved[def.action], isMac)}
-              </kbd>
+              <span className="shortcut-keys">
+                {isRecording
+                  ? <span className="shortcut-recording">Press keys…</span>
+                  : formatShortcutCaps(resolved[def.action], isMac).map((k, i) => <kbd className="key-cap" key={i}>{k}</kbd>)}
+              </span>
               <button className="cwd-btn" onClick={() => { setError(null); setRecording(isRecording ? null : def.action); }}>
                 {isRecording ? 'Cancel' : 'Record'}
               </button>

@@ -151,10 +151,17 @@ export function shortcutMatches(e: ShortcutLikeEvent, binding: string, isMac: bo
 const MAC_SYMBOLS: Record<string, string> = { Mod: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↩', Comma: ',', Escape: '⎋', Space: '␣' };
 const PC_LABELS: Record<string, string> = { Mod: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Enter: 'Enter', Comma: ',', Escape: 'Esc', Space: 'Space' };
 
+// Per-key display tokens of a normalized binding, e.g. ['⌘','⇧','P'] on macOS or
+// ['Ctrl','Shift','P'] elsewhere. Multi-character keys (F5, Tab, ArrowLeft) stay
+// intact as a single cap — callers rendering individual key "caps" must use this
+// rather than splitting the joined formatShortcut() string.
+export function formatShortcutCaps(binding: string, isMac: boolean): string[] {
+  const table = isMac ? MAC_SYMBOLS : PC_LABELS;
+  return normalizeShortcut(binding).split('+').map((t) => table[t] ?? t);
+}
+
 // Human-facing rendering of a normalized binding. macOS uses Apple's glyphs with
 // no separators (⌘⇧P); other platforms spell modifiers out joined by '+'.
 export function formatShortcut(binding: string, isMac: boolean): string {
-  const table = isMac ? MAC_SYMBOLS : PC_LABELS;
-  const tokens = normalizeShortcut(binding).split('+').map((t) => table[t] ?? t);
-  return tokens.join(isMac ? '' : '+');
+  return formatShortcutCaps(binding, isMac).join(isMac ? '' : '+');
 }

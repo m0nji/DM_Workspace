@@ -397,13 +397,25 @@ body {
 
 /* ── Settings: shortcuts & templates ────────────────────────────────────── */
 .shortcut-list, .template-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.shortcut-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
-  padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; }
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 .shortcut-row.recording { border-color: var(--accent); }
-.shortcut-label { font-size: 13px; }
-.shortcut-binding { color: var(--text); font-family: Menlo, monospace; font-size: 12px; border: 1px solid var(--border);
-  border-radius: 5px; padding: 2px 8px; background: rgba(0, 0, 0, .25); min-width: 54px; text-align: center; }
-.shortcut-row.recording .shortcut-binding { color: var(--accent); border-color: var(--accent); }
+.shortcut-label { font-size: 13px; white-space: nowrap; }
+.shortcut-keys { display: inline-flex; gap: 3px; }
+.key-cap {
+  background: #22262f; border: 1px solid #353a45; border-bottom-width: 2px;
+  border-radius: 5px; padding: 2px 6px; font-size: 11px;
+  font-family: ui-monospace, monospace; color: var(--text);
+}
+.shortcut-recording { color: var(--accent); font-size: 12px; }
+.cwd-btn.ghost:disabled { opacity: 0.4; cursor: default; }
 .setting-error { color: #ff8a8a; font-size: 11px; margin: -2px 0 10px; }
 .template-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
   padding: 8px; border: 1px solid var(--border); border-radius: 8px; }

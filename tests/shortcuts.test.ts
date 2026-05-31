@@ -7,7 +7,8 @@ import {
   isReservedTerminalShortcut,
   shortcutFromEvent,
   shortcutMatches,
-  formatShortcut
+  formatShortcut,
+  formatShortcutCaps
 } from '../src/shared/shortcuts';
 
 describe('normalizeShortcut', () => {
@@ -149,6 +150,22 @@ describe('formatShortcut', () => {
   it('renders spelled-out modifiers joined by + elsewhere', () => {
     expect(formatShortcut('Mod+Shift+P', false)).toBe('Ctrl+Shift+P');
     expect(formatShortcut('Mod+Comma', false)).toBe('Ctrl+,');
+  });
+});
+
+describe('formatShortcutCaps', () => {
+  it('returns per-key caps with macOS glyphs', () => {
+    expect(formatShortcutCaps('Mod+Shift+P', true)).toEqual(['⌘', '⇧', 'P']);
+  });
+  it('keeps a multi-character key as a single cap (no shattering)', () => {
+    expect(formatShortcutCaps('Mod+F5', true)).toEqual(['⌘', 'F5']);
+  });
+  it('spells out modifiers on non-mac', () => {
+    expect(formatShortcutCaps('Mod+Shift+P', false)).toEqual(['Ctrl', 'Shift', 'P']);
+  });
+  it('formatShortcut joins the same caps', () => {
+    expect(formatShortcut('Mod+Shift+P', true)).toBe('⌘⇧P');
+    expect(formatShortcut('Mod+Shift+P', false)).toBe('Ctrl+Shift+P');
   });
 });
 
