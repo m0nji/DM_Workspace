@@ -268,6 +268,65 @@ describe('workspace templates store actions', () => {
     expect(ws.layout).toBeNull();
   });
 
+  it('launchTemplateIntoWorkspace applies directly when no confirmation is needed', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Plain', cwd: '/repo', layout: { type: 'pane', id: 'tp1' },
+        confirmStartupCommands: true // no startupCommands → nothing to confirm
+      }]
+    });
+    useStore.getState().launchTemplateIntoWorkspace('w1', 'tpl1');
+    expect(useStore.getState().pendingTemplateLaunch).toBeNull();
+    expect(useStore.getState().workspaces.find((w) => w.id === 'w1')!.layout?.type).toBe('pane');
+  });
+
+  it('launchTemplateIntoWorkspace defers to confirm when commands need confirmation', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Dev', cwd: '/repo', layout: { type: 'pane', id: 'tp1' },
+        startupCommands: { tp1: 'npm run dev' }, confirmStartupCommands: true
+      }]
+    });
+    useStore.getState().launchTemplateIntoWorkspace('w1', 'tpl1');
+    expect(useStore.getState().pendingTemplateLaunch).toEqual({ templateId: 'tpl1', workspaceId: 'w1' });
+    expect(useStore.getState().workspaces.find((w) => w.id === 'w1')!.layout).toBeNull(); // not applied yet
+  });
+
+  it('confirmPendingTemplateLaunch routes to the target workspace when present', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Dev', cwd: '/repo', layout: { type: 'pane', id: 'tp1' },
+        startupCommands: { tp1: 'npm run dev' }, confirmStartupCommands: true
+      }],
+      pendingTemplateLaunch: { templateId: 'tpl1', workspaceId: 'w1' }
+    });
+    useStore.getState().confirmPendingTemplateLaunch(true);
+    expect(useStore.getState().workspaces).toHaveLength(1); // filled in place, no new ws
+    expect(useStore.getState().workspaces[0].layout?.type).toBe('pane');
+    expect(useStore.getState().pendingTemplateLaunch).toBeNull();
+  });
+
+  it('confirmPendingTemplateLaunch creates a new workspace when no target is set', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: { type: 'pane', id: 'p1' } }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Dev', cwd: '/repo', layout: { type: 'pane', id: 'tp1' },
+        startupCommands: { tp1: 'npm run dev' }, confirmStartupCommands: true
+      }],
+      pendingTemplateLaunch: { templateId: 'tpl1' }
+    });
+    useStore.getState().confirmPendingTemplateLaunch(true);
+    expect(useStore.getState().workspaces).toHaveLength(2); // new workspace created
+    expect(useStore.getState().pendingTemplateLaunch).toBeNull();
+  });
+
   it('resolves a custom pane title with cwd fallback', () => {
     expect(useStore.getState().paneTitle('p1', '/repo')).toBe('dev server');
     expect(useStore.getState().paneTitle('pX', '/fallback')).toBe('/fallback');

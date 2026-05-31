@@ -54,7 +54,7 @@ interface StoreState extends AppState {
   searchOpenPaneId: string | null;
   commandPaletteOpen: boolean;
   templateWizard: TemplateWizardState;
-  pendingTemplateLaunch: { templateId: string } | null;
+  pendingTemplateLaunch: { templateId: string; workspaceId?: string } | null;
   shortcutRecordingAction: ShortcutAction | null; // set while the editor captures a key; gates global shortcuts
   previewPanel: { open: boolean; widthPx: number; source: PreviewSource | null };
   openPreview: (source: PreviewSource) => void;
@@ -91,13 +91,15 @@ interface StoreState extends AppState {
   setCommandPaletteOpen: (open: boolean) => void;
   // templates
   setTemplateWizard: (state: TemplateWizardState) => void;
-  setPendingTemplateLaunch: (value: { templateId: string } | null) => void;
+  setPendingTemplateLaunch: (value: { templateId: string; workspaceId?: string } | null) => void;
   saveActiveWorkspaceAsTemplate: (input: SaveTemplateInput) => void;
   updateWorkspaceTemplate: (id: string, patch: Partial<Omit<WorkspaceTemplate, 'id'>>) => void;
   deleteWorkspaceTemplate: (id: string) => void;
   requestTemplateLaunch: (id: string) => void;
   createWorkspaceFromTemplate: (id: string, includeStartupCommands: boolean) => void;
   applyTemplateToWorkspace: (workspaceId: string, templateId: string, includeStartupCommands: boolean) => void;
+  launchTemplateIntoWorkspace: (workspaceId: string, templateId: string) => void;
+  confirmPendingTemplateLaunch: (includeStartupCommands: boolean) => void;
   consumeStartupCommand: (paneId: string) => string | null;
   paneTitle: (paneId: string, fallback: string) => string;
   // shortcuts
@@ -469,6 +471,34 @@ export const useStore = create<StoreState>((set, get) => ({
     persist(out);
     return out;
   }),
+
+  // Welcome-screen entry point: fill the given blank workspace from a template,
+  // routing through the confirm dialog first when the template carries startup
+  // commands that ask for confirmation.
+  launchTemplateIntoWorkspace: (workspaceId, templateId) => {
+    const tpl = (get().workspaceTemplates ?? []).find((t) => t.id === templateId);
+    if (!tpl) return;
+    const hasCommands = !!tpl.startupCommands && Object.keys(tpl.startupCommands).length > 0;
+    if (hasCommands && tpl.confirmStartupCommands) {
+      set({ pendingTemplateLaunch: { templateId, workspaceId }, commandPaletteOpen: false });
+    } else {
+      get().applyTemplateToWorkspace(workspaceId, templateId, true);
+      set({ commandPaletteOpen: false });
+    }
+  },
+
+  // Resolve a pending launch from the confirm dialog. If it targets an existing
+  // workspace (welcome-screen flow) fill it in place; otherwise create a new one.
+  confirmPendingTemplateLaunch: (includeStartupCommands) => {
+    const pending = get().pendingTemplateLaunch;
+    if (!pending) return;
+    if (pending.workspaceId) {
+      get().applyTemplateToWorkspace(pending.workspaceId, pending.templateId, includeStartupCommands);
+    } else {
+      get().createWorkspaceFromTemplate(pending.templateId, includeStartupCommands);
+    }
+    set({ pendingTemplateLaunch: null });
+  },
 
   // Return a pane's pending startup command once, then remove it (persisting so a
   // restart won't re-run it). Returns null when there's nothing pending.
