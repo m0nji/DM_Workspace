@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import type { SettingsSection } from '../../shared/types';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
 import {
   SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, shortcutFromEvent,
@@ -17,19 +18,8 @@ function ShortcutsSection(): JSX.Element {
   const resetBinding = useStore((s) => s.resetShortcutBinding);
   const recording = useStore((s) => s.shortcutRecordingAction);
   const setRecording = useStore((s) => s.setShortcutRecordingAction);
-  const focusSection = useStore((s) => s.settingsFocusSection);
-  const clearFocusSection = useStore((s) => s.clearSettingsFocusSection);
-  const sectionRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const resolved = resolveShortcuts(bindings, isMac);
-
-  // Scroll into view when opened via "Open keyboard shortcut settings".
-  useEffect(() => {
-    if (focusSection === 'shortcuts') {
-      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      clearFocusSection();
-    }
-  }, [focusSection, clearFocusSection]);
 
   useEffect(() => {
     if (!recording) return;
@@ -62,7 +52,7 @@ function ShortcutsSection(): JSX.Element {
   useEffect(() => () => setRecording(null), [setRecording]);
 
   return (
-    <div ref={sectionRef}>
+    <div>
       <div className="modal-section-label">Keyboard shortcuts</div>
       {error && <div className="setting-error">{error}</div>}
       <div className="shortcut-list">
@@ -197,11 +187,26 @@ function UpdateSection(): JSX.Element {
   );
 }
 
+const SECTIONS: { id: SettingsSection; label: string }[] = [
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'shortcuts', label: 'Shortcuts' },
+  { id: 'templates', label: 'Templates' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'updates', label: 'Updates' }
+];
+
 export function SettingsPanel(): JSX.Element | null {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
+  const focus = useStore((s) => s.settingsFocusSection);
+  const clearFocus = useStore((s) => s.clearSettingsFocusSection);
+  const [section, setSection] = useState<SettingsSection>(focus ?? 'appearance');
+
+  useEffect(() => {
+    if (focus) { setSection(focus); clearFocus(); }
+  }, [focus, clearFocus]);
 
   if (!open) return null;
 
@@ -217,125 +222,138 @@ export function SettingsPanel(): JSX.Element | null {
           <button className="modal-close" title="Close" onClick={() => setOpen(false)}>✕</button>
         </div>
 
-        <div className="settings-columns">
-        <div className="settings-group">
-        <div className="modal-section-label">Theme</div>
-
-        <div className="theme-gallery">
-          {BUILTIN_THEMES.map((t) => {
-            const active = settings.themeId === t.id;
-            return (
+        <div className="settings-body">
+          <nav className="settings-nav">
+            {SECTIONS.map((s) => (
               <button
-                key={t.id}
-                className={`theme-tile ${active ? 'active' : ''}`}
-                title={t.name}
-                onClick={() => updateSettings({ themeId: t.id, terminalBackground: t.background })}
+                key={s.id}
+                type="button"
+                className={`settings-nav-item ${section === s.id ? 'active' : ''}`}
+                aria-current={section === s.id ? 'page' : undefined}
+                onClick={() => setSection(s.id)}
               >
-                <span className="theme-swatch" style={{ background: t.background }}>
-                  <span style={{ color: t.ansi[1] }}>A</span>
-                  <span style={{ color: t.ansi[2] }}>a</span>
-                  <span style={{ color: t.ansi[4] }}>#</span>
-                </span>
-                <span className="theme-name">{t.name}</span>
+                {s.label}
               </button>
-            );
-          })}
-        </div>
-        </div>
+            ))}
+          </nav>
+          <div className="settings-content">
+            {section === 'appearance' && (
+              <>
+                <div className="settings-group">
+                <div className="modal-section-label">Theme</div>
 
-        <div className="settings-group">
-        <div className="modal-section-label">Background color</div>
+                <div className="theme-gallery">
+                  {BUILTIN_THEMES.map((t) => {
+                    const active = settings.themeId === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        className={`theme-tile ${active ? 'active' : ''}`}
+                        title={t.name}
+                        onClick={() => updateSettings({ themeId: t.id, terminalBackground: t.background })}
+                      >
+                        <span className="theme-swatch" style={{ background: t.background }}>
+                          <span style={{ color: t.ansi[1] }}>A</span>
+                          <span style={{ color: t.ansi[2] }}>a</span>
+                          <span style={{ color: t.ansi[4] }}>#</span>
+                        </span>
+                        <span className="theme-name">{t.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                </div>
 
-        <div className="setting-row">
-          <label>Custom color</label>
-          <input
-            type="color"
-            value={activeBg}
-            onChange={(e) => updateSettings({ terminalBackground: e.target.value })}
-          />
-        </div>
+                <div className="settings-group">
+                <div className="modal-section-label">Background color</div>
 
-        <div className="swatch-row">
-          {COLOR_PRESETS.map((p) => {
-            const active = activeBg.toLowerCase() === p.value.toLowerCase();
-            return (
-              <button
-                key={p.value}
-                className={`swatch ${active ? 'active' : ''}`}
-                title={p.label}
-                style={{ background: p.value }}
-                onClick={() => updateSettings({ terminalBackground: p.value })}
-              />
-            );
-          })}
-        </div>
+                <div className="setting-row">
+                  <label>Custom color</label>
+                  <input
+                    type="color"
+                    value={activeBg}
+                    onChange={(e) => updateSettings({ terminalBackground: e.target.value })}
+                  />
+                </div>
 
-        <p className="modal-hint">Overrides the selected theme's background. Pick a theme again to reset it.</p>
+                <div className="swatch-row">
+                  {COLOR_PRESETS.map((p) => {
+                    const active = activeBg.toLowerCase() === p.value.toLowerCase();
+                    return (
+                      <button
+                        key={p.value}
+                        className={`swatch ${active ? 'active' : ''}`}
+                        title={p.label}
+                        style={{ background: p.value }}
+                        onClick={() => updateSettings({ terminalBackground: p.value })}
+                      />
+                    );
+                  })}
+                </div>
 
-        <div className="setting-row">
-          <label>Opacity</label>
-          <input
-            type="range"
-            min={10}
-            max={100}
-            value={pct}
-            onChange={(e) => updateSettings({ terminalOpacity: Number(e.target.value) / 100 })}
-          />
-          <span className="setting-value">{pct}%</span>
-        </div>
+                <p className="modal-hint">Overrides the selected theme's background. Pick a theme again to reset it.</p>
 
-        <p className="modal-hint">
-          Lower opacity reveals the blurred backdrop behind the terminals (macOS).
-        </p>
-        </div>
+                <div className="setting-row">
+                  <label>Opacity</label>
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    value={pct}
+                    onChange={(e) => updateSettings({ terminalOpacity: Number(e.target.value) / 100 })}
+                  />
+                  <span className="setting-value">{pct}%</span>
+                </div>
 
-        <div className="settings-group">
-        <div className="modal-section-label">Sidebar</div>
+                <p className="modal-hint">
+                  Lower opacity reveals the blurred backdrop behind the terminals (macOS).
+                </p>
+                </div>
+              </>
+            )}
+            {section === 'shortcuts' && <ShortcutsSection />}
+            {section === 'templates' && <TemplatesSection />}
+            {section === 'notifications' && (
+              <>
+                <div className="settings-group">
+                <div className="modal-section-label">Sidebar</div>
 
-        <div className="setting-row">
-          <label htmlFor="done-badge-toggle">Show "terminals ready" badge</label>
-          <input
-            id="done-badge-toggle"
-            type="checkbox"
-            checked={settings.showDoneBadge ?? false}
-            onChange={(e) => updateSettings({ showDoneBadge: e.target.checked })}
-          />
-        </div>
+                <div className="setting-row">
+                  <label htmlFor="done-badge-toggle">Show "terminals ready" badge</label>
+                  <input
+                    id="done-badge-toggle"
+                    type="checkbox"
+                    checked={settings.showDoneBadge ?? false}
+                    onChange={(e) => updateSettings({ showDoneBadge: e.target.checked })}
+                  />
+                </div>
 
-        <p className="modal-hint">
-          Shows a green count on inactive workspaces when their terminals finish working.
-        </p>
-        </div>
+                <p className="modal-hint">
+                  Shows a green count on inactive workspaces when their terminals finish working.
+                </p>
+                </div>
 
-        <div className="settings-group">
-        <div className="modal-section-label">Notifications</div>
+                <div className="settings-group">
+                <div className="modal-section-label">Notifications</div>
 
-        <div className="setting-row">
-          <label htmlFor="notifications-toggle">Desktop notifications</label>
-          <input
-            id="notifications-toggle"
-            type="checkbox"
-            checked={settings.notificationsEnabled ?? false}
-            onChange={(e) => updateSettings({ notificationsEnabled: e.target.checked })}
-          />
-        </div>
+                <div className="setting-row">
+                  <label htmlFor="notifications-toggle">Desktop notifications</label>
+                  <input
+                    id="notifications-toggle"
+                    type="checkbox"
+                    checked={settings.notificationsEnabled ?? false}
+                    onChange={(e) => updateSettings({ notificationsEnabled: e.target.checked })}
+                  />
+                </div>
 
-        <p className="modal-hint">
-          Show an OS notification when a terminal finishes in a background workspace. Off by default.
-        </p>
-        </div>
-
-        <div className="settings-group">
-          <ShortcutsSection />
-        </div>
-
-        <div className="settings-group">
-          <TemplatesSection />
-        </div>
-
-        <div className="settings-group">
-          <UpdateSection />
-        </div>
+                <p className="modal-hint">
+                  Show an OS notification when a terminal finishes in a background workspace. Off by default.
+                </p>
+                </div>
+              </>
+            )}
+            {section === 'updates' && <UpdateSection />}
+          </div>
         </div>
       </div>
     </div>

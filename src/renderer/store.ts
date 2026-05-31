@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus
+  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection
 } from '../shared/types';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, reassignIds
@@ -77,9 +77,9 @@ interface StoreState extends AppState {
   resizeSplit: (splitId: string, ratio: number) => void;
   toggleMaximize: (paneId: string) => void;
   // settings
-  settingsFocusSection: 'shortcuts' | null; // when opening, scroll to this section
+  settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
-  setSettingsOpen: (open: boolean, focusSection?: 'shortcuts' | null) => void;
+  setSettingsOpen: (open: boolean, focusSection?: SettingsSection | null) => void;
   clearSettingsFocusSection: () => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
   setPaneCwd: (paneId: string, cwd: string) => void;

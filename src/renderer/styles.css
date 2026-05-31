@@ -86,13 +86,23 @@ body {
 .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
   padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   max-height: 85vh; overflow-y: auto; }
-/* The settings modal lays its sections out in two columns so the whole sheet
-   fits without scrolling. column-count flows groups top-to-bottom then into the
-   second column; break-inside keeps a group from splitting across columns. */
+/* The settings modal uses a left nav rail to pick a category and a content area
+   that renders one section at a time. */
 .modal.settings-modal { width: 640px; max-width: 92vw; }
-.settings-columns { column-count: 2; column-gap: 24px; }
-.settings-group { break-inside: avoid; -webkit-column-break-inside: avoid;
-  margin-bottom: 14px; }
+.settings-body { display: flex; gap: 20px; align-items: flex-start; }
+.settings-nav {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 150px; flex-shrink: 0;
+}
+.settings-nav-item {
+  text-align: left; padding: 8px 12px; border-radius: 7px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 13px;
+}
+.settings-nav-item:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.settings-nav-item.active { color: var(--accent); background: rgba(255, 138, 76, 0.12); }
+.settings-content { flex: 1; min-width: 0; }
+.settings-group { margin-bottom: 14px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
 .modal-close { background: none; border: none; color: var(--muted); cursor: pointer;

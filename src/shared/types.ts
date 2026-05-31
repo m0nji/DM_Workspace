@@ -2,6 +2,8 @@ import type { ShortcutAction } from './shortcuts';
 
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
+export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'notifications' | 'updates';
+
 export interface PaneNode {
   type: 'pane';
   id: string; // unique id; also used as the PTY pane identifier
