@@ -8,7 +8,7 @@ export function StartupCommandConfirmDialog(): JSX.Element | null {
   const pending = useStore((s) => s.pendingTemplateLaunch);
   const setPending = useStore((s) => s.setPendingTemplateLaunch);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
-  const createFromTemplate = useStore((s) => s.createWorkspaceFromTemplate);
+  const confirmLaunch = useStore((s) => s.confirmPendingTemplateLaunch);
 
   useEffect(() => {
     if (!pending) return;
@@ -26,8 +26,8 @@ export function StartupCommandConfirmDialog(): JSX.Element | null {
   const commands = tpl.startupCommands ?? {};
   const entries = Object.entries(commands);
   const close = (): void => setPending(null);
-  const createWith = (): void => { createFromTemplate(tpl.id, true); close(); };
-  const createWithout = (): void => { createFromTemplate(tpl.id, false); close(); };
+  const createWith = (): void => { confirmLaunch(true); };
+  const createWithout = (): void => { confirmLaunch(false); };
 
   return (
     <div className="modal-backdrop" onMouseDown={close}>
