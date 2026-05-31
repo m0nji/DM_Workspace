@@ -31,7 +31,7 @@ function score(haystack: string, query: string): number {
   return pos === 0 ? 1 : 1 / (1 + total);
 }
 
-export function CommandPalette(): JSX.Element | null {
+export function CommandPalette(): React.JSX.Element | null {
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const workspaces = useStore((s) => s.workspaces);

@@ -14,7 +14,7 @@ const svg = {
 };
 
 // Split into left + right (vertical divider).
-function SplitLeftRight(): JSX.Element {
+function SplitLeftRight(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
       <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
@@ -24,7 +24,7 @@ function SplitLeftRight(): JSX.Element {
 }
 
 // Split into top + bottom (horizontal divider).
-function SplitTopBottom(): JSX.Element {
+function SplitTopBottom(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
       <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
@@ -33,7 +33,7 @@ function SplitTopBottom(): JSX.Element {
   );
 }
 
-function Maximize(): JSX.Element {
+function Maximize(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
       <path d="M9 3h4v4" />
@@ -44,7 +44,7 @@ function Maximize(): JSX.Element {
   );
 }
 
-function Restore(): JSX.Element {
+function Restore(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
       <path d="M12 4l-3 3" />
@@ -55,7 +55,7 @@ function Restore(): JSX.Element {
   );
 }
 
-function Close(): JSX.Element {
+function Close(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
       <line x1="4" y1="4" x2="12" y2="12" />
@@ -64,7 +64,7 @@ function Close(): JSX.Element {
   );
 }
 
-export function Pane({ paneId, cwd }: Props): JSX.Element {
+export function Pane({ paneId, cwd }: Props): React.JSX.Element {
   const splitActivePane = useStore((s) => s.splitActivePane);
   const closeActivePane = useStore((s) => s.closeActivePane);
   const toggleMaximize = useStore((s) => s.toggleMaximize);

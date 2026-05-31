@@ -2,7 +2,7 @@ import React from 'react';
 import { useStore } from '../store';
 import { Icon } from './Icon';
 
-export function TitlebarActions(): JSX.Element {
+export function TitlebarActions(): React.JSX.Element {
   const togglePreview = useStore((s) => s.togglePreview);
   const previewOpen = useStore((s) => s.previewPanel.open);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);

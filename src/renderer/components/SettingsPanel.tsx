@@ -12,7 +12,7 @@ const isMac = navigator.userAgent.includes('Mac');
 // Record/reset the binding for each app action. While recording, a window-level
 // capture listener swallows the next key combo; global shortcuts are gated via
 // the store's shortcutRecordingAction so they don't fire mid-recording.
-function ShortcutsSection(): JSX.Element {
+function ShortcutsSection(): React.JSX.Element {
   const bindings = useStore((s) => s.settings.shortcutBindings);
   const updateBinding = useStore((s) => s.updateShortcutBinding);
   const resetBinding = useStore((s) => s.resetShortcutBinding);
@@ -86,7 +86,7 @@ function ShortcutsSection(): JSX.Element {
 
 // List, run, edit, and delete saved templates; launch the wizard to capture the
 // current workspace.
-function TemplatesSection(): JSX.Element {
+function TemplatesSection(): React.JSX.Element {
   const templates = useStore((s) => s.workspaceTemplates ?? []);
   const setWizard = useStore((s) => s.setTemplateWizard);
   const requestLaunch = useStore((s) => s.requestTemplateLaunch);
@@ -137,13 +137,13 @@ const COLOR_PRESETS: { label: string; value: string }[] = [
   { label: 'Dark purple', value: '#2d1b46' }
 ];
 
-function UpdateSection(): JSX.Element {
+function UpdateSection(): React.JSX.Element {
   const update = useStore((s) => s.update);
   const checkForUpdates = useStore((s) => s.checkForUpdates);
   const downloadUpdate = useStore((s) => s.downloadUpdate);
 
   let status: string;
-  let button: JSX.Element | null = (
+  let button: React.JSX.Element | null = (
     <button className="cwd-btn" onClick={checkForUpdates}>Check for updates</button>
   );
 
@@ -197,7 +197,7 @@ const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'updates', label: 'Updates' }
 ];
 
-export function SettingsPanel(): JSX.Element | null {
+export function SettingsPanel(): React.JSX.Element | null {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
   const settings = useStore((s) => s.settings);

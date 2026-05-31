@@ -2,9 +2,9 @@ import React, { useCallback } from 'react';
 import { useStore } from '../store';
 import type { Direction } from '../../shared/types';
 
-interface Props { splitId: string; direction: Direction; containerRef: React.RefObject<HTMLDivElement>; }
+interface Props { splitId: string; direction: Direction; containerRef: React.RefObject<HTMLDivElement | null>; }
 
-export function Splitter({ splitId, direction, containerRef }: Props): JSX.Element {
+export function Splitter({ splitId, direction, containerRef }: Props): React.JSX.Element {
   const resizeSplit = useStore((s) => s.resizeSplit);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {

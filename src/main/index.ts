@@ -1,5 +1,6 @@
 import { app, BrowserWindow, nativeTheme, screen } from 'electron';
 import { join } from 'path';
+import { pathToFileURL } from 'url';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
@@ -10,15 +11,43 @@ import { installAppMenu } from './menu';
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
 
+function isAllowedPreviewUrl(raw: string): boolean {
+  try {
+    const { protocol } = new URL(raw);
+    return protocol === 'file:' || protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedRendererNavigation(raw: string, rendererUrl: string, devServerUrl: string | undefined): boolean {
+  try {
+    const next = new URL(raw);
+    if (devServerUrl) return next.origin === new URL(devServerUrl).origin;
+    return raw === rendererUrl || raw.startsWith(`${rendererUrl}#`);
+  } catch {
+    return false;
+  }
+}
+
 // The preview panel uses a <webview> to show HTML files / URLs the user clicked.
 // Strip every privilege from attached webviews: no preload, no Node access, fully
 // sandboxed and context-isolated, so untrusted page content can't reach the host.
 app.on('web-contents-created', (_event, contents) => {
-  contents.on('will-attach-webview', (_e, webPreferences) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    if (!isAllowedPreviewUrl(params.src)) {
+      event.preventDefault();
+      return;
+    }
     delete webPreferences.preload;
+    webPreferences.allowRunningInsecureContent = false;
     webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
     webPreferences.contextIsolation = true;
     webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
   });
 });
 
@@ -41,6 +70,9 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
   const isWin = process.platform === 'win32';
+  const devServerUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL'];
+  const rendererFile = join(__dirname, '../renderer/index.html');
+  const rendererUrl = pathToFileURL(rendererFile).toString();
   // Keep the window chrome dark on Windows (title bar, native menus) and make the
   // Windows 11 acrylic backdrop use its dark tint regardless of the system theme.
   if (isWin) nativeTheme.themeSource = 'dark';
@@ -77,7 +109,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // required so preload can use Node-built IPC bridge
+      sandbox: true,
       webviewTag: true,
     }
   });
@@ -87,10 +119,14 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isTrustedRendererNavigation(url, rendererUrl, devServerUrl)) event.preventDefault();
+  });
+
+  if (devServerUrl) {
+    mainWindow.loadURL(devServerUrl);
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    mainWindow.loadFile(rendererFile);
   }
 
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;

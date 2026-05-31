@@ -43,7 +43,7 @@ function buildTheme(themeId: string, opacity: number, customBg?: string): ITheme
   };
 }
 
-export function TerminalView({ paneId, cwd }: Props): JSX.Element {
+export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const themeId = useStore((s) => s.settings.themeId);

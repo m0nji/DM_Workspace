@@ -6,7 +6,7 @@ import { LayoutRenderer } from './LayoutRenderer';
 // Every workspace stays mounted; only the active one is visible. This keeps each
 // terminal's xterm instance (and its scrollback) alive across workspace switches,
 // so switching back is instant instead of showing a blank, re-spawned terminal.
-export function WorkspaceView(): JSX.Element {
+export function WorkspaceView(): React.JSX.Element {
   const workspaces = useStore((s) => s.workspaces);
   const activeId = useStore((s) => s.activeWorkspaceId);
   const maximizedPaneId = useStore((s) => s.maximizedPaneId);
@@ -15,7 +15,7 @@ export function WorkspaceView(): JSX.Element {
     <div className="workspace-view">
       {workspaces.map((ws) => {
         const active = ws.id === activeId;
-        let content: JSX.Element;
+        let content: React.JSX.Element;
         if (!ws.layout) {
           content = <WelcomeScreen workspaceId={ws.id} cwd={ws.cwd} />;
         } else {

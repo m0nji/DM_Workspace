@@ -4,7 +4,7 @@ import { useStore } from '../store';
 // Shown before creating a workspace from a template that carries startup
 // commands (when the template asks for confirmation). Lets the user run the
 // commands, skip them, or cancel entirely.
-export function StartupCommandConfirmDialog(): JSX.Element | null {
+export function StartupCommandConfirmDialog(): React.JSX.Element | null {
   const pending = useStore((s) => s.pendingTemplateLaunch);
   const setPending = useStore((s) => s.setPendingTemplateLaunch);
   const templates = useStore((s) => s.workspaceTemplates ?? []);

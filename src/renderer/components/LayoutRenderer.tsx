@@ -14,7 +14,7 @@ interface Props {
   maximizedPaneId?: string | null;
 }
 
-export function LayoutRenderer({ node, cwd, maximizedPaneId = null }: Props): JSX.Element {
+export function LayoutRenderer({ node, cwd, maximizedPaneId = null }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (node.type === 'pane') {

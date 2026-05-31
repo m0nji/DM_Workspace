@@ -7,7 +7,7 @@ interface Props { paneId: string; }
 // A small find overlay for one pane. Visible when the store's searchOpenPaneId
 // matches this pane (set by the Cmd/Ctrl+F shortcut). Enter / Shift+Enter cycle
 // matches; Esc closes.
-export function SearchBar({ paneId }: Props): JSX.Element | null {
+export function SearchBar({ paneId }: Props): React.JSX.Element | null {
   const open = useStore((s) => s.searchOpenPaneId === paneId);
   const setSearchOpen = useStore((s) => s.setSearchOpen);
   const [query, setQuery] = useState('');

@@ -39,7 +39,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
 export interface IconProps { name: IconName; size?: number; }
 
 /** Renders a named icon at `size` CSS px, scaled from the shared 24×24 path canvas. */
-export function Icon({ name, size = 16 }: IconProps): JSX.Element {
+export function Icon({ name, size = 16 }: IconProps): React.JSX.Element {
   return (
     <svg
       width={size}

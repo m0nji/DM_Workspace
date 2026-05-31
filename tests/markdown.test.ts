@@ -18,4 +18,15 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('<script>');
     expect(html).toContain('ok');
   });
+
+  it('strips javascript links and active html from untrusted markdown', () => {
+    const html = renderMarkdown(
+      '[bad](javascript:alert(1))\n\n<form action="https://example.com"><input name="x"></form>\n\n<span style="color:red">styled</span>'
+    );
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('<form');
+    expect(html).not.toContain('<input');
+    expect(html).not.toContain('style=');
+    expect(html).toContain('styled');
+  });
 });

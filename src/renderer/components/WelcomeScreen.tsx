@@ -14,7 +14,7 @@ const PRESETS: PresetDef[] = [
 
 interface Props { workspaceId: string; cwd: string; }
 
-export function WelcomeScreen({ workspaceId, cwd }: Props): JSX.Element {
+export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
   const applyPreset = useStore((s) => s.applyPreset);
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
   const templates = useStore((s) => s.workspaceTemplates ?? []);

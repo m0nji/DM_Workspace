@@ -15,7 +15,7 @@ interface Props {
 
 /** A small dark popup menu positioned at (x, y). Closes on Escape, outside
  *  click, scroll, or window blur. Clamps itself to stay within the viewport. */
-export function ContextMenu({ x, y, items, onClose }: Props): JSX.Element {
+export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
 

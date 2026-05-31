@@ -15,7 +15,7 @@ interface WebviewEl extends HTMLElement {
   getURL(): string;
 }
 
-export function PreviewPanel(): JSX.Element | null {
+export function PreviewPanel(): React.JSX.Element | null {
   const panel = useStore((s) => s.previewPanel);
   const closePreview = useStore((s) => s.closePreview);
   const setPreviewWidth = useStore((s) => s.setPreviewWidth);

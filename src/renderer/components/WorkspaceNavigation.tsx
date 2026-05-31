@@ -8,7 +8,7 @@ interface WorkspaceNavigationProps {
   placement: WorkspaceNavigationPlacement;
 }
 
-export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): JSX.Element {
+export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): React.JSX.Element {
   const workspaces = useStore((s) => s.workspaces);
   const activeId = useStore((s) => s.activeWorkspaceId);
   const selectWorkspace = useStore((s) => s.selectWorkspace);

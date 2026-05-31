@@ -10,7 +10,7 @@ import { TemplateWizard } from './components/TemplateWizard';
 import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const hydrated = useStore((s) => s.hydrated);
   const hydrate = useStore((s) => s.hydrate);
   const applyUpdateEvent = useStore((s) => s.applyUpdateEvent);

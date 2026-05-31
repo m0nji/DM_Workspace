@@ -5,7 +5,7 @@ import type { LayoutNode } from '../../shared/types';
 
 // A compact schematic of a layout tree, echoing the preset glyphs on the welcome
 // screen so the user recognizes the captured shape at a glance.
-function LayoutMini({ node, highlight }: { node: LayoutNode; highlight?: string }): JSX.Element {
+function LayoutMini({ node, highlight }: { node: LayoutNode; highlight?: string }): React.JSX.Element {
   if (node.type === 'pane') {
     return <div className={`mini-pane ${highlight === node.id ? 'hl' : ''}`} />;
   }
@@ -25,7 +25,7 @@ function clean(map: Record<string, string>): Record<string, string> {
   return out;
 }
 
-export function TemplateWizard(): JSX.Element | null {
+export function TemplateWizard(): React.JSX.Element | null {
   const wizard = useStore((s) => s.templateWizard);
   const setWizard = useStore((s) => s.setTemplateWizard);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
