@@ -62,6 +62,24 @@ body {
   display: inline-flex; align-items: center; padding: 4px; border-radius: 4px; }
 .settings-btn:hover { color: var(--text); background: #2a2a2a; }
 
+/* One square, consistently-sized clickable target for every chrome icon. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative; /* anchors the update dot */
+}
+.icon-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+.icon-btn.active { color: #6cb6ff; }
+
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center; z-index: 100;
   -webkit-app-region: no-drag; }
