@@ -215,6 +215,7 @@ export function SettingsPanel(): JSX.Element | null {
   const pct = Math.round(settings.terminalOpacity * 100);
   // The effective background is the override if set, otherwise the theme's own.
   const activeBg = settings.terminalBackground ?? getTheme(settings.themeId).background;
+  const workspaceNavigationPlacement = settings.workspaceNavigationPlacement ?? 'left';
 
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -309,6 +310,33 @@ export function SettingsPanel(): JSX.Element | null {
 
                 <p className="modal-hint">
                   Lower opacity reveals the blurred backdrop behind the terminals (macOS).
+                </p>
+                </div>
+
+                <div className="settings-group">
+                <div className="modal-section-label">Workspace navigation</div>
+
+                <div className="segmented-control" role="group" aria-label="Workspace navigation placement">
+                  <button
+                    type="button"
+                    className={`segmented-control-item ${workspaceNavigationPlacement === 'left' ? 'active' : ''}`}
+                    aria-pressed={workspaceNavigationPlacement === 'left'}
+                    onClick={() => updateSettings({ workspaceNavigationPlacement: 'left' })}
+                  >
+                    Left sidebar
+                  </button>
+                  <button
+                    type="button"
+                    className={`segmented-control-item ${workspaceNavigationPlacement === 'top' ? 'active' : ''}`}
+                    aria-pressed={workspaceNavigationPlacement === 'top'}
+                    onClick={() => updateSettings({ workspaceNavigationPlacement: 'top' })}
+                  >
+                    Top tabs
+                  </button>
+                </div>
+
+                <p className="modal-hint">
+                  Choose where workspace switching appears. Only one placement is active at a time.
                 </p>
                 </div>
               </>

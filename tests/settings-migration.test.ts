@@ -5,12 +5,17 @@ import { DEFAULT_THEME_ID } from '../src/shared/themes';
 describe('migrateSettings', () => {
   it('maps a pre-theme state to the default theme, keeping opacity and preserving the custom background as an override', () => {
     const out = migrateSettings({ terminalBackground: '#101418', terminalOpacity: 0.5 });
-    expect(out).toEqual({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.5, terminalBackground: '#101418' });
+    expect(out).toEqual({
+      themeId: DEFAULT_THEME_ID,
+      terminalOpacity: 0.5,
+      terminalBackground: '#101418',
+      workspaceNavigationPlacement: 'left'
+    });
   });
 
   it('keeps a valid themeId', () => {
     const out = migrateSettings({ themeId: 'dracula', terminalOpacity: 0.9 });
-    expect(out).toEqual({ themeId: 'dracula', terminalOpacity: 0.9 });
+    expect(out).toEqual({ themeId: 'dracula', terminalOpacity: 0.9, workspaceNavigationPlacement: 'left' });
   });
 
   it('falls back to defaults for an unknown themeId or missing opacity', () => {
@@ -42,5 +47,26 @@ describe('migrateSettings', () => {
   it('omits shortcutBindings entirely when none are valid', () => {
     const out = migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, shortcutBindings: { nope: 1 } });
     expect(out.shortcutBindings).toBeUndefined();
+  });
+
+  it('keeps valid workspace navigation placement values', () => {
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID,
+      terminalOpacity: 0.75,
+      workspaceNavigationPlacement: 'left'
+    }).workspaceNavigationPlacement).toBe('left');
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID,
+      terminalOpacity: 0.75,
+      workspaceNavigationPlacement: 'top'
+    }).workspaceNavigationPlacement).toBe('top');
+  });
+
+  it('drops invalid workspace navigation placement values to the default left placement', () => {
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID,
+      terminalOpacity: 0.75,
+      workspaceNavigationPlacement: 'floating'
+    })).toEqual(defaultSettings());
   });
 });

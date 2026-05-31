@@ -1,7 +1,9 @@
 import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { AppState, LayoutNode, Settings, WindowBounds, Workspace, WorkspaceTemplate } from '../shared/types';
+import type {
+  AppState, LayoutNode, Settings, WindowBounds, Workspace, WorkspaceTemplate, WorkspaceNavigationPlacement
+} from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 import { SHORTCUT_ACTIONS, type ShortcutAction } from '../shared/shortcuts';
 
@@ -26,8 +28,12 @@ function migrateShortcutBindings(raw: unknown): Partial<Record<ShortcutAction, s
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+function migrateWorkspaceNavigationPlacement(raw: unknown): WorkspaceNavigationPlacement | undefined {
+  return raw === 'left' || raw === 'top' ? raw : undefined;
+}
+
 export function defaultSettings(): Settings {
-  return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75 };
+  return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, workspaceNavigationPlacement: 'left' };
 }
 
 // Migrate a raw persisted settings blob to the current shape. Pre-v0.2 states
@@ -44,12 +50,14 @@ export function migrateSettings(raw: unknown): Settings {
   const terminalOpacity = typeof r.terminalOpacity === 'number' && Number.isFinite(r.terminalOpacity)
     ? Math.min(1, Math.max(0, r.terminalOpacity))
     : d.terminalOpacity;
-  const out: Settings = { themeId, terminalOpacity };
+  const out: Settings = { themeId, terminalOpacity, workspaceNavigationPlacement: d.workspaceNavigationPlacement };
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
   const shortcutBindings = migrateShortcutBindings(r.shortcutBindings);
   if (shortcutBindings) out.shortcutBindings = shortcutBindings;
+  const workspaceNavigationPlacement = migrateWorkspaceNavigationPlacement(r.workspaceNavigationPlacement);
+  if (workspaceNavigationPlacement) out.workspaceNavigationPlacement = workspaceNavigationPlacement;
   return out;
 }
 

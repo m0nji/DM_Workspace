@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
+import type { WorkspaceNavigationPlacement } from '../../shared/types';
 import { ConfirmDialog } from './ConfirmDialog';
 
-export function Sidebar(): JSX.Element {
+interface WorkspaceNavigationProps {
+  placement: WorkspaceNavigationPlacement;
+}
+
+export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): JSX.Element {
   const workspaces = useStore((s) => s.workspaces);
   const activeId = useStore((s) => s.activeWorkspaceId);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
@@ -26,6 +31,9 @@ export function Sidebar(): JSX.Element {
   const pendingWs = pendingDeleteId
     ? workspaces.find((w) => w.id === pendingDeleteId)
     : undefined;
+  const top = placement === 'top';
+  const rootClass = top ? 'workspace-tabs' : 'sidebar';
+  const itemClass = top ? 'workspace-tab' : 'ws-item';
 
   // Focus + select the field when entering edit mode (more reliable than autoFocus
   // when the input is conditionally rendered inside a list that re-renders).
@@ -60,8 +68,8 @@ export function Sidebar(): JSX.Element {
   };
 
   return (
-    <div className="sidebar">
-      <div className="sidebar-header"><span>WORKSPACES</span></div>
+    <div className={rootClass}>
+      {!top && <div className="sidebar-header"><span>WORKSPACES</span></div>}
       {workspaces.map((w) => {
         const paneIds = collectPaneIds(w.layout);
         const count = paneIds.length;
@@ -73,7 +81,7 @@ export function Sidebar(): JSX.Element {
         return (
           <div
             key={w.id}
-            className={`ws-item ${w.id === activeId ? 'active' : ''}`}
+            className={`${itemClass} ${w.id === activeId ? 'active' : ''} ${editing ? 'editing' : ''}`}
             onClick={() => { if (!editing) selectWorkspace(w.id); }}
             onDoubleClick={(e) => { e.preventDefault(); startEdit(w.id, w.name); }}
           >
@@ -138,11 +146,19 @@ export function Sidebar(): JSX.Element {
           </div>
         );
       })}
-      <div className="add-ws" onClick={addWorkspace}>+ Workspace</div>
-
-      <div className="sidebar-footer">
-        <span className="app-version">v{__APP_VERSION__}</span>
+      <div
+        className={top ? 'add-workspace-tab' : 'add-ws'}
+        title={top ? 'Add workspace' : undefined}
+        onClick={addWorkspace}
+      >
+        {top ? '+' : '+ Workspace'}
       </div>
+
+      {!top && (
+        <div className="sidebar-footer">
+          <span className="app-version">v{__APP_VERSION__}</span>
+        </div>
+      )}
 
       {pendingWs && (
         <ConfirmDialog

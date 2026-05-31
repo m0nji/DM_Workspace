@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from './store';
-import { Sidebar } from './components/Sidebar';
+import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
 import { PreviewPanel } from './components/PreviewPanel';
@@ -17,6 +17,7 @@ export function App(): JSX.Element {
   const checkForUpdates = useStore((s) => s.checkForUpdates);
   const setWindowFocused = useStore((s) => s.setWindowFocused);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
+  const workspaceNavigationPlacement = useStore((s) => s.settings.workspaceNavigationPlacement ?? 'left');
 
   useKeyboardShortcuts();
 
@@ -52,9 +53,18 @@ export function App(): JSX.Element {
           Windows it's a custom row below the native window controls, so both
           platforms have the same titlebar surface for the action buttons. */}
       <div className="titlebar"><TitlebarActions /></div>
-      <div className="app">
-        <Sidebar />
-        <WorkspaceView />
+      <div className={`app app-${workspaceNavigationPlacement}`}>
+        {workspaceNavigationPlacement === 'left' ? (
+          <>
+            <WorkspaceNavigation placement="left" />
+            <WorkspaceView />
+          </>
+        ) : (
+          <div className="workspace-shell">
+            <WorkspaceNavigation placement="top" />
+            <WorkspaceView />
+          </div>
+        )}
         <PreviewPanel />
       </div>
       <SettingsPanel />

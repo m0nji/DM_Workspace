@@ -4,6 +4,8 @@ export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
 export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'notifications' | 'updates';
 
+export type WorkspaceNavigationPlacement = 'left' | 'top';
+
 export interface PaneNode {
   type: 'pane';
   id: string; // unique id; also used as the PTY pane identifier
@@ -53,6 +55,7 @@ export interface Settings {
   terminalBackground?: string; // optional hex override of the theme's background color
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
+  workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
   shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts
 }
 
