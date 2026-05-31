@@ -85,8 +85,11 @@ body {
   max-height: 85vh; overflow-y: auto; }
 /* The settings modal uses a left nav rail to pick a category and a content area
    that renders one section at a time. */
-.modal.settings-modal { width: 640px; max-width: 92vw; }
-.settings-body { display: flex; gap: 20px; align-items: flex-start; }
+/* Fixed height so switching sections doesn't resize (and re-center) the modal —
+   the left nav stays put and only the content area scrolls. */
+.modal.settings-modal { width: 640px; max-width: 92vw; height: min(620px, 85vh);
+  display: flex; flex-direction: column; overflow: hidden; }
+.settings-body { display: flex; gap: 20px; align-items: stretch; flex: 1; min-height: 0; }
 .settings-nav {
   display: flex; flex-direction: column; gap: 2px;
   min-width: 150px; flex-shrink: 0;
@@ -98,7 +101,7 @@ body {
 }
 .settings-nav-item:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
 .settings-nav-item.active { color: var(--accent); background: rgba(255, 138, 76, 0.12); }
-.settings-content { flex: 1; min-width: 0; }
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
 .settings-group { margin-bottom: 14px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
