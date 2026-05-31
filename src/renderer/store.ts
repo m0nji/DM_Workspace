@@ -97,6 +97,7 @@ interface StoreState extends AppState {
   deleteWorkspaceTemplate: (id: string) => void;
   requestTemplateLaunch: (id: string) => void;
   createWorkspaceFromTemplate: (id: string, includeStartupCommands: boolean) => void;
+  applyTemplateToWorkspace: (workspaceId: string, templateId: string, includeStartupCommands: boolean) => void;
   consumeStartupCommand: (paneId: string) => string | null;
   paneTitle: (paneId: string, fallback: string) => string;
   // shortcuts
@@ -442,6 +443,31 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     persist(next);
     return next;
+  }),
+
+  // Fill an existing (blank) workspace from a template, in place — used by the
+  // welcome screen so picking a template doesn't leave the empty workspace
+  // behind. Same clone/remap rules as createWorkspaceFromTemplate. Patches in
+  // place and does NOT change activeWorkspaceId — the caller targets the
+  // already-active workspace. Stale optional fields are deleted when the
+  // template omits them (this is why it spreads over the existing object).
+  applyTemplateToWorkspace: (workspaceId, templateId, includeStartupCommands) => set((s) => {
+    const tpl = (s.workspaceTemplates ?? []).find((t) => t.id === templateId);
+    if (!tpl) return s;
+    const { layout, paneIdMap } = cloneTemplateLayout(tpl.layout, nextPaneId, nextSplitId);
+    const workspaces = s.workspaces.map((w) => {
+      if (w.id !== workspaceId) return w;
+      const next: Workspace = { ...w, name: tpl.name, cwd: tpl.cwd, layout };
+      if (tpl.color) next.color = tpl.color; else delete next.color;
+      const paneTitles = remapStringMap(tpl.paneTitles, paneIdMap);
+      if (paneTitles) next.paneTitles = paneTitles; else delete next.paneTitles;
+      const pending = includeStartupCommands ? remapStringMap(tpl.startupCommands, paneIdMap) : undefined;
+      if (pending) next.pendingStartupCommands = pending; else delete next.pendingStartupCommands;
+      return next;
+    });
+    const out = { ...s, workspaces, maximizedPaneId: null, focusedPaneId: null };
+    persist(out);
+    return out;
   }),
 
   // Return a pane's pending startup command once, then remove it (persisting so a

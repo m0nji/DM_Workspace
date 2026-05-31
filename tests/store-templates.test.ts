@@ -189,6 +189,85 @@ describe('workspace templates store actions', () => {
     expect(tpl.paneTitles).toBeUndefined();
   });
 
+  it('applyTemplateToWorkspace fills an existing blank workspace in place', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'Workspace 1', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Dev', cwd: '/repo',
+        layout: { type: 'pane', id: 'tp1' },
+        paneTitles: { tp1: 'dev server' },
+        startupCommands: { tp1: 'npm run dev' },
+        confirmStartupCommands: true
+      }]
+    });
+
+    useStore.getState().applyTemplateToWorkspace('w1', 'tpl1', true);
+
+    const ws = useStore.getState().workspaces.find((w) => w.id === 'w1')!;
+    expect(useStore.getState().workspaces).toHaveLength(1); // no new workspace
+    expect(ws.name).toBe('Dev');
+    expect(ws.cwd).toBe('/repo');
+    expect(ws.layout?.type).toBe('pane');
+    const newPaneId = ws.layout!.id;
+    expect(newPaneId).not.toBe('tp1'); // fresh id
+    expect(ws.paneTitles?.[newPaneId]).toBe('dev server');
+    expect(ws.pendingStartupCommands?.[newPaneId]).toBe('npm run dev');
+    expect(saveState).toHaveBeenCalled();
+  });
+
+  it('applyTemplateToWorkspace omits startup commands when not included', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Dev', cwd: '/repo', layout: { type: 'pane', id: 'tp1' },
+        startupCommands: { tp1: 'npm run dev' }, confirmStartupCommands: true
+      }]
+    });
+    useStore.getState().applyTemplateToWorkspace('w1', 'tpl1', false);
+    const ws = useStore.getState().workspaces.find((w) => w.id === 'w1')!;
+    expect(ws.pendingStartupCommands).toBeUndefined();
+  });
+
+  it('applyTemplateToWorkspace clears stale fields the template does not supply', () => {
+    useStore.setState({
+      workspaces: [{
+        id: 'w1', name: 'Old', cwd: '/old',
+        layout: { type: 'pane', id: 'oldp' },
+        color: '#abcdef',
+        paneTitles: { oldp: 'old title' },
+        pendingStartupCommands: { oldp: 'echo stale' }
+      }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: [{
+        id: 'tpl1', name: 'Plain', cwd: '/repo',
+        layout: { type: 'pane', id: 'tp1' },
+        confirmStartupCommands: true
+        // no color, no paneTitles, no startupCommands
+      }]
+    });
+
+    useStore.getState().applyTemplateToWorkspace('w1', 'tpl1', true);
+
+    const ws = useStore.getState().workspaces.find((w) => w.id === 'w1')!;
+    expect(ws.color).toBeUndefined();
+    expect(ws.paneTitles).toBeUndefined();
+    expect(ws.pendingStartupCommands).toBeUndefined();
+  });
+
+  it('applyTemplateToWorkspace is a no-op when the template id is unknown', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'W', cwd: '/old', layout: null }],
+      activeWorkspaceId: 'w1',
+      workspaceTemplates: []
+    });
+    useStore.getState().applyTemplateToWorkspace('w1', 'nope', true);
+    const ws = useStore.getState().workspaces.find((w) => w.id === 'w1')!;
+    expect(useStore.getState().workspaces).toHaveLength(1);
+    expect(ws.layout).toBeNull();
+  });
+
   it('resolves a custom pane title with cwd fallback', () => {
     expect(useStore.getState().paneTitle('p1', '/repo')).toBe('dev server');
     expect(useStore.getState().paneTitle('pX', '/fallback')).toBe('/fallback');
