@@ -164,19 +164,38 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  ipc.pty.killAll();
-  if (process.platform !== 'darwin') app.quit();
+  // On macOS the app stays alive when all windows close, so just tear the
+  // terminals down. Elsewhere quitting routes pty cleanup through 'before-quit'.
+  if (process.platform === 'darwin') {
+    ipc.pty.killAll();
+  } else {
+    app.quit();
+  }
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-app.on('before-quit', () => {
-  ipc.pty.killAll();
-  // E2E only: remove the temporary userData dir created for test isolation
-  if (e2eTempDir) {
-    rmSync(e2eTempDir, { recursive: true, force: true });
-    e2eTempDir = null;
-  }
+// Quit only after every pty has actually exited. node-pty's exit callback can
+// otherwise fire while Electron is tearing down the JS environment, making the
+// native addon abort() the process (the "quit unexpectedly" dialog seen on
+// auto-update). preventDefault holds the quit, then we re-quit once cleanup is
+// done (or a short timeout elapses) — Squirrel's installer just waits a beat.
+let ptyCleanupDone = false;
+let ptyCleanupStarted = false;
+app.on('before-quit', (event) => {
+  if (ptyCleanupDone) return;
+  event.preventDefault();
+  if (ptyCleanupStarted) return;
+  ptyCleanupStarted = true;
+  ipc.pty.killAllAndWait().then(() => {
+    // E2E only: remove the temporary userData dir created for test isolation
+    if (e2eTempDir) {
+      rmSync(e2eTempDir, { recursive: true, force: true });
+      e2eTempDir = null;
+    }
+    ptyCleanupDone = true;
+    app.quit();
+  });
 });

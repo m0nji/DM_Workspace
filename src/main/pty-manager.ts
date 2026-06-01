@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import { killAndWait } from './pty-shutdown';
 import { existsSync } from 'fs';
 import { resolveCwd } from './resolve-cwd';
 import { app } from 'electron';
@@ -147,5 +148,14 @@ export class PtyManager {
 
   killAll(): void {
     for (const id of [...this.procs.keys()]) this.kill(id);
+  }
+
+  // Kill every pty and wait for each to actually exit before resolving, so the
+  // native addon is done calling back into JS before Electron tears the
+  // environment down on quit. See pty-shutdown.ts for why this matters.
+  killAllAndWait(timeoutMs = 1500): Promise<void> {
+    const procs = [...this.procs.values()];
+    this.procs.clear();
+    return killAndWait(procs, timeoutMs);
   }
 }
