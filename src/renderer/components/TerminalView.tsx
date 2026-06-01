@@ -316,16 +316,21 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       {
         label: 'Copy',
         disabled: !hasSelection,
-        onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(sel); }
+        // Refocus the terminal: clicking a menu button moves focus onto the
+        // button, and on close it falls to <body>, not back to xterm's hidden
+        // textarea — so keystrokes (e.g. Enter after Paste) are dropped until
+        // the user clicks into the terminal. term.focus() restores it.
+        onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(sel); term?.focus(); }
       },
       {
         label: 'Paste',
         onClick: async () => {
           const text = await window.api.clipboardRead();
           if (text) term?.paste(text);
+          term?.focus();
         }
       },
-      { label: 'Select All', onClick: () => term?.selectAll() },
+      { label: 'Select All', onClick: () => { term?.selectAll(); term?.focus(); } },
       { label: '-' },
       { label: 'Search', onClick: () => setSearchOpen(paneId) },
       { label: 'Close Terminal', onClick: () => closeActivePane(paneId) }
