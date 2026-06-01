@@ -72,3 +72,23 @@ jobs:
         run: |
           npm run build
           npx electron-builder --win --publish always
+
+  linux:
+    # Run after Windows for the same single-draft reason (see the windows job):
+    # serializing lets this job upload its AppImage + latest-linux.yml into the
+    # existing draft instead of racing to create a second one.
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build & publish (Linux)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build
+          npx electron-builder --linux --publish always
