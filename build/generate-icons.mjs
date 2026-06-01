@@ -8,6 +8,13 @@ import { fileURLToPath } from 'node:url';
 const dir = dirname(fileURLToPath(import.meta.url));
 const svg = join(dir, 'icon-master.svg');
 const iconset = join(dir, 'icon.iconset');
+// Linux: electron-builder reads a directory of <size>x<size>.png files and
+// installs each into the matching /usr/share/icons/hicolor/<size>x<size>/apps.
+// These MUST be standard hicolor sizes — a lone 1024px png lands in a size the
+// theme index doesn't list, so the .desktop Icon= fails to resolve and GNOME
+// falls back to a generic icon. (build/icon.png stays the 1024px runtime icon.)
+const linuxIcons = join(dir, 'icons');
+const linuxSizes = [16, 24, 32, 48, 64, 128, 256, 512];
 
 const render = (size) => sharp(svg, { density: 384 }).resize(size, size).png().toBuffer();
 
@@ -29,4 +36,10 @@ writeFileSync(join(dir, 'icon-256.png'), await render(256));
 const ico = await pngToIco([join(dir, 'icon-256.png')]);
 writeFileSync(join(dir, 'icon.ico'), ico);
 rmSync(join(dir, 'icon-256.png'), { force: true });
-console.log('Icons generated: build/icon.icns, build/icon.ico, build/icon.png');
+
+rmSync(linuxIcons, { recursive: true, force: true });
+mkdirSync(linuxIcons, { recursive: true });
+for (const size of linuxSizes) {
+  writeFileSync(join(linuxIcons, `${size}x${size}.png`), await render(size));
+}
+console.log('Icons generated: build/icon.icns, build/icon.ico, build/icon.png, build/icons/');

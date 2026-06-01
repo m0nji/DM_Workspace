@@ -89,7 +89,7 @@
         "AppImage",
         "deb"
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "category": "Development",
       "maintainer": "DM Workspace <dev@dmworkspace.local>"
     },
