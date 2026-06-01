@@ -86,11 +86,12 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
       "icon": "build/icon.png",
       "category": "Development",
-      "maintainer": "DM Workspace"
+      "maintainer": "DM Workspace <dev@dmworkspace.local>"
     },
     "directories": {
       "output": "dist"
