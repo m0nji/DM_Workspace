@@ -12,6 +12,7 @@ import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
+import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 
 interface Props { paneId: string; cwd: string; }
@@ -66,7 +67,11 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
         useStore.getState().settings.terminalOpacity,
         useStore.getState().settings.terminalBackground
       ),
-      cursorBlink: true
+      cursorBlink: true,
+      // xterm's native alt-click only ever emits ←/→ and models the prompt as
+      // one wrapped logical line, so it can't reach another line of a multi-line
+      // editor. Disable it; the custom mouseup handler below handles ↑/↓ too.
+      altClickMovesCursor: false
     });
     termRef.current = term;
     const fit = new FitAddon();
@@ -184,6 +189,58 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     };
     host.addEventListener('keydown', handleTerminalPasteShortcut, true);
 
+    // Click → walk the running program's input cursor to the clicked cell,
+    // using only ←/→ (which cross line boundaries in these editors). We feed the
+    // key sequence to the PTY so the program (shell, Claude Code, Codex) moves
+    // its own cursor. Option/Alt+click always triggers; a plain click triggers
+    // only when the clickMovesCursor setting is on (a plain click otherwise has
+    // jobs of its own: focus, select, open links). A drag makes a selection and
+    // is left alone. Only fires at the bottom of the scrollback, where the live
+    // cursor is.
+    const moveTriggered = (e: MouseEvent): boolean => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return false; // reserved for selection/links
+      if (e.altKey) return true; // Option/Alt+click: always
+      return useStore.getState().settings.clickMovesCursor ?? false; // plain click: opt-in
+    };
+    let clickMoveDownAt = -1;
+    const onMoveMouseDown = (e: MouseEvent): void => { clickMoveDownAt = moveTriggered(e) ? e.timeStamp : -1; };
+    const onMoveMouseUp = (e: MouseEvent): void => {
+      if (clickMoveDownAt < 0 || !moveTriggered(e)) { clickMoveDownAt = -1; return; }
+      const quick = e.timeStamp - clickMoveDownAt < 500; // long press → treat as selection
+      clickMoveDownAt = -1;
+      if (!quick || term.hasSelection()) return;
+      const buf = term.buffer.active;
+      if (buf.viewportY < buf.baseY) return; // scrolled up; the live cursor isn't on screen
+      const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
+      if (!screen) return;
+      const rect = screen.getBoundingClientRect();
+      const cellW = rect.width / term.cols;
+      const cellH = rect.height / term.rows;
+      if (!(cellW > 0) || !(cellH > 0)) return;
+      let col = Math.floor((e.clientX - rect.left) / cellW);
+      let row = Math.floor((e.clientY - rect.top) / cellH);
+      col = Math.min(Math.max(col, 0), term.cols - 1);
+      row = Math.min(Math.max(row, 0), term.rows - 1);
+      // Per-row content length + wrapped flag, so the move can count across
+      // newlines. Indexed by the same viewport rows as the cursor/target cells.
+      const rowsMeta: RowMeta[] = [];
+      for (let y = 0; y < term.rows; y++) {
+        const line = buf.getLine(buf.baseY + y);
+        rowsMeta.push({ length: (line?.translateToString(true) ?? '').length, wrapped: line?.isWrapped ?? false });
+      }
+      // Don't overshoot into the empty space past the end of the clicked line.
+      col = Math.min(col, rowsMeta[row].length);
+      const seq = clickMoveSequence(
+        rowsMeta,
+        { x: buf.cursorX, y: buf.cursorY },
+        { x: col, y: row },
+        term.modes.applicationCursorKeysMode
+      );
+      if (seq) { window.api.input({ paneId, data: seq }); activity.onInput(); }
+    };
+    host.addEventListener('mousedown', onMoveMouseDown, true);
+    host.addEventListener('mouseup', onMoveMouseUp, true);
+
     const safeFit = (): boolean => {
       if (host.clientWidth > 0 && host.clientHeight > 0) {
         fit.fit();
@@ -285,6 +342,8 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       cancelAnimationFrame(raf2);
       ro.disconnect();
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
+      host.removeEventListener('mousedown', onMoveMouseDown, true);
+      host.removeEventListener('mouseup', onMoveMouseUp, true);
       offData();
       offExit();
       inputDisp.dispose();

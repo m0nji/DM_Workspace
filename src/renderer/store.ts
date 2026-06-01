@@ -14,6 +14,7 @@ import type { PreviewSource } from '../shared/link-detect';
 const DEFAULT_SETTINGS: Settings = {
   themeId: DEFAULT_THEME_ID,
   terminalOpacity: 0.75,
+  clickMovesCursor: false,
   showDoneBadge: false,
   notificationsEnabled: false,
   workspaceNavigationPlacement: 'left'

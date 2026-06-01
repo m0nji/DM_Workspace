@@ -339,6 +339,25 @@ export function SettingsPanel(): React.JSX.Element | null {
                   Choose where workspace switching appears. Only one placement is active at a time.
                 </p>
                 </div>
+
+                <div className="settings-group">
+                <div className="modal-section-label">Terminal input</div>
+
+                <div className="setting-row">
+                  <label htmlFor="click-moves-cursor-toggle">Click moves the input cursor</label>
+                  <input
+                    id="click-moves-cursor-toggle"
+                    type="checkbox"
+                    checked={settings.clickMovesCursor ?? false}
+                    onChange={(e) => updateSettings({ clickMovesCursor: e.target.checked })}
+                  />
+                </div>
+
+                <p className="modal-hint">
+                  When on, a plain click moves the cursor in the input line to the clicked spot.
+                  Option/Alt+click always does this, regardless of this setting. Off by default.
+                </p>
+                </div>
               </>
             )}
             {section === 'shortcuts' && <ShortcutsSection />}

@@ -53,6 +53,7 @@ export interface Settings {
   themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
   terminalOpacity: number;     // 0..1 (1 = fully opaque)
   terminalBackground?: string; // optional hex override of the theme's background color
+  clickMovesCursor?: boolean;  // a plain click (no modifier) moves the input cursor to the clicked cell; Option/Alt+click always does (default off)
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
