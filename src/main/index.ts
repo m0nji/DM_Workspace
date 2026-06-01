@@ -7,6 +7,7 @@ import { registerIpc } from './ipc';
 import { isBoundsVisible } from './window-bounds';
 import { registerUpdater } from './updater';
 import { installAppMenu } from './menu';
+import { windowIconFile } from './window-icon';
 
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
@@ -76,12 +77,14 @@ function createWindow(): void {
   // Keep the window chrome dark on Windows (title bar, native menus) and make the
   // Windows 11 acrylic backdrop use its dark tint regardless of the system theme.
   if (isWin) nativeTheme.themeSource = 'dark';
-  // Packaged builds bundle the icon as an extraResource (see package.json); in dev
-  // it lives in the repo's build/ dir. The installer's win.icon doesn't cover the
-  // in-window title-bar icon, so set it explicitly.
+  // Packaged builds bundle the icons as extraResources (see package.json); in dev
+  // they live in the repo's build/ dir. The installer's win.icon doesn't cover the
+  // in-window title-bar icon, so set it explicitly. Linux gets the PNG, Windows the
+  // .ico (macOS uses the bundle icon).
+  const iconFile = windowIconFile(process.platform);
   const iconPath = app.isPackaged
-    ? join(process.resourcesPath, 'icon.ico')
-    : join(__dirname, '../../build/icon.ico');
+    ? join(process.resourcesPath, iconFile)
+    : join(__dirname, '../../build', iconFile);
   // Restore last-used window size/position. width/height always apply; x/y only
   // if the saved frame still overlaps a connected display (a disconnected monitor
   // would otherwise open the window off-screen) — otherwise the window is centered.
