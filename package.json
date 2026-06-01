@@ -51,6 +51,10 @@
       {
         "from": "build/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
       }
     ],
     "publish": [
@@ -78,6 +82,14 @@
         "nsis"
       ],
       "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Development",
+      "maintainer": "DM Workspace"
     },
     "directories": {
       "output": "dist"
