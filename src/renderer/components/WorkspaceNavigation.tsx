@@ -129,18 +129,22 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
             ) : (
               <>
                 <span className="name">{w.name}</span>
-                {doneCount > 0 && <span className="done-badge" title="Terminals ready">{doneCount}</span>}
-                <span className="badge">{count}</span>
-                <span
-                  className="rename"
-                  title="Rename workspace"
-                  onClick={(e) => { e.stopPropagation(); startEdit(w.id, w.name); }}
-                >✎</span>
-                <span
-                  className="del"
-                  title="Delete workspace"
-                  onClick={(e) => { e.stopPropagation(); setPendingDeleteId(w.id); }}
-                >✕</span>
+                <span className="ws-end">
+                  <span className="ws-actions">
+                    <span
+                      className="rename"
+                      title="Rename workspace"
+                      onClick={(e) => { e.stopPropagation(); startEdit(w.id, w.name); }}
+                    >✎</span>
+                    <span
+                      className="del"
+                      title="Delete workspace"
+                      onClick={(e) => { e.stopPropagation(); setPendingDeleteId(w.id); }}
+                    >✕</span>
+                  </span>
+                  {doneCount > 0 && <span className="done-badge" title="Terminals ready">{doneCount}</span>}
+                  <span className="badge">{count}</span>
+                </span>
               </>
             )}
           </div>

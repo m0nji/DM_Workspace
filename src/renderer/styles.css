@@ -56,9 +56,19 @@ body {
 .ws-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ws-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-item .badge { color: var(--muted); font-size: 11px; }
-.ws-item .del, .ws-item .rename { color: var(--muted); visibility: hidden; cursor: pointer; }
-.ws-item:hover .del, .ws-item:hover .rename { visibility: visible; }
-.ws-item .rename:hover, .ws-item .del:hover { color: var(--text); }
+/* Pane count (+ optional done badge) pinned to the far right. The edit/close
+   actions take no layout space — they overlay the tail of the name on hover,
+   immediately left of the count, so the name gets the full width otherwise. */
+.ws-end { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
+.ws-actions { position: absolute; right: 100%; top: 0; bottom: 0; display: flex;
+  align-items: center; gap: 6px; padding: 0 8px 0 18px; visibility: hidden;
+  background: linear-gradient(to right, rgba(42, 42, 42, 0), #2a2a2a 18px); }
+.ws-item:hover, .workspace-tab:hover { background: #2a2a2a; }
+.ws-item:hover .ws-actions, .workspace-tab:hover .ws-actions { visibility: visible; }
+.ws-item .rename, .ws-item .del,
+.workspace-tab .rename, .workspace-tab .del { color: var(--muted); cursor: pointer; }
+.ws-item .rename:hover, .ws-item .del:hover,
+.workspace-tab .rename:hover, .workspace-tab .del:hover { color: var(--text); }
 .add-ws { color: var(--muted); cursor: pointer; padding: 7px 8px; margin-top: 4px; }
 .add-ws:hover { color: var(--text); }
 
@@ -92,9 +102,6 @@ body {
 .workspace-tab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .workspace-tab .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-tab .badge { color: var(--muted); font-size: 11px; }
-.workspace-tab .del, .workspace-tab .rename { color: var(--muted); visibility: hidden; cursor: pointer; }
-.workspace-tab:hover .del, .workspace-tab:hover .rename { visibility: visible; }
-.workspace-tab .rename:hover, .workspace-tab .del:hover { color: var(--text); }
 .add-workspace-tab {
   flex: 0 0 auto;
   width: 28px;
