@@ -1,4 +1,5 @@
 import type { ShortcutAction } from './shortcuts';
+export type { Task, TaskColumn, TaskBoard } from './tasks-markdown';
 
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
@@ -133,6 +134,10 @@ export interface RendererApi {
   resolveLink(rel: string, cwd: string, roots: string[]): Promise<string | null>;
   // read a UTF-8 text file (used by the markdown preview)
   readFile(path: string): Promise<string>;
+  // task board (TASKS.md per working dir)
+  loadTasks(dir: string): Promise<import('./tasks-markdown').TaskBoard>;
+  saveTasks(dir: string, board: import('./tasks-markdown').TaskBoard): void;
+  onTasksChanged(cb: (dir: string, board: import('./tasks-markdown').TaskBoard) => void): () => void;
   // terminal scrollback persistence (replayed on restart; the process itself is fresh)
   getScrollback(paneId: string): Promise<string | null>;
   saveScrollback(paneId: string, data: string): void;

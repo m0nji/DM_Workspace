@@ -45,6 +45,13 @@ const api: RendererApi = {
   resolveLink: (rel: string, cwd: string, roots: string[]) =>
     ipcRenderer.invoke('link:resolve', { rel, cwd, roots }) as Promise<string | null>,
   readFile: (path: string) => ipcRenderer.invoke('file:read', path) as Promise<string>,
+  loadTasks: (dir: string) => ipcRenderer.invoke('tasks:load', dir) as Promise<import('../shared/tasks-markdown').TaskBoard>,
+  saveTasks: (dir, board) => ipcRenderer.send('tasks:save', { dir, board }),
+  onTasksChanged: (cb) => {
+    const handler = (_e: unknown, p: { dir: string; board: import('../shared/tasks-markdown').TaskBoard }) => cb(p.dir, p.board);
+    ipcRenderer.on('tasks:changed', handler);
+    return () => ipcRenderer.removeListener('tasks:changed', handler);
+  },
   getScrollback: (paneId: string) => ipcRenderer.invoke('scrollback:get', paneId) as Promise<string | null>,
   saveScrollback: (paneId: string, data: string) => ipcRenderer.send('scrollback:save', { paneId, data }),
   checkForUpdates: () => ipcRenderer.send('updates:check'),

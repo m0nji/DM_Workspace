@@ -1,9 +1,12 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
+import { loadTasks, saveTasks, tasksFilePath } from './task-store';
+import type { TaskBoard } from '../shared/types';
+import { watch, type FSWatcher } from 'node:fs';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
@@ -115,6 +118,47 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.on('scrollback:save', (_e, req: { paneId: string; data: string }) =>
     scrollback.set(req.paneId, req.data)
   );
+
+  // --- Task board ---------------------------------------------------------
+  // Echo-guard: remember the exact content we last wrote per dir so the file
+  // watcher ignores our own writes (no save->watch->reload ping-pong). Mirrors the
+  // scrollback debounce philosophy. One watcher at a time (the board only ever
+  // shows the active workspace's dir).
+  const lastWritten = new Map<string, string>();
+  let taskWatcher: FSWatcher | null = null;
+  let watchedDir: string | null = null;
+  let watchDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  const startTaskWatch = (dir: string): void => {
+    if (watchedDir === dir && taskWatcher) return;
+    taskWatcher?.close();
+    taskWatcher = null;
+    watchedDir = dir;
+    const file = tasksFilePath(dir);
+    try {
+      // Watch the .dmworkspace dir (the file may not exist yet); filter on filename.
+      taskWatcher = watch(dirname(file), (_evt, name) => {
+        if (name && name.toString() !== 'TASKS.md') return;
+        if (watchDebounce) clearTimeout(watchDebounce);
+        watchDebounce = setTimeout(() => {
+          let content = '';
+          try { content = readFileSync(file, 'utf8'); } catch { content = ''; }
+          if (content === lastWritten.get(dir)) return; // our own write
+          getWindow()?.webContents.send('tasks:changed', { dir, board: loadTasks(dir) });
+        }, 150);
+      });
+    } catch { /* dir may not exist yet; re-armed on next tasks:load */ }
+  };
+
+  ipcMain.handle('tasks:load', (_e, dir: string): TaskBoard => {
+    startTaskWatch(dir);
+    return loadTasks(dir);
+  });
+  ipcMain.on('tasks:save', (_e, req: { dir: string; board: TaskBoard }) => {
+    const content = saveTasks(req.dir, req.board);
+    lastWritten.set(req.dir, content);
+    startTaskWatch(req.dir); // (re)arm now that .dmworkspace exists
+  });
 
   ipcMain.handle('clipboard:read', () => clipboard.readText());
   // Lets the renderer decide whether an image-paste keystroke should be
