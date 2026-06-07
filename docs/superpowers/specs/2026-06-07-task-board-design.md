@@ -64,6 +64,21 @@ Nutzer steuert selbst, in welches Pane ein Task geht.
     als Hinweis (`claude`, `npm dev`, …) plus „＋ neues Pane".
 - **Bearbeiten:** „＋ Task" pro Spalte, Inline-Edit von Titel und Befehl, Löschen.
 
+## 3a. Aktivierung pro Workspace (`tasksEnabled`)
+
+Nicht jeder Workspace ist ein Coding-Workspace — Tasks sind daher **opt-in pro Workspace**.
+
+- **Neues Feld** `tasksEnabled?: boolean` am `Workspace`. Fehlend/`false` = aus (Default).
+- **Beim Anlegen:** Auf dem Welcome-Screen (der für jeden neuen, leeren Workspace erscheint)
+  eine kleine Checkbox „Tasks für diesen Workspace aktivieren", **standardmäßig aus**.
+- **Nachträglich umschaltbar:** Dieselbe Checkbox liegt zusätzlich im Inline-Edit-Panel des
+  Workspace (neben Umbenennen / Farbe / Ordner). Wichtig, weil aus Templates erzeugte
+  Workspaces keinen Welcome-Screen durchlaufen.
+- **Sichtbarkeit des Umschalters:** Der `Terminals ⇄ Tasks`-Umschalter in der Titelleiste
+  erscheint **nur**, wenn der aktive Workspace `tasksEnabled` hat. Sonst kein Ballast.
+- **Bestandsdaten:** Bestehende Workspaces ohne das Feld gelten als „aus" (opt-in bleibt
+  bewusst).
+
 ## 4. Architektur & Datenfluss
 
 Folgt den bestehenden Mustern (`state.json`, `scrollback.ts`, main/preload/renderer-Trennung).
