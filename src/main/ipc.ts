@@ -1,12 +1,11 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, watch, type FSWatcher } from 'node:fs';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { loadTasks, saveTasks, tasksFilePath } from './task-store';
 import type { TaskBoard } from '../shared/types';
-import { watch, type FSWatcher } from 'node:fs';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
@@ -147,7 +146,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
           getWindow()?.webContents.send('tasks:changed', { dir, board: loadTasks(dir) });
         }, 150);
       });
-    } catch { /* dir may not exist yet; re-armed on next tasks:load */ }
+    } catch { /* .dmworkspace may not exist yet; re-armed by the next tasks:save (which creates it) or tasks:load */ }
   };
 
   ipcMain.handle('tasks:load', (_e, dir: string): TaskBoard => {
