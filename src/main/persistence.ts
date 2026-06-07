@@ -133,6 +133,7 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
   if (layout === undefined) return undefined;
   const out: Workspace = { id: r.id, name: r.name, cwd: r.cwd, layout };
   if (typeof r.color === 'string') out.color = r.color;
+  if (typeof r.tasksEnabled === 'boolean') out.tasksEnabled = r.tasksEnabled;
   const paneTitles = migrateStringMap(r.paneTitles);
   if (paneTitles) out.paneTitles = paneTitles;
   const pendingStartupCommands = migrateStringMap(r.pendingStartupCommands);
