@@ -22,6 +22,7 @@ export function App(): React.JSX.Element {
   const taskView = useStore((s) => s.taskView);
   const applyTasksChanged = useStore((s) => s.applyTasksChanged);
   const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
+  const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   // Board shows only when toggled on AND the active workspace opted in. Guards the
   // case where you switch to a non-task workspace while the board is open.
   const showBoard = taskView && tasksEnabled;
@@ -47,6 +48,14 @@ export function App(): React.JSX.Element {
 
   // Live-update the board when TASKS.md changes outside the app.
   useEffect(() => window.api.onTasksChanged(applyTasksChanged), [applyTasksChanged]);
+
+  // When the active workspace changes while the board is open, rebind it to the
+  // newly active workspace (reloads its TASKS.md, re-arms the file watcher, and
+  // re-points tasksDir) so edits never target the previous workspace's file.
+  useEffect(() => {
+    const s = useStore.getState();
+    if (s.taskView && s.activeWorkspace()?.tasksEnabled) void s.openTaskView();
+  }, [activeWorkspaceId]);
 
   if (!hydrated) {
     return (

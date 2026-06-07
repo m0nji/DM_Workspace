@@ -10,6 +10,7 @@ import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
+import { focusTerminal } from './terminal-registry';
 
 const DEFAULT_SETTINGS: Settings = {
   themeId: DEFAULT_THEME_ID,
@@ -64,7 +65,6 @@ interface StoreState extends AppState {
   tasksDir: string | null;           // working dir the loaded board belongs to
   openTaskView: () => Promise<void>;
   closeTaskView: () => void;
-  reloadTasks: () => Promise<void>;
   applyTasksChanged: (dir: string, board: import('../shared/types').TaskBoard) => void;
   mutateTasks: (fn: (board: import('../shared/types').TaskBoard) => import('../shared/types').TaskBoard) => void;
   runTaskInPane: (paneId: string, text: string) => void;
@@ -367,16 +367,18 @@ export const useStore = create<StoreState>((set, get) => ({
   openTaskView: async () => {
     const ws = get().activeWorkspace();
     if (!ws) return;
-    const board = await window.api.loadTasks(ws.cwd);
-    set({ taskView: true, tasks: board, tasksDir: ws.cwd });
+    const dir = ws.cwd;
+    // Bind tasksDir synchronously so edits always target the ACTIVE workspace's
+    // file, even before the async load resolves (prevents writing to the previous
+    // workspace's TASKS.md when switching while the board is open). Clear stale
+    // tasks when the dir changes so the board shows "loading" rather than the old
+    // workspace's cards.
+    set((s) => ({ taskView: true, tasksDir: dir, tasks: s.tasksDir === dir ? s.tasks : null }));
+    const board = await window.api.loadTasks(dir);
+    // Guard against an out-of-order load if the dir changed again meanwhile.
+    if (get().tasksDir === dir) set({ tasks: board });
   },
   closeTaskView: () => set({ taskView: false }),
-
-  reloadTasks: async () => {
-    const dir = get().tasksDir;
-    if (!dir) return;
-    set({ tasks: await window.api.loadTasks(dir) });
-  },
 
   // Apply an external file change only when it matches the board we're showing.
   applyTasksChanged: (dir, board) => set((s) => (s.tasksDir === dir ? { tasks: board } : s)),
@@ -394,10 +396,8 @@ export const useStore = create<StoreState>((set, get) => ({
   runTaskInPane: (paneId, text) => {
     window.api.input({ paneId, data: `${text}\r` });
     set({ taskView: false, focusedPaneId: paneId });
-    requestAnimationFrame(() => {
-      // focusTerminal is imported lazily to avoid a cycle with TerminalView.
-      void import('./terminal-registry').then((m) => m.focusTerminal(paneId));
-    });
+    // rAF so the pane is un-hidden (display:none -> block) before we focus it.
+    requestAnimationFrame(() => focusTerminal(paneId));
   },
 
   // Create a pane and stage the task text as a one-shot startup command, reusing
