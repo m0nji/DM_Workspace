@@ -59,6 +59,16 @@ interface StoreState extends AppState {
   focusedPaneId: string | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
+  taskView: boolean;                 // true => board visible instead of terminals
+  tasks: import('../shared/types').TaskBoard | null;
+  tasksDir: string | null;           // working dir the loaded board belongs to
+  openTaskView: () => Promise<void>;
+  closeTaskView: () => void;
+  reloadTasks: () => Promise<void>;
+  applyTasksChanged: (dir: string, board: import('../shared/types').TaskBoard) => void;
+  mutateTasks: (fn: (board: import('../shared/types').TaskBoard) => import('../shared/types').TaskBoard) => void;
+  runTaskInPane: (paneId: string, text: string) => void;
+  runTaskInNewPane: (text: string) => void;
   commandPaletteOpen: boolean;
   templateWizard: TemplateWizardState;
   pendingTemplateLaunch: { templateId: string; workspaceId?: string } | null;
@@ -156,6 +166,9 @@ export const useStore = create<StoreState>((set, get) => ({
   focusedPaneId: null,
   windowFocused: true,
   searchOpenPaneId: null,
+  taskView: false,
+  tasks: null,
+  tasksDir: null,
   commandPaletteOpen: false,
   templateWizard: { open: false, templateId: null },
   pendingTemplateLaunch: null,
@@ -349,6 +362,64 @@ export const useStore = create<StoreState>((set, get) => ({
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),
+
+  openTaskView: async () => {
+    const ws = get().activeWorkspace();
+    if (!ws) return;
+    const board = await window.api.loadTasks(ws.cwd);
+    set({ taskView: true, tasks: board, tasksDir: ws.cwd });
+  },
+  closeTaskView: () => set({ taskView: false }),
+
+  reloadTasks: async () => {
+    const dir = get().tasksDir;
+    if (!dir) return;
+    set({ tasks: await window.api.loadTasks(dir) });
+  },
+
+  // Apply an external file change only when it matches the board we're showing.
+  applyTasksChanged: (dir, board) => set((s) => (s.tasksDir === dir ? { tasks: board } : s)),
+
+  // Local edit helper: transform the board, persist to TASKS.md, keep state in sync.
+  mutateTasks: (fn) => set((s) => {
+    if (!s.tasks || !s.tasksDir) return s;
+    const tasks = fn(s.tasks);
+    window.api.saveTasks(s.tasksDir, tasks);
+    return { ...s, tasks };
+  }),
+
+  // Send a task's command/title into a running pane, then reveal terminals and
+  // focus that pane. Uses the same input path as startup commands.
+  runTaskInPane: (paneId, text) => {
+    window.api.input({ paneId, data: `${text}\r` });
+    set({ taskView: false, focusedPaneId: paneId });
+    requestAnimationFrame(() => {
+      // focusTerminal is imported lazily to avoid a cycle with TerminalView.
+      void import('./terminal-registry').then((m) => m.focusTerminal(paneId));
+    });
+  },
+
+  // Create a pane and stage the task text as a one-shot startup command, reusing
+  // the proven consumeStartupCommand mechanism. Splits the focused pane (or makes
+  // a single pane on the welcome screen).
+  runTaskInNewPane: (text) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws) return s;
+    const newPaneId = nextPaneId();
+    let layout;
+    if (!ws.layout) {
+      layout = { type: 'pane', id: newPaneId } as const;
+    } else {
+      const ids = collectPaneIds(ws.layout);
+      const target = s.focusedPaneId && ids.includes(s.focusedPaneId) ? s.focusedPaneId : ids[0];
+      layout = splitPane(ws.layout, target, 'h', newPaneId, nextSplitId());
+    }
+    const pendingStartupCommands = { ...(ws.pendingStartupCommands ?? {}), [newPaneId]: text };
+    const workspaces = s.workspaces.map((w) => w.id === ws.id ? { ...w, layout, pendingStartupCommands } : w);
+    const next = { ...s, workspaces, taskView: false, focusedPaneId: newPaneId };
+    persist(next);
+    return next;
+  }),
 
   openPreview: (source) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, source } })),
   closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),

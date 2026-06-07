@@ -19,3 +19,8 @@ export function clearTerminal(paneId: string): void {
 export function clearTerminals(paneIds: string[]): void {
   for (const id of paneIds) registry.get(id)?.();
 }
+
+const focusRegistry = new Map<string, () => void>();
+export function registerTerminalFocus(paneId: string, focus: () => void): void { focusRegistry.set(paneId, focus); }
+export function unregisterTerminalFocus(paneId: string): void { focusRegistry.delete(paneId); }
+export function focusTerminal(paneId: string): void { focusRegistry.get(paneId)?.(); }
