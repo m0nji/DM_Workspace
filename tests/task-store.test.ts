@@ -61,4 +61,10 @@ describe('ensureGitignore', () => {
     ensureGitignore(dir);
     expect(existsSync(join(dir, '.gitignore'))).toBe(false);
   });
+  it('appends on a new line when the existing .gitignore has no trailing newline', () => {
+    mkdirSync(join(dir, '.git'));
+    writeFileSync(join(dir, '.gitignore'), 'node_modules', 'utf8'); // no trailing \n
+    ensureGitignore(dir);
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules\n.dmworkspace/\n');
+  });
 });
