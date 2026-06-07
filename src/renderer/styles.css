@@ -641,3 +641,5 @@ input[type="checkbox"]:checked::after {
 .task-edit-title, .task-edit-cmd { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; }
 .task-edit-actions { display: flex; gap: 6px; }
 .task-edit-actions button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+.welcome-tasks-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; color: var(--text); font-size: 13px; cursor: pointer; }
+.ws-tasks-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--text); font-size: 12px; cursor: pointer; }

@@ -104,6 +104,7 @@ interface StoreState extends AppState {
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
   setWorkspaceColor: (id: string, color: string) => void;
+  setTasksEnabled: (id: string, enabled: boolean) => void;
   // command palette
   setCommandPaletteOpen: (open: boolean) => void;
   // templates
@@ -430,6 +431,15 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
+    persist(next);
+    return next;
+  }),
+
+  setTasksEnabled: (id, enabled) => set((s) => {
+    const workspaces = s.workspaces.map((w) => w.id === id ? { ...w, tasksEnabled: enabled } : w);
+    // If the active workspace just lost tasks, leave the board view.
+    const taskView = s.taskView && !(s.activeWorkspaceId === id && !enabled);
+    const next = { ...s, workspaces, taskView };
     persist(next);
     return next;
   }),

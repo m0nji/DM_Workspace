@@ -32,6 +32,7 @@ export interface Workspace {
   color?: string;       // optional hex accent shown in the sidebar
   paneTitles?: Record<string, string>;            // custom pane label keyed by pane id (overrides live cwd when set)
   pendingStartupCommands?: Record<string, string>; // one-shot commands to send after a pane spawns (created-from-template)
+  tasksEnabled?: boolean; // opt-in: show the task board for this workspace (default off)
 }
 
 // A reusable workspace blueprint: layout + folder + optional pane titles and

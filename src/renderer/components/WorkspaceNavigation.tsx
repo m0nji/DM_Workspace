@@ -20,6 +20,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const activeId2 = useStore((s) => s.activeWorkspaceId);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
+  const setTasksEnabled = useStore((s) => s.setTasksEnabled);
 
   const WS_COLORS = ['#c97b4a', '#4a90c9', '#5cb85c', '#c95a5a', '#a05ac9', '#c9b34a'];
 
@@ -125,6 +126,11 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
                     </svg>
                   </button>
                 </div>
+                <label className="ws-tasks-toggle" onMouseDown={(e) => e.preventDefault()} onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={w.tasksEnabled ?? false}
+                         onChange={(e) => setTasksEnabled(w.id, e.target.checked)} />
+                  Tasks aktivieren
+                </label>
               </div>
             ) : (
               <>
