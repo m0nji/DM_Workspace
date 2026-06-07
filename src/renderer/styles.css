@@ -617,26 +617,27 @@ input[type="checkbox"]:checked::after {
 
 /* --- Task board --------------------------------------------------------- */
 .task-board { display: flex; gap: 12px; padding: 14px; height: 100%; overflow: auto; box-sizing: border-box; }
-.task-board-empty { color: var(--muted, #889); padding: 24px; }
-.task-column { flex: 1; min-width: 200px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; display: flex; flex-direction: column; }
-.task-column-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #ccd; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.task-board-empty { color: var(--muted); padding: 24px; }
+.task-column { flex: 1; min-width: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; }
+.task-column-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text); border-bottom: 1px solid var(--border); }
 .task-add, .task-del, .task-run-caret { background: none; border: none; color: inherit; cursor: pointer; opacity: .7; }
 .task-add:hover, .task-del:hover, .task-run-caret:hover { opacity: 1; }
 .task-column-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
-.task-card { background: #2c2c36; border: 1px solid #3a3a44; border-radius: 6px; padding: 8px; }
+.task-card { background: #2c2c36; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
 .task-card-main { cursor: grab; }
-.task-title { display: block; color: #dde; font-size: 13px; }
-.task-cmd { display: inline-block; margin-top: 4px; font-size: 11px; color: #7a8; background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 3px; }
+.task-title { display: block; color: var(--text); font-size: 13px; }
+.task-cmd { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 3px; }
 .task-card-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 .task-run { position: relative; display: flex; align-items: center; gap: 2px; }
 .task-run-btn { background: #2f4a3a; color: #8fd; border: 1px solid #3f6a4a; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
 .task-run-btn:disabled { opacity: .4; cursor: default; }
-.task-pane-picker { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 20; background: #23232c; border: 1px solid #4a4a55; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.6); padding: 4px; min-width: 170px; }
-.task-pane-picker-label { font-size: 10px; color: #889; text-transform: uppercase; padding: 3px 7px; }
-.task-pane-item { display: flex; width: 100%; text-align: left; background: none; border: none; color: #dde; padding: 5px 7px; border-radius: 4px; cursor: pointer; }
-.task-pane-item:hover { background: #3a4a6a; }
+.task-pane-backdrop { position: fixed; inset: 0; z-index: 19; }
+.task-pane-picker { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.6); padding: 4px; min-width: 170px; }
+.task-pane-picker-label { font-size: 10px; color: var(--muted); text-transform: uppercase; padding: 3px 7px; }
+.task-pane-item { display: flex; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 5px 7px; border-radius: 4px; cursor: pointer; }
+.task-pane-item:hover { background: rgba(255,255,255,0.08); }
 .task-pane-new { color: #8fd; }
 .task-card-editing { display: flex; flex-direction: column; gap: 6px; }
-.task-edit-title, .task-edit-cmd { background: #1c1c22; border: 1px solid #3a3a44; border-radius: 4px; color: #dde; padding: 4px 6px; font-size: 12px; }
+.task-edit-title, .task-edit-cmd { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; }
 .task-edit-actions { display: flex; gap: 6px; }
-.task-edit-actions button { background: #333; border: 1px solid #444; color: #dde; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+.task-edit-actions button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }

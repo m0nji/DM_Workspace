@@ -7,6 +7,7 @@ import type { Task, TaskBoard as Board } from '../../shared/types';
 // Move a task from one (column, index) to the end of a target column. Returns a
 // new board; pure so it stays easy to reason about.
 function moveTask(board: Board, from: { col: number; idx: number }, toCol: number): Board {
+  if (from.col === toCol) return board; // dropping within the same column: no-op (no within-column reorder)
   const columns = board.columns.map((c) => ({ ...c, tasks: [...c.tasks] }));
   const [moved] = columns[from.col].tasks.splice(from.idx, 1);
   if (!moved) return board;
@@ -51,7 +52,7 @@ export function TaskBoard(): React.JSX.Element {
   return (
     <div className="task-board">
       {tasks.columns.map((col, ci) => (
-        <div className="task-column" key={col.name + ci}
+        <div className="task-column" key={ci}
              onDragOver={(e) => e.preventDefault()} onDrop={() => drop(ci)}>
           <div className="task-column-head">
             <span>{col.name}</span>
@@ -59,7 +60,7 @@ export function TaskBoard(): React.JSX.Element {
           </div>
           <div className="task-column-body">
             {col.tasks.map((t, ti) => (
-              <TaskCard key={t.id} task={t} columnIndex={ci} taskIndex={ti}
+              <TaskCard key={t.id} task={t}
                         onEdit={(patch) => editTask(ci, ti, patch)}
                         onDelete={() => deleteTask(ci, ti)}
                         onDragStart={() => setDrag({ col: ci, idx: ti })} />

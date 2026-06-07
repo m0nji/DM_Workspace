@@ -1,16 +1,14 @@
 // src/renderer/components/TaskCard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import type { Task } from '../../shared/types';
 
 interface Props {
   task: Task;
-  columnIndex: number;
-  taskIndex: number;
   onEdit: (patch: Partial<Pick<Task, 'title' | 'command'>>) => void;
   onDelete: () => void;
-  onDragStart: (e: React.DragEvent) => void;
+  onDragStart: () => void;
 }
 
 // One task card. The Run button targets the last-focused pane by default and
@@ -20,6 +18,12 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   const [picker, setPicker] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [command, setCommand] = useState(task.command ?? '');
+
+  // Keep the local edit buffers in sync with external changes (file watcher) while
+  // the card is not being edited, so entering edit mode starts from current data.
+  useEffect(() => {
+    if (!editing) { setTitle(task.title); setCommand(task.command ?? ''); }
+  }, [task.title, task.command, editing]);
 
   const activeWorkspace = useStore((s) => s.activeWorkspace);
   const focusedPaneId = useStore((s) => s.focusedPaneId);
@@ -72,19 +76,22 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
           <button type="button" className="task-run-caret" title="Ziel-Pane wählen"
                   onClick={() => setPicker((v) => !v)}>⌄</button>
           {picker && (
-            <div className="task-pane-picker" onMouseLeave={() => setPicker(false)}>
-              <div className="task-pane-picker-label">In welches Pane?</div>
-              {paneIds.map((pid) => (
-                <button type="button" key={pid} className="task-pane-item"
-                        onClick={() => { runTaskInPane(pid, text); setPicker(false); }}>
-                  <span>{paneTitle(pid, pid)}</span>
+            <>
+              <div className="task-pane-backdrop" onClick={() => setPicker(false)} />
+              <div className="task-pane-picker">
+                <div className="task-pane-picker-label">In welches Pane?</div>
+                {paneIds.map((pid) => (
+                  <button type="button" key={pid} className="task-pane-item"
+                          onClick={() => { runTaskInPane(pid, text); setPicker(false); }}>
+                    <span>{paneTitle(pid, pid)}</span>
+                  </button>
+                ))}
+                <button type="button" className="task-pane-item task-pane-new"
+                        onClick={() => { runTaskInNewPane(text); setPicker(false); }}>
+                  ＋ neues Pane
                 </button>
-              ))}
-              <button type="button" className="task-pane-item task-pane-new"
-                      onClick={() => { runTaskInNewPane(text); setPicker(false); }}>
-                ＋ neues Pane
-              </button>
-            </div>
+              </div>
+            </>
           )}
         </div>
         <button type="button" className="task-del" title="Löschen" onClick={onDelete}>✕</button>
