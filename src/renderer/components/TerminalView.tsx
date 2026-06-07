@@ -11,9 +11,12 @@ import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
+import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
+import { collectPaneIds } from '../../shared/layout-tree';
 import { ContextMenu, type MenuItem } from './ContextMenu';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface Props { paneId: string; cwd: string; }
 
@@ -55,6 +58,7 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
   const closeActivePane = useStore((s) => s.closeActivePane);
   const [atBottom, setAtBottom] = useState(true);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current!;
@@ -273,6 +277,15 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 1000);
     };
 
+    // Wipe the buffer (scrollback + viewport), keeping the current prompt line as
+    // the new first line, then persist immediately so a restart doesn't replay
+    // the history we just cleared. Driven from the context menu via the registry.
+    const clearBuffer = (): void => {
+      term.clear();
+      flushSave();
+    };
+    registerTerminal(paneId, clearBuffer);
+
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
       term.write(data, updateAtBottom);
@@ -350,6 +363,7 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       scrollDisp.dispose();
       activity.dispose();
       unregisterSearch(paneId);
+      unregisterTerminal(paneId);
       term.dispose();
       termRef.current = null;
     };
@@ -391,6 +405,9 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       },
       { label: 'Select All', onClick: () => { term?.selectAll(); term?.focus(); } },
       { label: '-' },
+      { label: 'Clear Window', onClick: () => { clearTerminal(paneId); term?.focus(); } },
+      { label: 'Clear All Windows', onClick: () => setConfirmClearAll(true) },
+      { label: '-' },
       { label: 'Search', onClick: () => setSearchOpen(paneId) },
       { label: 'Close Terminal', onClick: () => closeActivePane(paneId) }
     ];
@@ -403,6 +420,19 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     >
       <div className="xterm-host" ref={hostRef} />
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
+      {confirmClearAll && (
+        <ConfirmDialog
+          title="Clear all windows?"
+          message="All panes in this workspace will be cleared and their scrollback history lost."
+          confirmLabel="Clear all"
+          onConfirm={() => {
+            const ws = useStore.getState().activeWorkspace();
+            clearTerminals(collectPaneIds(ws?.layout ?? null));
+            setConfirmClearAll(false);
+          }}
+          onCancel={() => setConfirmClearAll(false)}
+        />
+      )}
       {!atBottom && (
         <button className="scroll-bottom-btn" title="Scroll to bottom" onClick={scrollToBottom}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
