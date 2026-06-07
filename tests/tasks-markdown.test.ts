@@ -38,6 +38,12 @@ describe('parseTasks', () => {
     expect(board.columns[0].name).toBe('Backlog');
   });
 
+  it('tolerates CRLF line endings', () => {
+    const board = parseTasks('## Todo\r\n- [ ] task `cmd`\r\n');
+    expect(board.columns[0].name).toBe('Todo');
+    expect(board.columns[0].tasks[0]).toMatchObject({ title: 'task', command: 'cmd', done: false });
+  });
+
   it('round-trips through serialize without losing data', () => {
     const md = '## Todo\n- [ ] a `ls -la`\n- [x] b\n\n## Doing\n\n## Done\n- [x] c';
     const board = parseTasks(md);

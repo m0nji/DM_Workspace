@@ -1,7 +1,7 @@
 export interface Task {
   id: string;        // ephemeral, assigned at parse time; not persisted to markdown
   title: string;
-  command?: string;  // optional run command (trailing inline `code`); falls back to title when absent
+  command?: string;  // optional run command (trailing inline `code`). When absent, the consumer (Run button) sends the title instead — this module does not fall back.
   done: boolean;     // checkbox state
 }
 
@@ -18,8 +18,10 @@ export const DEFAULT_COLUMNS = ['Todo', 'Doing', 'Done'] as const;
 
 const HEADING = /^#{1,6}\s+(.*\S)\s*$/;
 const ITEM = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/;
-// Trailing inline-code command: "title `command`" → ['title', 'command']
-const TRAILING_CMD = /^(.*?)\s*`([^`]+)`\s*$/;
+// Trailing inline-code command: "title `command`" → ['title', 'command'].
+// Only the LAST backtick span is treated as the command; any earlier inline-code
+// spans remain part of the title.
+const TRAILING_CMD = /^(.*)\s*`([^`]+)`\s*$/;
 
 // Parse a TASKS.md document into a board. Headings (##) become columns, checkbox
 // list items become tasks. Tolerant: unknown headings are kept; non-matching lines
