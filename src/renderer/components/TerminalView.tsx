@@ -11,7 +11,7 @@ import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
-import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals } from '../terminal-registry';
+import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, registerTerminalFocus, unregisterTerminalFocus } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
@@ -285,6 +285,7 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       flushSave();
     };
     registerTerminal(paneId, clearBuffer);
+    registerTerminalFocus(paneId, () => term.focus());
 
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
@@ -364,6 +365,7 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       activity.dispose();
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
+      unregisterTerminalFocus(paneId);
       term.dispose();
       termRef.current = null;
     };
