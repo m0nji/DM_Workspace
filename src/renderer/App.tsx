@@ -8,6 +8,7 @@ import { TitlebarActions } from './components/TitlebarActions';
 import { CommandPalette } from './components/CommandPalette';
 import { TemplateWizard } from './components/TemplateWizard';
 import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
+import { TaskBoard } from './components/TaskBoard';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): React.JSX.Element {
@@ -18,6 +19,12 @@ export function App(): React.JSX.Element {
   const setWindowFocused = useStore((s) => s.setWindowFocused);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
   const workspaceNavigationPlacement = useStore((s) => s.settings.workspaceNavigationPlacement ?? 'left');
+  const taskView = useStore((s) => s.taskView);
+  const applyTasksChanged = useStore((s) => s.applyTasksChanged);
+  const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
+  // Board shows only when toggled on AND the active workspace opted in. Guards the
+  // case where you switch to a non-task workspace while the board is open.
+  const showBoard = taskView && tasksEnabled;
 
   useKeyboardShortcuts();
 
@@ -38,6 +45,9 @@ export function App(): React.JSX.Element {
     return () => { offFocus(); offActivate(); };
   }, [setWindowFocused, selectWorkspace]);
 
+  // Live-update the board when TASKS.md changes outside the app.
+  useEffect(() => window.api.onTasksChanged(applyTasksChanged), [applyTasksChanged]);
+
   if (!hydrated) {
     return (
       <div className="root">
@@ -57,12 +67,22 @@ export function App(): React.JSX.Element {
         {workspaceNavigationPlacement === 'left' ? (
           <>
             <WorkspaceNavigation placement="left" />
-            <WorkspaceView />
+            <div className="view-stack">
+              <div className="view-pane" style={{ display: showBoard ? 'none' : 'block' }}>
+                <WorkspaceView />
+              </div>
+              {showBoard && <div className="view-pane"><TaskBoard /></div>}
+            </div>
           </>
         ) : (
           <div className="workspace-shell">
             <WorkspaceNavigation placement="top" />
-            <WorkspaceView />
+            <div className="view-stack">
+              <div className="view-pane" style={{ display: showBoard ? 'none' : 'block' }}>
+                <WorkspaceView />
+              </div>
+              {showBoard && <div className="view-pane"><TaskBoard /></div>}
+            </div>
           </div>
         )}
         <PreviewPanel />
