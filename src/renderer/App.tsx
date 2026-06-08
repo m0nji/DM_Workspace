@@ -77,7 +77,7 @@ export function App(): React.JSX.Element {
           <>
             <WorkspaceNavigation placement="left" />
             <div className="view-stack">
-              <div className="view-pane" style={{ display: showBoard ? 'none' : 'block' }}>
+              <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
                 <WorkspaceView />
               </div>
               {showBoard && <div className="view-pane"><TaskBoard /></div>}
@@ -87,7 +87,7 @@ export function App(): React.JSX.Element {
           <div className="workspace-shell">
             <WorkspaceNavigation placement="top" />
             <div className="view-stack">
-              <div className="view-pane" style={{ display: showBoard ? 'none' : 'block' }}>
+              <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
                 <WorkspaceView />
               </div>
               {showBoard && <div className="view-pane"><TaskBoard /></div>}
