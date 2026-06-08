@@ -63,7 +63,9 @@ jobs:
           # Build artifacts only — publishing is a separate, retried step below
           # because electron-builder's own uploader does not retry GitHub's
           # intermittent 504s and 422s on already-existing assets.
-          npx electron-builder --mac --publish never
+          # electron-builder also downloads the electron binary from GitHub —
+          # retry it too so a transient 504 mid-build doesn't fail the job.
+          bash ./scripts/retry.sh npx electron-builder --mac --publish never
       - name: Publish to GitHub release (macOS)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,7 +103,7 @@ jobs:
         shell: bash
         run: |
           npm run build
-          npx electron-builder --win --publish never
+          bash ./scripts/retry.sh npx electron-builder --win --publish never
       - name: Publish to GitHub release (Windows)
         shell: bash
         env:
@@ -136,7 +138,7 @@ jobs:
       - name: Build (Linux)
         run: |
           npm run build
-          npx electron-builder --linux --publish never
+          bash ./scripts/retry.sh npx electron-builder --linux --publish never
       - name: Publish to GitHub release (Linux)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

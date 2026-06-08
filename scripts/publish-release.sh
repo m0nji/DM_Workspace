@@ -23,10 +23,24 @@ TAG="v${VERSION}"
 # nullglob drops patterns that match nothing on a given platform. Plain globbing
 # keeps this compatible with the macOS runner's bash 3.2 (no mapfile/find -print0).
 shopt -s nullglob
-FILES=( \
+RAW=( \
   dist/*.dmg dist/*.zip dist/*.exe dist/*.AppImage \
   dist/*.deb dist/*.rpm dist/*.snap \
   dist/*.blockmap dist/latest*.yml )
+
+# electron-builder writes artifacts to disk with the (spaced) productName, e.g.
+# "DM Workspace-0.7.4-arm64-mac.zip", but sanitizes spaces to hyphens for the
+# URLs it records in latest*.yml ("DM-Workspace-..."). gh release upload keeps
+# the on-disk name (and GitHub turns spaces into dots), which would NOT match the
+# yml and break the auto-updater. So rename spaces to hyphens before upload,
+# reproducing exactly what electron-builder's own uploader would have used.
+FILES=()
+for f in "${RAW[@]}"; do
+  base="$(basename "$f")"
+  safe="${base// /-}"
+  if [ "$base" != "$safe" ]; then cp -f "$f" "dist/$safe"; f="dist/$safe"; fi
+  FILES+=( "$f" )
+done
 
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "::error::no release artifacts found in dist/"; exit 1
