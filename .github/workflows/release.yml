@@ -24,7 +24,19 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # GitHub's release CDN intermittently 504s while electron's postinstall
+      # downloads its prebuilt binary, which fails the whole job. Retry npm ci a
+      # few times so a transient gateway timeout doesn't sink the release.
+      - name: Install dependencies (retry on transient network errors)
+        run: |
+          ok=
+          for i in 1 2 3 4 5; do
+            if npm ci; then ok=1; break; fi
+            echo "::warning::npm ci failed (attempt $i/5) — retrying in 30s"
+            rm -rf node_modules
+            sleep 30
+          done
+          [ "$ok" = 1 ] || { echo "::error::npm ci failed after 5 attempts"; exit 1; }
       - name: Decode signing certificate (.p12) and API key (.p8)
         run: |
           # APPLE_CERTIFICATE must be a base64-encoded Developer ID Application
@@ -65,7 +77,20 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # GitHub's release CDN intermittently 504s while electron's postinstall
+      # downloads its prebuilt binary, which fails the whole job. Retry npm ci a
+      # few times so a transient gateway timeout doesn't sink the release.
+      - name: Install dependencies (retry on transient network errors)
+        shell: bash # the retry loop is bash; the Windows runner defaults to pwsh
+        run: |
+          ok=
+          for i in 1 2 3 4 5; do
+            if npm ci; then ok=1; break; fi
+            echo "::warning::npm ci failed (attempt $i/5) — retrying in 30s"
+            rm -rf node_modules
+            sleep 30
+          done
+          [ "$ok" = 1 ] || { echo "::error::npm ci failed after 5 attempts"; exit 1; }
       - name: Build & publish (Windows)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +110,19 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # GitHub's release CDN intermittently 504s while electron's postinstall
+      # downloads its prebuilt binary, which fails the whole job. Retry npm ci a
+      # few times so a transient gateway timeout doesn't sink the release.
+      - name: Install dependencies (retry on transient network errors)
+        run: |
+          ok=
+          for i in 1 2 3 4 5; do
+            if npm ci; then ok=1; break; fi
+            echo "::warning::npm ci failed (attempt $i/5) — retrying in 30s"
+            rm -rf node_modules
+            sleep 30
+          done
+          [ "$ok" = 1 ] || { echo "::error::npm ci failed after 5 attempts"; exit 1; }
       - name: Build & publish (Linux)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
