@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 import { tasksFilePath, loadTasks, saveTasks, ensureGitignore } from '../src/main/task-store';
 import { parseTasks } from '../src/shared/tasks-markdown';
 
@@ -12,6 +12,13 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 describe('tasksFilePath', () => {
   it('points at .dmworkspace/TASKS.md inside the working dir', () => {
     expect(tasksFilePath(dir)).toBe(join(dir, '.dmworkspace', 'TASKS.md'));
+  });
+  // A freshly created workspace defaults its cwd to the literal string '~'
+  // (store.ts). The OS never expands '~', so paths built from it must resolve to
+  // the home dir — otherwise mkdir '~/.dmworkspace' crashes the main process.
+  it('expands a leading ~ to the home directory', () => {
+    expect(tasksFilePath('~')).toBe(join(homedir(), '.dmworkspace', 'TASKS.md'));
+    expect(tasksFilePath('~/proj')).toBe(join(homedir(), 'proj', '.dmworkspace', 'TASKS.md'));
   });
 });
 

@@ -1,12 +1,17 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
 import { parseTasks, serializeTasks, type TaskBoard } from '../shared/tasks-markdown';
+import { expandTilde } from './resolve-cwd';
 
 const DIR = '.dmworkspace';
 const GITIGNORE_ENTRY = '.dmworkspace/';
 
+// A fresh workspace defaults its cwd to the literal '~' (and users may type a
+// '~/...' path). The OS never expands the tilde, so expand it here — the single
+// chokepoint where a workspace dir becomes a real filesystem path — before any
+// fs call. mkdirSync('~/.dmworkspace') would otherwise crash the main process.
 export function tasksFilePath(workingDir: string): string {
-  return join(workingDir, DIR, 'TASKS.md');
+  return join(expandTilde(workingDir), DIR, 'TASKS.md');
 }
 
 // Read+parse the board for a working dir. Missing/unreadable file => default board.
@@ -43,7 +48,7 @@ function findGitRoot(startDir: string): string | null {
 // Idempotently add `.dmworkspace/` to the git root's .gitignore so tasks never
 // land in version control. No-op when the dir is not inside a git repo.
 export function ensureGitignore(workingDir: string): void {
-  const gitRoot = findGitRoot(workingDir);
+  const gitRoot = findGitRoot(expandTilde(workingDir));
   if (!gitRoot) return;
   const gitignore = join(gitRoot, '.gitignore');
   let existing = '';
