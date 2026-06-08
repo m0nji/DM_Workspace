@@ -67,7 +67,7 @@ jobs:
       - name: Publish to GitHub release (macOS)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/publish-release.sh
+        run: bash ./scripts/publish-release.sh
 
   windows:
     # Run after macOS so only one job publishes first: electron-builder creates
@@ -106,7 +106,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/publish-release.sh
+        run: bash ./scripts/publish-release.sh
 
   linux:
     # Run after Windows for the same single-draft reason (see the windows job):
@@ -140,4 +140,4 @@ jobs:
       - name: Publish to GitHub release (Linux)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/publish-release.sh
+        run: bash ./scripts/publish-release.sh
