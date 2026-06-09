@@ -305,11 +305,15 @@ input[type="checkbox"]:checked::after {
    unlike the DOM renderer, does not theme it itself), so don't hard-code it here. */
 .xterm-viewport::-webkit-scrollbar { width: 10px; }
 .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+/* xterm forces overflow-y: scroll, so the gutter is always reserved. Keep the
+   thumb invisible until the pointer is over the terminal (macOS-style overlay
+   behaviour) so it doesn't read as a permanent grey bar down the right edge. */
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--border); border-radius: 5px; border: 2px solid transparent;
+  background: transparent; border-radius: 5px; border: 2px solid transparent;
   background-clip: padding-box;
 }
-.xterm-viewport::-webkit-scrollbar-thumb:hover { background: #444; }
+.xterm-host-wrap:hover .xterm-viewport::-webkit-scrollbar-thumb { background: var(--border); }
+.xterm-host-wrap:hover .xterm-viewport::-webkit-scrollbar-thumb:hover { background: #444; }
 
 .maximized-host { position: absolute; inset: 8px; }
 
