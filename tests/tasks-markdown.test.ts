@@ -84,6 +84,18 @@ describe('parseTasks', () => {
       b.columns.map((c) => ({ name: c.name, tasks: c.tasks.map(({ title, description, command, done }) => ({ title, description, command, done })) }));
     expect(strip(reparsed)).toEqual(strip(board));
   });
+
+  it('does not attach an indented line across a blank line', () => {
+    const board = parseTasks('## Todo\n- [ ] A\n\n  stray');
+    expect(board.columns[0].tasks[0].description).toBeUndefined();
+  });
+
+  it('round-trips a description whose line begins with spaces', () => {
+    const board = parseTasks('## Todo\n- [ ] A\n    indented note');
+    expect(board.columns[0].tasks[0].description).toBe('  indented note');
+    const reparsed = parseTasks(serializeTasks(board));
+    expect(reparsed.columns[0].tasks[0].description).toBe('  indented note');
+  });
 });
 
 describe('serializeTasks', () => {

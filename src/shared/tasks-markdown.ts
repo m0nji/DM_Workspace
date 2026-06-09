@@ -35,6 +35,7 @@ export function parseTasks(md: string): TaskBoard {
 
   for (const rawLine of md.split('\n')) {
     const line = rawLine.replace(/\r$/, '');
+    if (line.trim() === '') { currentTask = null; continue; }
     const h = HEADING.exec(line);
     if (h) {
       current = { name: h[1], tasks: [] };
@@ -55,9 +56,10 @@ export function parseTasks(md: string): TaskBoard {
     }
     // An indented, non-empty line that is neither heading nor item is a
     // continuation line: it belongs to the most recently opened task as
-    // description. Strip the leading indentation; join multiples with \n.
+    // description. Strip the canonical 2-space prefix so the value round-trips
+    // losslessly; join multiples with \n.
     if (currentTask && /^\s{2,}\S/.test(line)) {
-      const text = line.replace(/^\s+/, '');
+      const text = line.replace(/^ {2}/, '');
       currentTask.description = currentTask.description ? `${currentTask.description}\n${text}` : text;
     }
   }
