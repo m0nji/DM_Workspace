@@ -2,7 +2,7 @@ export interface Task {
   id: string;        // ephemeral, assigned at parse time; not persisted to markdown
   title: string;
   description?: string; // optional, multiline (lines joined with \n); persisted as indented continuation lines
-  command?: string;  // optional run command (trailing inline `code`). When absent, the consumer (Run button) sends the title instead — this module does not fall back.
+  command?: string;  // optional run command (trailing inline `code`). When absent, the card hides the Run button — nothing is sent.
   done: boolean;     // checkbox state
 }
 
@@ -35,7 +35,7 @@ export function parseTasks(md: string): TaskBoard {
 
   for (const rawLine of md.split('\n')) {
     const line = rawLine.replace(/\r$/, '');
-    if (line.trim() === '') { currentTask = null; continue; }
+    if (line === '') { currentTask = null; continue; }
     const h = HEADING.exec(line);
     if (h) {
       current = { name: h[1], tasks: [] };
@@ -54,11 +54,12 @@ export function parseTasks(md: string): TaskBoard {
       current.tasks.push(currentTask);
       continue;
     }
-    // An indented, non-empty line that is neither heading nor item is a
+    // An indented line (2+ leading spaces) that is neither heading nor item is a
     // continuation line: it belongs to the most recently opened task as
-    // description. Strip the canonical 2-space prefix so the value round-trips
+    // description. Indented blank lines are kept (they encode blank lines inside a
+    // description). Strip the canonical 2-space prefix so values round-trip
     // losslessly; join multiples with \n.
-    if (currentTask && /^\s{2,}\S/.test(line)) {
+    if (currentTask && /^\s{2,}/.test(line)) {
       const text = line.replace(/^ {2}/, '');
       currentTask.description = currentTask.description ? `${currentTask.description}\n${text}` : text;
     }

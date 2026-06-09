@@ -96,6 +96,18 @@ describe('parseTasks', () => {
     const reparsed = parseTasks(serializeTasks(board));
     expect(reparsed.columns[0].tasks[0].description).toBe('  indented note');
   });
+
+  it('round-trips a description that contains a blank line', () => {
+    const board = parseTasks('## Todo\n- [ ] A\n  para 1\n  \n  para 2');
+    expect(board.columns[0].tasks[0].description).toBe('para 1\n\npara 2');
+    const reparsed = parseTasks(serializeTasks(board));
+    expect(reparsed.columns[0].tasks[0].description).toBe('para 1\n\npara 2');
+  });
+
+  it('still treats a non-indented blank line as a description terminator', () => {
+    const board = parseTasks('## Todo\n- [ ] A\n\n  stray');
+    expect(board.columns[0].tasks[0].description).toBeUndefined();
+  });
 });
 
 describe('serializeTasks', () => {
