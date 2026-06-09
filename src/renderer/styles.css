@@ -626,7 +626,9 @@ input[type="checkbox"]:checked::after {
 .task-card { background: #2c2c36; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
 .task-card-main { cursor: grab; }
 .task-title { display: block; color: var(--text); font-size: 13px; }
-.task-cmd { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 3px; }
+.task-cmd { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 3px; max-width: 100%; overflow-wrap: anywhere; }
+.task-desc { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.task-no-cmd { font-size: 11px; color: var(--muted); opacity: .7; }
 .task-card-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 .task-run { position: relative; display: flex; align-items: center; gap: 2px; }
 .task-run-btn { background: #2f4a3a; color: #8fd; border: 1px solid #3f6a4a; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
@@ -638,7 +640,8 @@ input[type="checkbox"]:checked::after {
 .task-pane-item:hover { background: rgba(255,255,255,0.08); }
 .task-pane-new { color: #8fd; }
 .task-card-editing { display: flex; flex-direction: column; gap: 6px; }
-.task-edit-title, .task-edit-cmd { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; }
+.task-edit-title, .task-edit-cmd, .task-edit-desc { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; }
+.task-edit-desc { font-family: inherit; resize: vertical; min-height: 48px; }
 .task-edit-actions { display: flex; gap: 6px; }
 .task-edit-actions button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
 .welcome-tasks-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; color: var(--text); font-size: 13px; cursor: pointer; }
