@@ -18,12 +18,17 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   const [picker, setPicker] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [command, setCommand] = useState(task.command ?? '');
+  const [description, setDescription] = useState(task.description ?? '');
 
   // Keep the local edit buffers in sync with external changes (file watcher) while
   // the card is not being edited, so entering edit mode starts from current data.
   useEffect(() => {
-    if (!editing) { setTitle(task.title); setCommand(task.command ?? ''); }
-  }, [task.title, task.command, editing]);
+    if (!editing) { setTitle(task.title); setDescription(task.description ?? ''); setCommand(task.command ?? ''); }
+  }, [task.title, task.description, task.command, editing]);
+
+  // Close the pane picker if the task loses its command (the run UI — and the
+  // picker's own close handlers — unmount, so reset the state here).
+  useEffect(() => { if (!task.command) setPicker(false); }, [task.command]);
 
   const activeWorkspace = useStore((s) => s.activeWorkspace);
   const focusedPaneId = useStore((s) => s.focusedPaneId);
@@ -37,7 +42,7 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   const defaultPane = focusedPaneId && paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
 
   const commitEdit = (): void => {
-    onEdit({ title: title.trim() || task.title, command: command.trim() || undefined });
+    onEdit({ title: title.trim() || task.title, description: description.trim() || undefined, command: command.trim() || undefined });
     setEditing(false);
   };
 
@@ -48,6 +53,10 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
                onChange={(e) => setTitle(e.target.value)}
                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
                placeholder="Titel" />
+        <textarea className="task-edit-desc" value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+                  placeholder="Beschreibung (optional)" rows={3} />
         <input className="task-edit-cmd" value={command}
                onChange={(e) => setCommand(e.target.value)}
                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
