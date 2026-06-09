@@ -292,16 +292,17 @@ input[type="checkbox"]:checked::after {
   border-radius: 4px; }
 .pane-btn:hover { color: var(--text); background: #2a2a2a; }
 .pane-body { flex: 1; min-height: 0; }
-.pane-body .xterm { height: 100%; padding: 4px; }
+.pane-body .xterm { height: 100%; padding: 0 4px; }
+/* height:100% lets the wrapper hold a sub-cell themed strip below the pinned
+   host (see TerminalView's safeFit/syncBackgrounds) so the WebGL renderer leaves
+   no black bar at the bottom. */
 .xterm-host { height: 100%; }
 
 /* Terminal scrollbar: style the track/thumb to blend with the dark layout —
    transparent track (so the terminal's themed background shows through), subtle
-   thumb in the border color. Do NOT override the viewport's background-color
-   here: xterm sets it at runtime to the theme background (with terminalOpacity
-   baked into the rgba alpha), and forcing it transparent would discard both the
-   theme background and the opacity — leaving only the foreground text colored
-   and killing the macOS vibrancy effect. */
+   thumb in the border color. The viewport's background-color is set from JS to
+   the themed (opacity-baked) background in TerminalView (the WebGL renderer,
+   unlike the DOM renderer, does not theme it itself), so don't hard-code it here. */
 .xterm-viewport::-webkit-scrollbar { width: 10px; }
 .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
 .xterm-viewport::-webkit-scrollbar-thumb {

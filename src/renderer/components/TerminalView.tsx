@@ -48,6 +48,23 @@ function buildTheme(themeId: string, opacity: number, customBg?: string): ITheme
   };
 }
 
+// FitAddon rounds the terminal to a whole number of rows, so the host is usually
+// a little taller than rows×cellHeight. The WebGL renderer paints that leftover
+// slack as opaque black (an opaque compositing layer the DOM background can't show
+// through), which is the black bar seen at the bottom of every pane. We fix it by
+// pinning the host to an exact multiple of the cell height after each fit, so the
+// WebGL region has no uncovered slack; the few remaining pixels live in the host
+// wrapper below it (plain CSS, no WebGL) which we paint with the themed background
+// so they blend in. We also set the viewport background for the DOM-renderer
+// fallback path, which xterm normally themes itself but only for that renderer.
+function syncBackgrounds(host: HTMLElement | null, background: string | undefined): void {
+  if (!host || !background) return;
+  const vp = host.querySelector('.xterm-viewport') as HTMLElement | null;
+  if (vp) vp.style.backgroundColor = background;
+  // The wrapper holds the sub-cell slack strip below the pinned host.
+  if (host.parentElement) host.parentElement.style.backgroundColor = background;
+}
+
 export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -262,11 +279,17 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     host.addEventListener('mouseup', onMoveMouseUp, true);
 
     const safeFit = (): boolean => {
-      if (host.clientWidth > 0 && host.clientHeight > 0) {
-        fit.fit();
-        return true;
-      }
-      return false;
+      // Clear any previous pin so we measure (and fit to) the full wrapper height,
+      // then pin the host to the exact rendered rows height. fit.fit() makes xterm
+      // set .xterm-screen's height to rows×cellHeight synchronously, so reading it
+      // back is reliable even before the first WebGL render. Pinning leaves the
+      // WebGL region with no uncovered slack to paint black (see syncBackgrounds).
+      host.style.height = '';
+      if (host.clientWidth <= 0 || host.clientHeight <= 0) return false;
+      fit.fit();
+      const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
+      if (screen && screen.offsetHeight > 0) host.style.height = `${screen.offsetHeight}px`;
+      return true;
     };
 
     // Persist the *rendered* terminal buffer (text + colors) rather than the raw
@@ -354,7 +377,12 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     let raf1 = 0;
     let raf2 = 0;
     raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => { safeFit(); spawnOnce(); });
+      raf2 = requestAnimationFrame(() => {
+        safeFit();
+        spawnOnce();
+        const s = useStore.getState().settings;
+        syncBackgrounds(host, buildTheme(s.themeId, s.terminalOpacity, s.terminalBackground).background);
+      });
     });
 
     const resize = () => {
@@ -366,11 +394,29 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     const ro = new ResizeObserver(resize);
     ro.observe(host);
 
+    // The very first fit can run before the WebGL renderer has measured the cell
+    // size, so .xterm-screen still has no height and the host can't be pinned —
+    // which leaves the black bottom bar on idle panes (no output → no resize/render
+    // to retry). Poll across a few frames until the screen reports a real height,
+    // then pin once. Cancelled on unmount.
+    let pinRaf = 0;
+    let pinTries = 0;
+    const pinWhenReady = (): void => {
+      const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
+      if (screen && screen.offsetHeight > 0) {
+        host.style.height = `${screen.offsetHeight}px`;
+        return;
+      }
+      if (pinTries++ < 60) pinRaf = requestAnimationFrame(pinWhenReady);
+    };
+    pinWhenReady();
+
     return () => {
       flushSave();
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       ro.disconnect();
+      cancelAnimationFrame(pinRaf);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
       host.removeEventListener('mousedown', onMoveMouseDown, true);
       host.removeEventListener('mouseup', onMoveMouseUp, true);
@@ -395,7 +441,9 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
   useEffect(() => {
     const term = termRef.current;
     if (term) {
-      term.options.theme = buildTheme(themeId, opacity, customBg);
+      const theme = buildTheme(themeId, opacity, customBg);
+      term.options.theme = theme;
+      syncBackgrounds(hostRef.current, theme.background);
     }
   }, [themeId, opacity, customBg]);
 
