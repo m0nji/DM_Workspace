@@ -1,6 +1,6 @@
 {
   "name": "dm-workspace",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Cross-platform tiling terminal multiplexer",
   "main": "out/main/index.js",
   "author": "DM Workspace",
