@@ -1,6 +1,7 @@
 export interface Task {
   id: string;        // ephemeral, assigned at parse time; not persisted to markdown
   title: string;
+  description?: string; // optional, multiline (lines joined with \n); persisted as indented continuation lines
   command?: string;  // optional run command (trailing inline `code`). When absent, the consumer (Run button) sends the title instead — this module does not fall back.
   done: boolean;     // checkbox state
 }
@@ -29,6 +30,7 @@ const TRAILING_CMD = /^(.*)\s*`([^`]+)`\s*$/;
 export function parseTasks(md: string): TaskBoard {
   const columns: TaskColumn[] = [];
   let current: TaskColumn | null = null;
+  let currentTask: Task | null = null;
   let counter = 0;
 
   for (const rawLine of md.split('\n')) {
@@ -37,6 +39,7 @@ export function parseTasks(md: string): TaskBoard {
     if (h) {
       current = { name: h[1], tasks: [] };
       columns.push(current);
+      currentTask = null;
       continue;
     }
     const it = ITEM.exec(line);
@@ -46,7 +49,16 @@ export function parseTasks(md: string): TaskBoard {
       let command: string | undefined;
       const m = TRAILING_CMD.exec(title);
       if (m) { title = m[1].trim(); command = m[2].trim(); }
-      current.tasks.push({ id: `t${++counter}`, title, command, done });
+      currentTask = { id: `t${++counter}`, title, description: undefined, command, done };
+      current.tasks.push(currentTask);
+      continue;
+    }
+    // An indented, non-empty line that is neither heading nor item is a
+    // continuation line: it belongs to the most recently opened task as
+    // description. Strip the leading indentation; join multiples with \n.
+    if (currentTask && /^\s{2,}\S/.test(line)) {
+      const text = line.replace(/^\s+/, '');
+      currentTask.description = currentTask.description ? `${currentTask.description}\n${text}` : text;
     }
   }
 
@@ -65,6 +77,9 @@ export function serializeTasks(board: TaskBoard): string {
       const box = t.done ? 'x' : ' ';
       const cmd = t.command ? ` \`${t.command}\`` : '';
       lines.push(`- [${box}] ${t.title}${cmd}`);
+      if (t.description && t.description.trim()) {
+        for (const dl of t.description.split('\n')) lines.push(`  ${dl}`);
+      }
     }
     return lines.join('\n');
   });

@@ -52,6 +52,38 @@ describe('parseTasks', () => {
       b.columns.map((c) => ({ name: c.name, tasks: c.tasks.map(({ title, command, done }) => ({ title, command, done })) }));
     expect(strip(reparsed)).toEqual(strip(board));
   });
+
+  it('parses an indented continuation line as the task description', () => {
+    const board = parseTasks('## Todo\n- [ ] Tunnel öffnen `ssh x`\n  Erklärt den Schritt.');
+    expect(board.columns[0].tasks[0]).toMatchObject({
+      title: 'Tunnel öffnen', command: 'ssh x', description: 'Erklärt den Schritt.', done: false,
+    });
+  });
+
+  it('joins multiple indented lines into a multiline description', () => {
+    const board = parseTasks('## Todo\n- [ ] A\n  Zeile eins.\n  Zeile zwei.');
+    expect(board.columns[0].tasks[0].description).toBe('Zeile eins.\nZeile zwei.');
+  });
+
+  it('leaves description undefined when there is no continuation line', () => {
+    const board = parseTasks('## Todo\n- [ ] A `cmd`');
+    expect(board.columns[0].tasks[0].description).toBeUndefined();
+  });
+
+  it('ignores an indented line that has no preceding task', () => {
+    const board = parseTasks('## Todo\n  orphan line\n- [ ] A');
+    expect(board.columns[0].tasks).toHaveLength(1);
+    expect(board.columns[0].tasks[0]).toMatchObject({ title: 'A', description: undefined });
+  });
+
+  it('round-trips a description (single and multiline) through serialize', () => {
+    const md = '## Todo\n- [ ] A `ls`\n  one line\n- [ ] B\n  line 1\n  line 2\n';
+    const board = parseTasks(md);
+    const reparsed = parseTasks(serializeTasks(board));
+    const strip = (b: ReturnType<typeof parseTasks>) =>
+      b.columns.map((c) => ({ name: c.name, tasks: c.tasks.map(({ title, description, command, done }) => ({ title, description, command, done })) }));
+    expect(strip(reparsed)).toEqual(strip(board));
+  });
 });
 
 describe('serializeTasks', () => {
@@ -61,5 +93,13 @@ describe('serializeTasks', () => {
     expect(out).toContain('## Todo');
     expect(out).toContain('- [ ] a `cmd`');
     expect(out).toContain('- [x] b');
+  });
+
+  it('writes the description as indented continuation lines', () => {
+    const board = parseTasks('## Todo\n- [ ] A `cmd`\n  erste Zeile\n  zweite Zeile');
+    const out = serializeTasks(board);
+    expect(out).toContain('- [ ] A `cmd`');
+    expect(out).toContain('  erste Zeile');
+    expect(out).toContain('  zweite Zeile');
   });
 });
