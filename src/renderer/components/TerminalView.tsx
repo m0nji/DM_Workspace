@@ -4,6 +4,7 @@ import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { findLinks, resolveSource, fileTarget } from '../../shared/link-detect';
@@ -86,6 +87,21 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     const serializeAddon = new SerializeAddon();
     term.loadAddon(serializeAddon);
     term.open(host);
+
+    // GPU renderer. xterm's default DOM renderer chokes on high-throughput
+    // streaming output (e.g. an active Claude Code session) and on scrolling
+    // through a large buffer, which shows up as visible lag. WebGL fixes that.
+    // It can fail (no GL context, lost context after sleep/GPU reset); in that
+    // case dispose it and fall back to the DOM renderer rather than crash.
+    let webgl: WebglAddon | null = null;
+    try {
+      webgl = new WebglAddon();
+      webgl.onContextLoss(() => { webgl?.dispose(); webgl = null; });
+      term.loadAddon(webgl);
+    } catch {
+      webgl?.dispose();
+      webgl = null;
+    }
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.
     const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
@@ -366,6 +382,7 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
       unregisterTerminalFocus(paneId);
+      webgl?.dispose();
       term.dispose();
       termRef.current = null;
     };
