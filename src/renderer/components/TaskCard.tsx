@@ -6,7 +6,7 @@ import type { Task } from '../../shared/types';
 
 interface Props {
   task: Task;
-  onEdit: (patch: Partial<Pick<Task, 'title' | 'command'>>) => void;
+  onEdit: (patch: Partial<Pick<Task, 'title' | 'description' | 'command'>>) => void;
   onDelete: () => void;
   onDragStart: () => void;
 }
@@ -31,7 +31,7 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   const runTaskInPane = useStore((s) => s.runTaskInPane);
   const runTaskInNewPane = useStore((s) => s.runTaskInNewPane);
 
-  const text = task.command && task.command.length ? task.command : task.title;
+  const text = task.command ?? '';
   const ws = activeWorkspace();
   const paneIds = collectPaneIds(ws?.layout ?? null);
   const defaultPane = focusedPaneId && paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
@@ -64,36 +64,41 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
     <div className="task-card" draggable onDragStart={onDragStart}>
       <div className="task-card-main" onDoubleClick={() => setEditing(true)}>
         <span className="task-title">{task.title}</span>
+        {task.description && <div className="task-desc">{task.description}</div>}
         {task.command && <code className="task-cmd">{task.command}</code>}
       </div>
       <div className="task-card-row">
-        <div className="task-run">
-          <button type="button" className="task-run-btn" disabled={!defaultPane}
-                  title={defaultPane ? `In Pane senden: ${paneTitle(defaultPane, defaultPane)}` : 'Kein Pane vorhanden'}
-                  onClick={() => defaultPane && runTaskInPane(defaultPane, text)}>
-            ▶ Run{defaultPane ? ` → ${paneTitle(defaultPane, defaultPane)}` : ''}
-          </button>
-          <button type="button" className="task-run-caret" title="Ziel-Pane wählen"
-                  onClick={() => setPicker((v) => !v)}>⌄</button>
-          {picker && (
-            <>
-              <div className="task-pane-backdrop" onClick={() => setPicker(false)} />
-              <div className="task-pane-picker">
-                <div className="task-pane-picker-label">In welches Pane?</div>
-                {paneIds.map((pid) => (
-                  <button type="button" key={pid} className="task-pane-item"
-                          onClick={() => { runTaskInPane(pid, text); setPicker(false); }}>
-                    <span>{paneTitle(pid, pid)}</span>
+        {task.command ? (
+          <div className="task-run">
+            <button type="button" className="task-run-btn" disabled={!defaultPane}
+                    title={defaultPane ? `In Pane senden: ${paneTitle(defaultPane, defaultPane)}` : 'Kein Pane vorhanden'}
+                    onClick={() => defaultPane && runTaskInPane(defaultPane, text)}>
+              ▶ Run{defaultPane ? ` → ${paneTitle(defaultPane, defaultPane)}` : ''}
+            </button>
+            <button type="button" className="task-run-caret" title="Ziel-Pane wählen"
+                    onClick={() => setPicker((v) => !v)}>⌄</button>
+            {picker && (
+              <>
+                <div className="task-pane-backdrop" onClick={() => setPicker(false)} />
+                <div className="task-pane-picker">
+                  <div className="task-pane-picker-label">In welches Pane?</div>
+                  {paneIds.map((pid) => (
+                    <button type="button" key={pid} className="task-pane-item"
+                            onClick={() => { runTaskInPane(pid, text); setPicker(false); }}>
+                      <span>{paneTitle(pid, pid)}</span>
+                    </button>
+                  ))}
+                  <button type="button" className="task-pane-item task-pane-new"
+                          onClick={() => { runTaskInNewPane(text); setPicker(false); }}>
+                    ＋ neues Pane
                   </button>
-                ))}
-                <button type="button" className="task-pane-item task-pane-new"
-                        onClick={() => { runTaskInNewPane(text); setPicker(false); }}>
-                  ＋ neues Pane
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <span className="task-no-cmd">— kein Befehl —</span>
+        )}
         <button type="button" className="task-del" title="Löschen" onClick={onDelete}>✕</button>
       </div>
     </div>

@@ -30,7 +30,7 @@ export function TaskBoard(): React.JSX.Element {
     return { columns };
   });
 
-  const editTask = (col: number, idx: number, patch: Partial<Pick<Task, 'title' | 'command'>>): void =>
+  const editTask = (col: number, idx: number, patch: Partial<Pick<Task, 'title' | 'description' | 'command'>>): void =>
     mutateTasks((b) => {
       const columns = b.columns.map((c, i) => i !== col ? c : {
         ...c, tasks: c.tasks.map((t, j) => j === idx ? { ...t, ...patch } : t)
