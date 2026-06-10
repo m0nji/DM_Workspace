@@ -65,7 +65,7 @@ describe('migrateSettings', () => {
   it('drops invalid workspace navigation placement values to the default left placement', () => {
     expect(migrateSettings({
       themeId: DEFAULT_THEME_ID,
-      terminalOpacity: 0.75,
+      terminalOpacity: 0.95,
       workspaceNavigationPlacement: 'floating'
     })).toEqual(defaultSettings());
   });

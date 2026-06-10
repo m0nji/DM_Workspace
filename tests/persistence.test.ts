@@ -27,7 +27,7 @@ describe('persistence serialize/deserialize', () => {
     }));
     expect(result.settings).toEqual({
       themeId: 'default',
-      terminalOpacity: 0.75,
+      terminalOpacity: 0.95,
       workspaceNavigationPlacement: 'left'
     });
     expect(result.activeWorkspaceId).toBeNull();

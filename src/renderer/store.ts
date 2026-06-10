@@ -14,7 +14,11 @@ import { focusTerminal } from './terminal-registry';
 
 const DEFAULT_SETTINGS: Settings = {
   themeId: DEFAULT_THEME_ID,
-  terminalOpacity: 0.75,
+  // 0.95: a hint of window vibrancy while keeping the reserved scrollbar gutter
+  // from reading as a band (the WebGL canvas composites translucency a few levels
+  // lighter than the CSS-painted gutter; the gap scales with 1-opacity, so a near-
+  // opaque terminal makes it imperceptible).
+  terminalOpacity: 0.95,
   clickMovesCursor: false,
   showDoneBadge: false,
   notificationsEnabled: false,

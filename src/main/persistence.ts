@@ -33,7 +33,7 @@ function migrateWorkspaceNavigationPlacement(raw: unknown): WorkspaceNavigationP
 }
 
 export function defaultSettings(): Settings {
-  return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.75, workspaceNavigationPlacement: 'left' };
+  return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, workspaceNavigationPlacement: 'left' };
 }
 
 // Migrate a raw persisted settings blob to the current shape. Pre-v0.2 states
