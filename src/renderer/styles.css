@@ -17,6 +17,26 @@ body {
   font-size: 13px;
   overflow: hidden;
 }
+
+/* App-wide scrollbars. Any overflow:auto/scroll element (settings, preview,
+   command palette, task board, …) otherwise gets the NATIVE macOS scrollbar,
+   whose visibility follows System Settings → Appearance → "Show scroll bars"
+   (Always / when-scrolling / automatic) plus whether a mouse is attached. So the
+   same build shows a bright, always-on bar on one Mac and nothing on another.
+   Style our own thin, dark, floating thumb so the app looks identical regardless
+   of that per-machine system setting. The terminal viewport is handled separately
+   below (it has overflow-y:scroll and uses xterm's own overlay slider). */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 .root { display: flex; flex-direction: column; height: 100vh; }
 /* macOS hiddenInset: a full-width draggable strip so the window can be moved and
    the traffic lights have their own space above the sidebar/content. On Windows
@@ -314,11 +334,21 @@ input[type="checkbox"]:checked::after {
    no black bar at the bottom. */
 .xterm-host { height: 100%; }
 
-/* Terminal scrollbar. xterm v6 renders its own VSCode-style overlay scrollbar at
-   .xterm-scrollable-element > .scrollbar (not the native viewport scrollbar). Slim
-   the vertical slider to a thin, rounded, macOS-like thumb, right-aligned in the
-   reserved gutter. The slider colour comes from the scrollbarSlider* theme options;
-   xterm auto-fades it when idle. */
+/* Terminal scrollbar. xterm's .xterm-viewport has overflow-y:scroll, so it carries
+   a NATIVE macOS scrollbar underneath xterm's own overlay slider — on a Mac with
+   "Show scroll bars: Always" (or a mouse attached) that native bar shows as a bright
+   vertical strip down the right edge of every pane. Hide it: the terminal scrolls
+   via wheel/keys and shows xterm's own thin overlay slider (styled below) instead,
+   so panes look identical regardless of the system scroll-bar setting. The global
+   ::-webkit-scrollbar rule above doesn't reach here — this class selector is more
+   specific and wins. */
+.xterm .xterm-viewport::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* xterm renders its own VSCode-style overlay scrollbar at
+   .xterm-scrollable-element > .scrollbar. Slim the vertical slider to a thin,
+   rounded, macOS-like thumb, right-aligned in the reserved gutter. The slider
+   colour comes from the scrollbarSlider* theme options; xterm auto-fades it when
+   idle. */
 .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
   width: 7px !important;
   left: auto !important;
