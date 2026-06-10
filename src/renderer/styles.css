@@ -316,23 +316,15 @@ input[type="checkbox"]:checked::after {
 
 /* Terminal scrollbar. xterm v6 renders its own VSCode-style overlay scrollbar at
    .xterm-scrollable-element > .scrollbar (not the native viewport scrollbar). Slim
-   the vertical slider to a thin, rounded, macOS-like thumb and right-align it in the
-   reserved gutter (whose width is set via overviewRuler.width in TerminalView). The
-   slider colour comes from the scrollbarSlider* theme options; xterm auto-fades it
-   when idle. The gutter blends with the terminal because the canvas background is
-   transparent (see buildTheme), so no dark band shows down the edge. */
+   the vertical slider to a thin, rounded, macOS-like thumb, right-aligned in the
+   reserved gutter. The slider colour comes from the scrollbarSlider* theme options;
+   xterm auto-fades it when idle. */
 .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
   width: 7px !important;
   left: auto !important;
   right: 1px !important;
   border-radius: 10px !important;
 }
-/* Setting overviewRuler.width (to shrink the scrollbar's reserved width — see
-   TerminalView) also switches on xterm's decoration overview ruler, a 1px column
-   pinned to the right edge that renders as a thin vertical line. The app never adds
-   ruler decorations (findNext/findPrevious pass no decoration options), so hide it.
-   Its width is read from the option, not the element, so the reservation stays small. */
-.xterm-decoration-overview-ruler { display: none !important; }
 
 .maximized-host { position: absolute; inset: 8px; }
 

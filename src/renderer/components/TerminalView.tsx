@@ -37,23 +37,19 @@ function bgColor(themeId: string, opacity: number, customBg?: string): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
-// Build an xterm ITheme from a theme id. The canvas background is kept fully
-// TRANSPARENT: the WebGL renderer paints the default cell background as its own
-// translucent layer, but only across the canvas area — xterm v6's reserved
-// scrollbar gutter is a CSS-only strip beside the canvas, so that extra canvas
-// layer left the gutter one translucency-step lighter, reading as a vertical band
-// down the right edge of every pane. With a transparent canvas the terminal
-// background comes entirely from the CSS backdrop (bgColor, applied by
-// syncBackgrounds), which spans the full width including the gutter — so it's
-// uniform and the band disappears. foreground/cursor/ANSI still come from the theme.
-function buildTheme(themeId: string, _opacity: number, _customBg?: string): ITheme {
+// Build an xterm ITheme from a theme id + opacity. The background is the themed
+// colour with opacity baked into the alpha (so a translucent terminal reveals the
+// window vibrancy). The WebGL renderer paints this; keeping it opaque (alpha-baked,
+// not fully transparent) is required — a fully transparent canvas makes the WebGL
+// renderer draw written cells with an opaque-black background (visible boxes).
+function buildTheme(themeId: string, opacity: number, customBg?: string): ITheme {
   const t = getTheme(themeId);
   const [
     black, red, green, yellow, blue, magenta, cyan, white,
     brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite
   ] = t.ansi;
   return {
-    background: 'rgba(0, 0, 0, 0)', foreground: t.foreground, cursor: t.cursor,
+    background: bgColor(themeId, opacity, customBg), foreground: t.foreground, cursor: t.cursor,
     // Thin, macOS-like overlay scrollbar slider (xterm v6 fades it when idle).
     scrollbarSliderBackground: 'rgba(190, 190, 190, 0.4)',
     scrollbarSliderHoverBackground: 'rgba(190, 190, 190, 0.55)',
@@ -76,11 +72,6 @@ function syncBackgrounds(host: HTMLElement | null, background: string | undefine
   if (!host || !background) return;
   const vp = host.querySelector('.xterm-viewport') as HTMLElement | null;
   if (vp) vp.style.backgroundColor = background;
-  // The scrollable element spans the full width including the reserved scrollbar
-  // gutter and sits directly behind the (now transparent) canvas, so painting it
-  // gives both the text area and the gutter the same backdrop — no band.
-  const scrollable = host.querySelector('.xterm-scrollable-element') as HTMLElement | null;
-  if (scrollable) scrollable.style.backgroundColor = background;
   // The wrapper holds the sub-cell slack strip below the pinned host.
   if (host.parentElement) host.parentElement.style.backgroundColor = background;
 }
@@ -110,13 +101,6 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
         useStore.getState().settings.terminalBackground
       ),
       cursorBlink: true,
-      // xterm v6 (and FitAddon) reserve the vertical scrollbar's width
-      // (= overviewRuler.width, else 14px) by narrowing the text area. We want the
-      // thin slider to overlay the edge macOS-style rather than steal a ~14px
-      // column, so reserve the minimum (1px). The 7px slider is absolutely
-      // positioned and floats over the rightmost edge only while scrolling.
-      // (We don't use the overview ruler itself — no decorations set overviewRulerOptions.)
-      overviewRuler: { width: 1 },
       // xterm's native alt-click only ever emits ←/→ and models the prompt as
       // one wrapped logical line, so it can't reach another line of a multi-line
       // editor. Disable it; the custom mouseup handler below handles ↑/↓ too.
