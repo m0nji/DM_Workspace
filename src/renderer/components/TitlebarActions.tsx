@@ -1,13 +1,13 @@
 import React from 'react';
 import { useStore } from '../store';
 import { Icon } from './Icon';
+import { UpdateBadge } from './UpdateBadge';
 
 export function TitlebarActions(): React.JSX.Element {
   const togglePreview = useStore((s) => s.togglePreview);
   const previewOpen = useStore((s) => s.previewPanel.open);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setCommandPaletteOpen = useStore((s) => s.setCommandPaletteOpen);
-  const updateAvailable = useStore((s) => s.update.status === 'available');
   const taskView = useStore((s) => s.taskView);
   const openTaskView = useStore((s) => s.openTaskView);
   const closeTaskView = useStore((s) => s.closeTaskView);
@@ -16,6 +16,7 @@ export function TitlebarActions(): React.JSX.Element {
 
   return (
     <div className="titlebar-actions">
+      <UpdateBadge />
       {tasksEnabled && (
         <div className="view-toggle" role="tablist" aria-label="Ansicht">
           <button type="button" role="tab" aria-selected={!taskView}
@@ -34,7 +35,6 @@ export function TitlebarActions(): React.JSX.Element {
       </button>
       <button type="button" className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
         <Icon name="settings" />
-        {updateAvailable && <span className="update-dot" title="Update available" />}
       </button>
     </div>
   );

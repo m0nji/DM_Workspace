@@ -238,8 +238,24 @@ input[type="checkbox"]:checked::after {
 .confirm-btn-danger { background: #c95a5a; border-color: #c95a5a; color: #fff; }
 .confirm-btn-danger:hover { background: #d46666; }
 .update-status { flex: 1; color: var(--muted); font-size: 12px; }
-.update-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px;
-  border-radius: 50%; background: var(--accent); border: 1px solid var(--panel); }
+
+/* Top-right update indicator (TitlebarActions → UpdateBadge). Accent pill so an
+   available/staged update is obvious at a glance; opts out of the titlebar drag
+   region so it stays clickable. */
+.update-badge {
+  -webkit-app-region: no-drag;
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 10px; margin-right: 2px;
+  border: none; border-radius: 12px; cursor: pointer;
+  background: var(--accent); color: #1a1a1a;
+  font-family: inherit; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.update-badge:hover { filter: brightness(1.08); }
+.update-badge.downloading {
+  background: rgba(201, 123, 74, 0.16); color: var(--accent); cursor: default;
+}
+.update-badge.ready { animation: update-badge-pulse 1.6s ease-in-out infinite; }
+@keyframes update-badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
 .ws-rename-input { flex: 1; background: #000; color: var(--text);
   border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
 

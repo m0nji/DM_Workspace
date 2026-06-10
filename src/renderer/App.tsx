@@ -38,6 +38,18 @@ export function App(): React.JSX.Element {
     return off;
   }, [applyUpdateEvent, checkForUpdates]);
 
+  // Re-check for updates every 60 minutes so a long-running window still notices
+  // a release. Skip while a download is in flight or already staged so the check
+  // (which flips status back to 'checking') doesn't wipe that progress.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const status = useStore.getState().update.status;
+      if (status === 'downloading' || status === 'downloaded') return;
+      useStore.getState().checkForUpdates();
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // Track window focus (gates notifications) and handle notification clicks
   // that ask to jump to a specific workspace.
   useEffect(() => {
