@@ -402,8 +402,12 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
         window.api.resize({ paneId, cols: term.cols, rows: term.rows });
       }
     };
+    // Observe the wrapper, not the host: safeFit pins the host to a fixed pixel
+    // height, so a height-only pane resize (splitter drag, maximize) never
+    // changes the host's size and would never fire the observer. The wrapper
+    // always tracks the pane layout and is never pinned.
     const ro = new ResizeObserver(resize);
-    ro.observe(host);
+    ro.observe(host.parentElement ?? host);
 
     // The very first fit can run before the WebGL renderer has measured the cell
     // size, so .xterm-screen still has no height and the host can't be pinned —
