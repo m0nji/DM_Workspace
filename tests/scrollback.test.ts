@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -67,13 +67,35 @@ describe('truncateScrollback', () => {
 });
 
 describe('ScrollbackStore', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('stores and retrieves per-pane scrollback, persisting to disk', () => {
     const file = tmpFile();
     const store = new ScrollbackStore(file);
     store.set('p1', 'output one');
     expect(store.get('p1')).toBe('output one');
+    store.flush();
     // A fresh store reading the same file sees the persisted value.
     expect(new ScrollbackStore(file).get('p1')).toBe('output one');
+    rmSync(file, { force: true });
+  });
+
+  it('batches multiple set calls into one delayed disk write', () => {
+    vi.useFakeTimers();
+    const file = tmpFile();
+    const store = new ScrollbackStore(file, { flushDelayMs: 1000 });
+
+    store.set('p1', 'first');
+    store.set('p1', 'second');
+    expect(new ScrollbackStore(file).get('p1')).toBeUndefined();
+
+    vi.advanceTimersByTime(999);
+    expect(new ScrollbackStore(file).get('p1')).toBeUndefined();
+
+    vi.advanceTimersByTime(1);
+    expect(new ScrollbackStore(file).get('p1')).toBe('second');
     rmSync(file, { force: true });
   });
 
@@ -91,6 +113,7 @@ describe('ScrollbackStore', () => {
     store.set('p1', 'x');
     store.clear('p1');
     expect(store.get('p1')).toBeUndefined();
+    store.flush();
     expect(new ScrollbackStore(file).get('p1')).toBeUndefined();
     rmSync(file, { force: true });
   });
@@ -103,6 +126,7 @@ describe('ScrollbackStore', () => {
     store.prune(['keep']);
     expect(store.get('keep')).toBe('a');
     expect(store.get('orphan')).toBeUndefined();
+    store.flush();
     expect(new ScrollbackStore(file).get('orphan')).toBeUndefined();
     rmSync(file, { force: true });
   });

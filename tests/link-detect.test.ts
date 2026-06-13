@@ -64,6 +64,12 @@ describe('fileTarget', () => {
   it('adds a leading slash before file:// when missing', () => {
     expect(fileTarget('web', 'a/b.html')).toBe('file:///a/b.html');
   });
+  it('encodes file URL characters that would otherwise break navigation', () => {
+    expect(fileTarget('web', '/tmp/My Report #1.html')).toBe('file:///tmp/My%20Report%20%231.html');
+  });
+  it('normalizes Windows file URLs with encoded path segments', () => {
+    expect(fileTarget('web', 'C:\\Users\\me\\My Report #1.html')).toBe('file:///C:/Users/me/My%20Report%20%231.html');
+  });
 });
 
 describe('pathEndsWith', () => {

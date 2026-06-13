@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
 import { readFileSync, readdirSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
@@ -9,6 +10,7 @@ import type { TaskBoard } from '../shared/types';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
+import { readPreviewFile } from './preview-file';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
@@ -23,6 +25,12 @@ const MAX_DEPTH = 5;   // levels below the start base
 const MAX_DIRS = 2000; // total dirs visited before giving up
 const SKIP = new Set(['node_modules', '.git']);
 
+interface ResolveLinkPathOptions {
+  maxDepth?: number;
+  maxDirs?: number;
+  onVisitDir?: (dir: string) => void;
+}
+
 // Resolve a relative link target via a bounded breadth-first walk of the file
 // tree, starting at the pane cwd and then each known workspace root. Returns the
 // first file whose path ends (segment-aligned) with `rel`; BFS yields the
@@ -33,12 +41,12 @@ export function resolveLinkPath(
   rel: string,
   cwd: string,
   roots: string[],
-  opts: { maxDepth?: number; maxDirs?: number } = {}
+  opts: ResolveLinkPathOptions = {}
 ): string | null {
   const maxDepth = opts.maxDepth ?? MAX_DEPTH;
   const maxDirs = opts.maxDirs ?? MAX_DIRS;
   const norm = (p: string) => p.replace(/\/+$/, '');
-  const starts = [norm(cwd), ...roots.map(norm)];
+  const starts = [...new Set([norm(cwd), ...roots.map(norm)])];
   // Only skip a nested start if its ancestor completed its BFS WITHOUT hitting
   // the budget cap — if the ancestor was capped, the nested start may not have
   // been reached and must run its own BFS with a fresh budget.
@@ -60,6 +68,7 @@ export function resolveLinkPath(
       if (visited >= maxDirs) { capped = true; break; }
       visited++;
       const { dir, depth } = queue[head++];
+      opts.onVisitDir?.(dir);
       let entries;
       try {
         entries = readdirSync(dir, { withFileTypes: true });
@@ -92,6 +101,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   // Wipe the temp image dir on quit; pasted images only need to survive the session.
   app.on('will-quit', () => {
+    scrollback.flush();
     try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   });
 
@@ -179,8 +189,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (image.isEmpty()) return null;
     try {
       mkdirSync(IMAGE_TMP_DIR, { recursive: true });
-      const file = join(IMAGE_TMP_DIR, `paste-${Date.now()}.png`);
-      writeFileSync(file, image.toPNG());
+      const file = join(IMAGE_TMP_DIR, `paste-${Date.now()}-${randomUUID()}.png`);
+      writeFileSync(file, image.toPNG(), { flag: 'wx', mode: 0o600 });
       return file;
     } catch {
       return null;
@@ -193,10 +203,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // panel never needs anything else, and this avoids slurping arbitrary files
   // (e.g. a malicious agent printing a clickable ~/.ssh/id_rsa path).
   ipcMain.handle('file:read', (_e, path: string): string => {
-    if (!/\.(md|markdown|mdx|txt)$/i.test(path)) {
-      throw new Error('file:read is restricted to text/markdown files');
-    }
-    return readFileSync(path, 'utf8');
+    return readPreviewFile(path);
   });
 
   ipcMain.handle('dialog:pickDirectory', async () => {

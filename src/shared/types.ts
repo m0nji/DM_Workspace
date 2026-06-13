@@ -159,6 +159,8 @@ export interface RendererApi {
   getPathForFile(file: File): string;
   // the host platform (for path-escaping decisions in the renderer)
   platform: NodeJS.Platform;
+  // e2e-only: keep xterm on the DOM renderer for tests that assert terminal text
+  disableWebgl: boolean;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;

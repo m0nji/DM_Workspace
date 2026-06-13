@@ -46,8 +46,19 @@ function joinPath(cwd: string, rel: string): string {
 
 // Build a preview target from a resolved absolute fs path: markdown reads the path
 // directly; web (html) needs a file:// url with a leading slash.
+function fileUrl(abs: string): string {
+  let path = abs.replace(/\\/g, '/');
+  if (/^[A-Za-z]:\//.test(path)) path = `/${path}`;
+  if (!path.startsWith('/')) path = `/${path}`;
+  const encoded = path.split('/').map((part, index) => {
+    if (index === 1 && /^[A-Za-z]:$/.test(part)) return part;
+    return encodeURIComponent(part);
+  }).join('/');
+  return `file://${encoded}`;
+}
+
 export function fileTarget(kind: PreviewKind, abs: string): string {
-  if (kind === 'web') return `file://${abs.startsWith('/') ? abs : `/${abs}`}`;
+  if (kind === 'web') return fileUrl(abs);
   return abs;
 }
 

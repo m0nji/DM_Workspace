@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { renderMarkdown } from '../markdown';
 import { resolveSource, fileTarget } from '../../shared/link-detect';
+import { escapeHtml } from '../../shared/html';
 import { Icon } from './Icon';
 
 // Minimal typing for the Electron <webview> element methods we call.
@@ -36,7 +37,7 @@ export function PreviewPanel(): React.JSX.Element | null {
     window.api
       .readFile(source.target)
       .then((text) => { if (!cancelled) setMdHtml(renderMarkdown(text)); })
-      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${String(err)}</p>`); });
+      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`); });
     return () => { cancelled = true; };
   }, [panel.open, source]);
 
@@ -73,7 +74,9 @@ export function PreviewPanel(): React.JSX.Element | null {
 
   const reload = useCallback(() => {
     if (isMarkdown) {
-      if (source?.resolved) window.api.readFile(source.target).then((t) => setMdHtml(renderMarkdown(t))).catch(() => {});
+      if (source?.resolved) window.api.readFile(source.target).then((t) => setMdHtml(renderMarkdown(t))).catch((err) => {
+        setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`);
+      });
     } else {
       webviewRef.current?.reload();
     }

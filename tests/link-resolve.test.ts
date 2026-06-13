@@ -120,6 +120,17 @@ describe('resolveLinkPath', () => {
     expect(resolveLinkPath('inside.md', root, [nested], { maxDirs: 1 })).toBe(target);
   });
 
+  it('deduplicates equivalent cwd and workspace roots before walking', () => {
+    const visited: string[] = [];
+
+    expect(resolveLinkPath('missing.md', root, [root, `${root}/`], {
+      maxDepth: 0,
+      onVisitDir: (dir) => visited.push(dir),
+    })).toBeNull();
+
+    expect(visited).toEqual([root]);
+  });
+
   it('still searches a root after a cwd subtree exhausts its own maxDirs budget', () => {
     for (const d of ['x1', 'x2', 'x3']) mkdirSync(join(root, d), { recursive: true });
     const ws = mkdtempSync(join(tmpdir(), 'ws-'));

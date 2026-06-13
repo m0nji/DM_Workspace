@@ -123,13 +123,15 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     // It can fail (no GL context, lost context after sleep/GPU reset); in that
     // case dispose it and fall back to the DOM renderer rather than crash.
     let webgl: WebglAddon | null = null;
-    try {
-      webgl = new WebglAddon();
-      webgl.onContextLoss(() => { webgl?.dispose(); webgl = null; });
-      term.loadAddon(webgl);
-    } catch {
-      webgl?.dispose();
-      webgl = null;
+    if (!window.api.disableWebgl) {
+      try {
+        webgl = new WebglAddon();
+        webgl.onContextLoss(() => { webgl?.dispose(); webgl = null; });
+        term.loadAddon(webgl);
+      } catch {
+        webgl?.dispose();
+        webgl = null;
+      }
     }
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.

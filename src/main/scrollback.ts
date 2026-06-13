@@ -10,6 +10,7 @@ export type ScrollbackMap = Record<string, string>;
 // The stored data is the renderer's serialized buffer — rows of text with inline
 // SGR color escapes, separated by newlines.
 export const MAX_SCROLLBACK_CHARS = 256 * 1024;
+const DEFAULT_FLUSH_DELAY_MS = 1000;
 
 // Keep the most recent tail of `data`. When trimming, drop the (now partial)
 // first line so we cut on a row boundary: serialized rows are newline-separated
@@ -52,13 +53,16 @@ export function saveScrollbackToFile(file: string, map: ScrollbackMap): void {
   }
 }
 
-// Holds the scrollback map in memory and writes through to disk on every change.
-// Writes are infrequent (the renderer debounces saves), so write-through is fine.
+// Holds the scrollback map in memory and batches disk writes so pane output
+// bursts do not rewrite scrollback.json on every save event.
 export class ScrollbackStore {
   private map: ScrollbackMap;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly flushDelayMs: number;
 
-  constructor(private readonly file: string) {
+  constructor(private readonly file: string, opts: { flushDelayMs?: number } = {}) {
     this.map = loadScrollbackFromFile(file);
+    this.flushDelayMs = opts.flushDelayMs ?? DEFAULT_FLUSH_DELAY_MS;
   }
 
   get(paneId: string): string | undefined {
@@ -67,13 +71,13 @@ export class ScrollbackStore {
 
   set(paneId: string, data: string): void {
     this.map[paneId] = truncateScrollback(data);
-    this.persist();
+    this.schedulePersist();
   }
 
   clear(paneId: string): void {
     if (paneId in this.map) {
       delete this.map[paneId];
-      this.persist();
+      this.schedulePersist();
     }
   }
 
@@ -87,7 +91,23 @@ export class ScrollbackStore {
         changed = true;
       }
     }
-    if (changed) this.persist();
+    if (changed) this.schedulePersist();
+  }
+
+  flush(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.persist();
+  }
+
+  private schedulePersist(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      this.persist();
+    }, this.flushDelayMs);
   }
 
   private persist(): void {

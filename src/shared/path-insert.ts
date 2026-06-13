@@ -4,8 +4,8 @@
 // the de-facto terminal drag-and-drop convention per platform:
 //   - POSIX (macOS/Linux): backslash-escape spaces and shell-special chars,
 //     exactly like Terminal.app / iTerm / GNOME Terminal do on a file drag.
-//   - Windows: wrap in double quotes when the path contains a space (backslashes
-//     are path separators there and must NOT be escaped).
+//   - Windows: wrap in double quotes when the path contains whitespace or shell
+//     metacharacters (backslashes are path separators there and must NOT be escaped).
 // Each path gets a trailing space so the next token is separated.
 
 // Characters that are special to a POSIX shell and must be escaped with a backslash.
@@ -16,7 +16,8 @@ function escapePosix(p: string): string {
 }
 
 function escapeWindows(p: string): string {
-  return /\s/.test(p) ? `"${p}"` : p;
+  if (!/[\s&|;<>()^"%!]/.test(p)) return p;
+  return `"${p.replace(/"/g, '`"')}"`;
 }
 
 export function formatPathsForInsert(paths: string[], platform: NodeJS.Platform): string {

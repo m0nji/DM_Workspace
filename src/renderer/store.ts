@@ -95,7 +95,7 @@ interface StoreState extends AppState {
   applyPreset: (kind: PresetKind) => void;
   splitActivePane: (paneId: string, direction: Direction) => void;
   closeActivePane: (paneId: string) => void;
-  resizeSplit: (splitId: string, ratio: number) => void;
+  resizeSplit: (splitId: string, ratio: number, persistNow?: boolean) => void;
   toggleMaximize: (paneId: string) => void;
   // settings
   settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
@@ -319,13 +319,13 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  resizeSplit: (splitId, ratio) => set((s) => {
+  resizeSplit: (splitId, ratio, persistNow = true) => set((s) => {
     const workspaces = s.workspaces.map((w) => {
       if (w.id !== s.activeWorkspaceId || !w.layout) return w;
       return { ...w, layout: setRatio(w.layout, splitId, ratio) };
     });
     const next = { ...s, workspaces };
-    persist(next);
+    if (persistNow) persist(next);
     return next;
   }),
 

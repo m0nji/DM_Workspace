@@ -12,16 +12,18 @@ export function Splitter({ splitId, direction, containerRef }: Props): React.JSX
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
+    let lastRatio = 0.5;
 
     const onMove = (ev: MouseEvent) => {
-      const ratio = direction === 'h'
+      lastRatio = direction === 'h'
         ? (ev.clientX - rect.left) / rect.width
         : (ev.clientY - rect.top) / rect.height;
-      resizeSplit(splitId, ratio);
+      resizeSplit(splitId, lastRatio, false);
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      resizeSplit(splitId, lastRatio, true);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);

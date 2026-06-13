@@ -36,6 +36,16 @@ describe('formatPathsForInsert (Windows)', () => {
   it('does not backslash-escape on Windows (backslashes are path separators)', () => {
     expect(formatPathsForInsert(['C:\\a\\b.png'], 'win32')).toBe('C:\\a\\b.png ');
   });
+
+  it('quotes paths containing shell metacharacters even without spaces', () => {
+    expect(formatPathsForInsert(['C:\\Users\\me\\report&calc;.png'], 'win32'))
+      .toBe('"C:\\Users\\me\\report&calc;.png" ');
+  });
+
+  it('escapes embedded double quotes inside quoted Windows paths', () => {
+    expect(formatPathsForInsert(['C:\\Users\\me\\bad"name.png'], 'win32'))
+      .toBe('"C:\\Users\\me\\bad`"name.png" ');
+  });
 });
 
 describe('formatPathsForInsert (edge cases)', () => {

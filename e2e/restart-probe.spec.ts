@@ -7,7 +7,7 @@ const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-probe-'));
 const MARKER = 'PROBE_MARK_77';
 
 function env(): Record<string, string> {
-  const e = { ...process.env, DMWS_USERDATA: USERDATA } as Record<string, string>;
+  const e = { ...process.env, DMWS_USERDATA: USERDATA, DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
   delete e.DMWS_E2E;
   return e;
 }

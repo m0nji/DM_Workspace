@@ -14,7 +14,8 @@ test('login shell restores PATH (codex found) and reports 256-color TERM', async
     env: {
       HOME: process.env.HOME as string,
       PATH: '/usr/bin:/bin:/usr/sbin:/sbin', // minimal, NO homebrew
-      DMWS_USERDATA: USERDATA
+      DMWS_USERDATA: USERDATA,
+      DMWS_DISABLE_WEBGL: '1'
     }
   });
   const win = await app.firstWindow();

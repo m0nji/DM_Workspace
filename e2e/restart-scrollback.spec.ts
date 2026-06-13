@@ -10,7 +10,7 @@ const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-restart-'));
 const MARKER = 'SCROLLBACK_MARKER_4242';
 
 function launchEnv(): Record<string, string> {
-  const env: Record<string, string> = { ...process.env, DMWS_USERDATA: USERDATA } as Record<string, string>;
+  const env: Record<string, string> = { ...process.env, DMWS_USERDATA: USERDATA, DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
   delete env.DMWS_E2E;
   return env;
 }
