@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
   PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload
@@ -64,7 +64,15 @@ const api: RendererApi = {
   },
   clipboardRead: () => ipcRenderer.invoke('clipboard:read') as Promise<string>,
   clipboardHasImage: () => ipcRenderer.invoke('clipboard:has-image') as Promise<boolean>,
+  // Save a clipboard image to a temp PNG and return its absolute path (null if
+  // there's no image or the write fails). Lets us insert a file path that any
+  // tool can read, instead of relying on the tool to read the OS clipboard.
+  clipboardSaveImage: () => ipcRenderer.invoke('clipboard:save-image') as Promise<string | null>,
   clipboardWrite: (text: string) => ipcRenderer.send('clipboard:write', text),
+  // Resolve the real filesystem path of a dropped File (Electron 32+ removed
+  // File.path; webUtils.getPathForFile is the supported replacement).
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  platform: process.platform,
   notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
   onWindowFocus: (cb: (focused: boolean) => void) => {
     const handler = (_e: unknown, focused: boolean) => cb(focused);

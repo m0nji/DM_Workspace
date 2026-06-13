@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
-import { readFileSync, readdirSync, watch, type FSWatcher } from 'node:fs';
+import { readFileSync, readdirSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
 import { loadStateFromFile, saveStateToFile } from './persistence';
@@ -15,6 +15,9 @@ import type {
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
 const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
+// Pasted clipboard images are dropped here as temp PNGs so we can insert their
+// path into the terminal. Wiped on quit — they only need to live for the session.
+const IMAGE_TMP_DIR = join(app.getPath('temp'), 'dm-workspace-images');
 
 const MAX_DEPTH = 5;   // levels below the start base
 const MAX_DIRS = 2000; // total dirs visited before giving up
@@ -86,6 +89,11 @@ export function resolveLinkPath(
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   const pty = new PtyManager();
   const scrollback = new ScrollbackStore(SCROLLBACK_FILE());
+
+  // Wipe the temp image dir on quit; pasted images only need to survive the session.
+  app.on('will-quit', () => {
+    try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
+  });
 
   pty.onData((paneId, data) => {
     const payload: PtyDataEvent = { paneId, data };
@@ -163,6 +171,21 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // Lets the renderer decide whether an image-paste keystroke should be
   // forwarded to the PTY (so the running program can read the image itself).
   ipcMain.handle('clipboard:has-image', () => !clipboard.readImage().isEmpty());
+  // Save a clipboard image to a temp PNG so the renderer can insert its path into
+  // the terminal line. This is tool-independent (any program reads a file path)
+  // and works on Windows, where CLI tools can't reliably read the OS clipboard.
+  ipcMain.handle('clipboard:save-image', () => {
+    const image = clipboard.readImage();
+    if (image.isEmpty()) return null;
+    try {
+      mkdirSync(IMAGE_TMP_DIR, { recursive: true });
+      const file = join(IMAGE_TMP_DIR, `paste-${Date.now()}.png`);
+      writeFileSync(file, image.toPNG());
+      return file;
+    } catch {
+      return null;
+    }
+  });
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
 
   // Used by the markdown preview panel. The path comes from a link the user

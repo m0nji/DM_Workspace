@@ -37,6 +37,13 @@ function isTrustedRendererNavigation(raw: string, rendererUrl: string, devServer
 app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
+  // A file dropped anywhere on the window must never navigate the app to that
+  // file (Electron's default). Our drop handlers preventDefault, but this is the
+  // safety net for a drop that lands outside them.
+  contents.on('will-navigate', (event, url) => {
+    if (url.startsWith('file://') && !url.startsWith(contents.getURL())) event.preventDefault();
+  });
+
   contents.on('will-attach-webview', (event, webPreferences, params) => {
     if (!isAllowedPreviewUrl(params.src)) {
       event.preventDefault();

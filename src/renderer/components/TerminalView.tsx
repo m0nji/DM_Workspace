@@ -14,6 +14,7 @@ import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
 import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, registerTerminalFocus, unregisterTerminalFocus } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
+import { formatPathsForInsert } from '../../shared/path-insert';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { ContextMenu, type MenuItem } from './ContextMenu';
@@ -223,19 +224,55 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
           activity.onInput();
           return;
         }
-        // No text — if an image is on the clipboard, forward Ctrl+V (0x16) to
-        // the PTY so the running program (e.g. Claude Code) reads the image
-        // from the OS clipboard itself. Swallowing the keystroke here (the old
-        // behaviour) made image paste impossible. Only forward it when an image
-        // is actually present, so an empty clipboard doesn't trigger a spurious
-        // "no image in clipboard" paste.
+        // No text — if an image is on the clipboard, save it to a temp file and
+        // insert its path. This is tool-independent (Claude Code, Codex, opencode,
+        // … all read a file path) and works on Windows, where CLI tools can't
+        // reliably read the OS clipboard themselves. Only when saving fails do we
+        // fall back to forwarding Ctrl+V (0x16) so the program can try the
+        // clipboard itself — preserving the previous behaviour as a safety net.
         if (await window.api.clipboardHasImage()) {
-          window.api.input({ paneId, data: '\x16' });
+          const file = await window.api.clipboardSaveImage();
+          if (file) {
+            term.paste(formatPathsForInsert([file], window.api.platform));
+          } else {
+            window.api.input({ paneId, data: '\x16' });
+          }
           activity.onInput();
         }
       });
     };
     host.addEventListener('keydown', handleTerminalPasteShortcut, true);
+
+    // Drag & drop files from the OS file browser into the terminal line. We
+    // insert each dropped file's path (tool-independent — any program reads a
+    // path), instead of letting Electron navigate the window to the file.
+    const onDragOver = (e: DragEvent): void => {
+      if (!e.dataTransfer?.types.includes('Files')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      host.classList.add('drop-target');
+    };
+    const onDragLeave = (e: DragEvent): void => {
+      // Only clear when the pointer actually leaves the host (not on child enter).
+      if (e.relatedTarget && host.contains(e.relatedTarget as Node)) return;
+      host.classList.remove('drop-target');
+    };
+    const onDrop = (e: DragEvent): void => {
+      host.classList.remove('drop-target');
+      const files = e.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+      e.preventDefault();
+      const paths = Array.from(files)
+        .map((f) => window.api.getPathForFile(f))
+        .filter((p) => p && p.length > 0);
+      if (paths.length === 0) return;
+      term.paste(formatPathsForInsert(paths, window.api.platform));
+      term.focus();
+      activity.onInput();
+    };
+    host.addEventListener('dragover', onDragOver);
+    host.addEventListener('dragleave', onDragLeave);
+    host.addEventListener('drop', onDrop);
 
     // Click → walk the running program's input cursor to the clicked cell,
     // using only ←/→ (which cross line boundaries in these editors). We feed the
@@ -433,6 +470,9 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       ro.disconnect();
       cancelAnimationFrame(pinRaf);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
+      host.removeEventListener('dragover', onDragOver);
+      host.removeEventListener('dragleave', onDragLeave);
+      host.removeEventListener('drop', onDrop);
       host.removeEventListener('mousedown', onMoveMouseDown, true);
       host.removeEventListener('mouseup', onMoveMouseUp, true);
       offData();

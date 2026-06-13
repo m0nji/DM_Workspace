@@ -150,7 +150,13 @@ export interface RendererApi {
   // clipboard (routed through the main process for reliability under contextIsolation)
   clipboardRead(): Promise<string>;
   clipboardHasImage(): Promise<boolean>;
+  // save a clipboard image to a temp file; returns its path, or null if none/failed
+  clipboardSaveImage(): Promise<string | null>;
   clipboardWrite(text: string): void;
+  // resolve the real filesystem path of a dropped File
+  getPathForFile(file: File): string;
+  // the host platform (for path-escaping decisions in the renderer)
+  platform: NodeJS.Platform;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;
