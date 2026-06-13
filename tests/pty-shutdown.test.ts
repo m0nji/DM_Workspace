@@ -4,10 +4,10 @@ import { killAndWait, type KillableProc } from '../src/main/pty-shutdown';
 // A fake pty whose exit we drive manually, so we can assert killAndWait waits
 // for the real onExit before resolving (the thing that prevents the abort crash).
 function fakeProc(): KillableProc & { fireExit: () => void; killed: boolean } {
-  let listener: (() => void) | null = null;
+  let listener: ((e: { exitCode: number; signal?: number }) => void) | null = null;
   return {
     killed: false,
-    onExit(cb: () => void) {
+    onExit(cb: (e: { exitCode: number; signal?: number }) => void) {
       listener = cb;
       return undefined;
     },
@@ -15,7 +15,7 @@ function fakeProc(): KillableProc & { fireExit: () => void; killed: boolean } {
       this.killed = true;
     },
     fireExit() {
-      listener?.();
+      listener?.({ exitCode: 0 });
     }
   };
 }
