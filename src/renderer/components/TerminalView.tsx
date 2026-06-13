@@ -540,6 +540,23 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
     >
       <div className="xterm-host" ref={hostRef} />
+      {/* Drop-zone overlay: shown (via the `.drop-target` class the drag handlers
+          toggle on .xterm-host) while a file is dragged over the terminal. It
+          blurs the terminal behind it and shows a full-area hint. pointer-events
+          stay off so the underlying host keeps receiving the drag/drop events. */}
+      <div className="drop-overlay" aria-hidden>
+        <div className="drop-overlay-inner">
+          <svg className="drop-overlay-icon" width="40" height="40" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" strokeWidth="1.5"
+               strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
+          </svg>
+          <div className="drop-overlay-text">Dateien hier ablegen</div>
+          <div className="drop-overlay-sub">fügt den Pfad ins Terminal ein</div>
+        </div>
+      </div>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
       {confirmClearAll && (
         <ConfirmDialog
