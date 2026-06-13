@@ -13,6 +13,39 @@ export function collectPaneIds(node: LayoutNode | null): string[] {
   return [...collectPaneIds(node.children[0]), ...collectPaneIds(node.children[1])];
 }
 
+// A human-friendly position label for a pane ("oben", "unten links", …) derived
+// from its path in the split tree. Vertical splits ('v') read as oben/unten,
+// horizontal ('h') as links/rechts; vertical words come first for natural German
+// ("oben links"). Returns '' for a single pane, an unknown pane, or a null layout
+// — callers fall back to their own default in that case.
+export function panePositionLabel(node: LayoutNode | null, paneId: string): string {
+  const path = pathToPane(node, paneId);
+  if (!path) return '';
+  const vertical: string[] = [];
+  const horizontal: string[] = [];
+  for (const { direction, side } of path) {
+    if (direction === 'v') vertical.push(side === 0 ? 'oben' : 'unten');
+    else horizontal.push(side === 0 ? 'links' : 'rechts');
+  }
+  return [...vertical, ...horizontal].join(' ');
+}
+
+// The sequence of split decisions from the root down to `paneId`, or null if the
+// pane isn't in the tree. Each step records the split's direction and which child
+// (0/1) the pane lives in.
+function pathToPane(
+  node: LayoutNode | null,
+  paneId: string
+): Array<{ direction: Direction; side: 0 | 1 }> | null {
+  if (node === null) return null;
+  if (node.type === 'pane') return node.id === paneId ? [] : null;
+  const left = pathToPane(node.children[0], paneId);
+  if (left) return [{ direction: node.direction, side: 0 }, ...left];
+  const right = pathToPane(node.children[1], paneId);
+  if (right) return [{ direction: node.direction, side: 1 }, ...right];
+  return null;
+}
+
 // Returns split-node ids in depth-first order.
 export function collectSplitIds(node: LayoutNode | null): string[] {
   if (node === null || node.type === 'pane') return [];

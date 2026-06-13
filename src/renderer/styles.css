@@ -682,7 +682,9 @@ input[type="checkbox"]:checked::after {
 .task-run-btn { background: #2f4a3a; color: #8fd; border: 1px solid #3f6a4a; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
 .task-run-btn:disabled { opacity: .4; cursor: default; }
 .task-pane-backdrop { position: fixed; inset: 0; z-index: 19; }
-.task-pane-picker { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.6); padding: 4px; min-width: 170px; }
+/* Fixed (not absolute) so the picker floats above the column's overflow:auto and
+   is never clipped; top/left/bottom are set inline from the caret button's rect. */
+.task-pane-picker { position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.6); padding: 4px; min-width: 170px; max-height: 60vh; overflow-y: auto; }
 .task-pane-picker-label { font-size: 10px; color: var(--muted); text-transform: uppercase; padding: 3px 7px; }
 .task-pane-item { display: flex; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 5px 7px; border-radius: 4px; cursor: pointer; }
 .task-pane-item:hover { background: rgba(255,255,255,0.08); }
