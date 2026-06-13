@@ -170,33 +170,45 @@ app.whenReady().then(() => {
   createWindow();
 });
 
+// Single coordinated pty teardown shared by both quit paths. Memoized while it's
+// in flight so concurrent callers await the SAME cleanup, then re-armed once it
+// settles (a macOS window can be reopened and spawn fresh ptys). This is what
+// makes auto-update safe: quitAndInstall() closes every window FIRST (firing
+// window-all-closed) and only THEN calls app.quit() — so before-quit must wait
+// on the teardown the window-close already started. The old code used a
+// fire-and-forget killAll() here that emptied the pty map, turning before-quit's
+// killAllAndWait into a no-op and letting Electron tear the JS env down while
+// node-pty's native exit callbacks were still firing — the abort() that surfaced
+// as the "quit unexpectedly" dialog. See pty-shutdown.ts for the addon detail.
+let ptyTeardown: Promise<void> | null = null;
+function teardownPtys(): Promise<void> {
+  if (!ptyTeardown) {
+    ptyTeardown = ipc.pty.killAllAndWait().finally(() => {
+      ptyTeardown = null;
+    });
+  }
+  return ptyTeardown;
+}
+
 app.on('window-all-closed', () => {
   // On macOS the app stays alive when all windows close, so just tear the
-  // terminals down. Elsewhere quitting routes pty cleanup through 'before-quit'.
-  if (process.platform === 'darwin') {
-    ipc.pty.killAll();
-  } else {
-    app.quit();
-  }
+  // terminals down (safely, awaiting their exit). Elsewhere this means quit —
+  // app.quit() routes the same teardown through 'before-quit'.
+  void teardownPtys();
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-// Quit only after every pty has actually exited. node-pty's exit callback can
-// otherwise fire while Electron is tearing down the JS environment, making the
-// native addon abort() the process (the "quit unexpectedly" dialog seen on
-// auto-update). preventDefault holds the quit, then we re-quit once cleanup is
-// done (or a short timeout elapses) — Squirrel's installer just waits a beat.
+// Quit only after every pty has actually exited. preventDefault holds the quit,
+// then we re-quit once the (possibly already-running) teardown completes.
 let ptyCleanupDone = false;
-let ptyCleanupStarted = false;
 app.on('before-quit', (event) => {
   if (ptyCleanupDone) return;
   event.preventDefault();
-  if (ptyCleanupStarted) return;
-  ptyCleanupStarted = true;
-  ipc.pty.killAllAndWait().then(() => {
+  teardownPtys().then(() => {
     // E2E only: remove the temporary userData dir created for test isolation
     if (e2eTempDir) {
       rmSync(e2eTempDir, { recursive: true, force: true });

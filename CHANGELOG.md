@@ -2,6 +2,10 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.7.18 – 2026-06-14
+- fix: Das „Was ist neu"-Fenster ist jetzt wirklich so breit wie das Einstellungen-Menü – der vorige Versuch hatte technisch nicht gegriffen
+- fix: Kurze „unerwartet beendet"-Fehlermeldung direkt nach einem Update behoben – beim Einspielen werden die Terminals jetzt sauber beendet, bevor sich das Programm schließt
+
 ## 0.7.17 – 2026-06-13
 - perf: Inaktive Workspaces geben ihren Grafikspeicher (WebGL) wieder frei – deutlich weniger Arbeitsspeicher- und GPU-Verbrauch bei vielen Workspaces. Der Terminalinhalt bleibt erhalten, und beim Zurückwechseln ist das Terminal sofort wieder da
 
