@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
+import { ChangelogModal } from './ChangelogModal';
+import { parseChangelog, type ChangelogVersion } from '../../shared/changelog';
 
 function DownloadIcon(): React.JSX.Element {
   return (
@@ -14,9 +16,10 @@ function DownloadIcon(): React.JSX.Element {
 
 // Prominent top-right update indicator. Hidden unless an update is actually
 // available/in-flight, so it only draws attention when there's something to do.
-// Clicking downloads the available update, then (once downloaded) restarts to
-// install — the same actions the Settings panel exposes, surfaced where they're
-// visible at a glance.
+// Clicking the "available" badge opens a dialog with the new version's changes
+// and a confirm button; confirming downloads + installs (the main process
+// relaunches once the download finishes). Downloading/downloaded states surface
+// progress and a restart fallback.
 export function UpdateBadge(): React.JSX.Element | null {
   const status = useStore((s) => s.update.status);
   const version = useStore((s) => s.update.version);
@@ -24,14 +27,46 @@ export function UpdateBadge(): React.JSX.Element | null {
   const downloadUpdate = useStore((s) => s.downloadUpdate);
   const installUpdate = useStore((s) => s.installUpdate);
 
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [notes, setNotes] = useState<{ versions: ChangelogVersion[]; raw: string | null } | null>(null);
+
+  const openDialog = (): void => {
+    setDialogOpen(true);
+    setNotes(null); // show the loading hint until the fetch resolves
+    if (version) {
+      void window.api.fetchUpdateNotes(version).then((body) => {
+        setNotes({ versions: body ? parseChangelog(body) : [], raw: body });
+      });
+    } else {
+      setNotes({ versions: [], raw: null });
+    }
+  };
+
   if (status === 'available') {
     return (
-      <button type="button" className="update-badge"
-              title={`Update${version ? ` ${version}` : ''} verfügbar – herunterladen`}
-              onClick={downloadUpdate}>
-        <DownloadIcon />
-        <span>Update{version ? ` ${version}` : ''}</span>
-      </button>
+      <>
+        <button type="button" className="update-badge"
+                title={`Update${version ? ` ${version}` : ''} verfügbar`}
+                onClick={openDialog}>
+          <DownloadIcon />
+          <span>Update{version ? ` ${version}` : ''}</span>
+        </button>
+        {dialogOpen && (
+          <ChangelogModal
+            title={`Update verfügbar${version ? ` – v${version}` : ''}`}
+            versions={notes?.versions ?? []}
+            fallbackText={notes === null
+              ? 'Änderungen werden geladen …'
+              : (notes.raw ?? 'Die Änderungshinweise konnten nicht geladen werden. Du kannst das Update trotzdem installieren.')}
+            confirm={{
+              label: 'Jetzt aktualisieren',
+              cancelLabel: 'Später',
+              onConfirm: () => { downloadUpdate(); setDialogOpen(false); }
+            }}
+            onClose={() => setDialogOpen(false)}
+          />
+        )}
+      </>
     );
   }
   if (status === 'downloading') {

@@ -57,6 +57,7 @@ const api: RendererApi = {
   checkForUpdates: () => ipcRenderer.send('updates:check'),
   downloadUpdate: () => ipcRenderer.send('updates:download'),
   quitAndInstall: () => ipcRenderer.send('updates:install'),
+  fetchUpdateNotes: (version: string) => ipcRenderer.invoke('updates:notes', version) as Promise<string | null>,
   onUpdateEvent: (cb: (e: UpdateEvent) => void) => {
     const handler = (_e: unknown, payload: UpdateEvent) => cb(payload);
     ipcRenderer.on('updates:event', handler);

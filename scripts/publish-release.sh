@@ -47,13 +47,30 @@ if [ "${#FILES[@]}" -eq 0 ]; then
 fi
 printf 'Artifacts to upload:\n'; printf '  %s\n' "${FILES[@]}"
 
+# Release notes: the CHANGELOG.md section for this version (so the in-app update
+# dialog, which fetches the GitHub release body, shows the curated changes). The
+# awk prints the lines after this version's "## <version>" heading up to the next
+# "## " heading; falls back to a generic line if the section is missing.
+BODY="$(awk -v ver="$VERSION" '
+  /^## / { if (inSec) exit; if (index($0, ver)) { inSec=1; next } }
+  inSec { print }
+' CHANGELOG.md 2>/dev/null | sed '/^[[:space:]]*$/d')"
+if [ -n "$BODY" ]; then
+  NOTES="$(printf '## %s\n%s' "$VERSION" "$BODY")" # re-add heading so the parser groups entries
+else
+  NOTES="Automated release $VERSION"
+fi
+
 # Ensure a draft release exists for this tag. Idempotent: the first platform job
 # creates it, later jobs (and re-runs) find it already there. The release is left
 # as a DRAFT on purpose — a human reviews and publishes it so the auto-updater
 # (which only sees published releases) gets a complete set of assets.
 if ! gh release view "$TAG" >/dev/null 2>&1; then
-  gh release create "$TAG" --draft --title "$TAG" \
-    --notes "Automated release $VERSION" || true
+  gh release create "$TAG" --draft --title "$TAG" --notes "$NOTES" || true
+else
+  # Keep notes in sync on re-runs (e.g. after a CHANGELOG edit) — otherwise only
+  # the first job's notes would stick.
+  gh release edit "$TAG" --notes "$NOTES" || true
 fi
 
 # Upload with --clobber so an asset left over from a half-finished prior attempt

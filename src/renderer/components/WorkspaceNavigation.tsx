@@ -3,6 +3,8 @@ import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import type { WorkspaceNavigationPlacement } from '../../shared/types';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ChangelogModal } from './ChangelogModal';
+import { changelogVersions } from '../changelog-data';
 
 interface WorkspaceNavigationProps {
   placement: WorkspaceNavigationPlacement;
@@ -27,6 +29,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pendingWs = pendingDeleteId
@@ -166,8 +169,18 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
       {!top && (
         <div className="sidebar-footer">
-          <span className="app-version">v{__APP_VERSION__}</span>
+          <button type="button" className="app-version" title="Was ist neu – Changelog anzeigen"
+                  onClick={() => setShowChangelog(true)}>v{__APP_VERSION__}</button>
         </div>
+      )}
+
+      {showChangelog && (
+        <ChangelogModal
+          title="Was ist neu"
+          versions={changelogVersions}
+          highlightVersion={__APP_VERSION__}
+          onClose={() => setShowChangelog(false)}
+        />
       )}
 
       {pendingWs && (

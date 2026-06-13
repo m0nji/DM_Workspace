@@ -4,6 +4,26 @@ import type { UpdateEvent } from '../shared/types';
 
 const { autoUpdater } = electronUpdater;
 
+// Repo the releases live in (mirrors build.publish in package.json). Used to fetch
+// the release notes shown in the update dialog.
+const RELEASES_REPO = 'm0nji/DM_Workspace';
+
+// Fetch the GitHub release body for a version tag (public repo — no auth). Returns
+// the markdown body, or null if offline / not found / malformed.
+async function fetchReleaseNotes(version: string): Promise<string | null> {
+  const tag = version.startsWith('v') ? version : `v${version}`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases/tags/${tag}`, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'DM-Workspace' }
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { body?: unknown };
+    return typeof data.body === 'string' && data.body.trim() ? data.body : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Wire electron-updater to the renderer. Updates only work in the packaged,
  * code-signed app published to GitHub Releases; in dev we report 'disabled'.
@@ -42,4 +62,5 @@ export function registerUpdater(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('updates:install', () => {
     if (enabled) autoUpdater.quitAndInstall();
   });
+  ipcMain.handle('updates:notes', (_e, version: string) => fetchReleaseNotes(version));
 }

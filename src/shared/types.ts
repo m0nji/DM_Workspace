@@ -146,6 +146,8 @@ export interface RendererApi {
   checkForUpdates(): void;
   downloadUpdate(): void;
   quitAndInstall(): void;
+  // fetch the offered version's release notes (GitHub release body) for the update dialog
+  fetchUpdateNotes(version: string): Promise<string | null>;
   onUpdateEvent(cb: (e: UpdateEvent) => void): () => void;
   // clipboard (routed through the main process for reliability under contextIsolation)
   clipboardRead(): Promise<string>;
