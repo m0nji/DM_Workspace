@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
 
-interface Props { paneId: string; cwd: string; }
+interface Props { paneId: string; cwd: string; active?: boolean; }
 
 const svg = {
   fill: 'none',
@@ -64,7 +64,7 @@ function Close(): React.JSX.Element {
   );
 }
 
-export function Pane({ paneId, cwd }: Props): React.JSX.Element {
+export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const splitActivePane = useStore((s) => s.splitActivePane);
   const closeActivePane = useStore((s) => s.closeActivePane);
   const toggleMaximize = useStore((s) => s.toggleMaximize);
@@ -96,7 +96,7 @@ export function Pane({ paneId, cwd }: Props): React.JSX.Element {
       </div>
       <div className="pane-body">
         <SearchBar paneId={paneId} />
-        <TerminalView paneId={paneId} cwd={cwd} />
+        <TerminalView paneId={paneId} cwd={cwd} active={active} />
       </div>
     </div>
   );

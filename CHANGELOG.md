@@ -2,6 +2,9 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.7.17 – 2026-06-13
+- perf: Inaktive Workspaces geben ihren Grafikspeicher (WebGL) wieder frei – deutlich weniger Arbeitsspeicher- und GPU-Verbrauch bei vielen Workspaces. Der Terminalinhalt bleibt erhalten, und beim Zurückwechseln ist das Terminal sofort wieder da
+
 ## 0.7.16 – 2026-06-13
 - fix: Das „Was ist neu"- und das Update-Fenster sind jetzt etwas breiter (so breit wie das Einstellungen-Menü), damit der Text nicht mehr gequetscht wirkt
 

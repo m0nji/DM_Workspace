@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -20,7 +20,7 @@ import { collectPaneIds } from '../../shared/layout-tree';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 
-interface Props { paneId: string; cwd: string; }
+interface Props { paneId: string; cwd: string; active?: boolean; }
 
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
@@ -77,9 +77,18 @@ function syncBackgrounds(host: HTMLElement | null, background: string | undefine
   if (host.parentElement) host.parentElement.style.backgroundColor = background;
 }
 
-export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
+export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
+  // The pane holds a WebGL/GPU context only while its workspace is active. Electron
+  // caps live WebGL contexts (~16); one per mounted-but-hidden pane would exhaust
+  // them and force xterm to drop the oldest context. syncWebgl disposes the addon
+  // when the workspace goes inactive and recreates it on return. The xterm buffer
+  // stays in memory either way, so no output is lost and the DOM renderer (xterm's
+  // fallback, same path used on context loss) covers the hidden pane.
+  const webglRef = useRef<WebglAddon | null>(null);
+  const webglFailedRef = useRef(false); // creation threw (no GL at all) — stop retrying
+  const activeRef = useRef(active);
   const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
   const customBg = useStore((s) => s.settings.terminalBackground);
@@ -89,6 +98,32 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
   const [atBottom, setAtBottom] = useState(true);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
+
+  // Acquire or release the WebGL renderer to match whether this pane should hold a
+  // GPU context (see webglRef comment). Idempotent: re-acquiring an existing
+  // context, or releasing a missing one, is a no-op. Called from the mount effect
+  // (initial state) and from the active effect (on workspace switch).
+  const syncWebgl = useCallback((shouldHave: boolean): void => {
+    const term = termRef.current;
+    if (!term || window.api.disableWebgl || webglFailedRef.current) return;
+    if (shouldHave && !webglRef.current) {
+      try {
+        const addon = new WebglAddon();
+        // Context loss (GPU sleep/reset) frees the context: drop the addon and let
+        // xterm fall back to the DOM renderer. A later activation re-acquires one.
+        addon.onContextLoss(() => { addon.dispose(); if (webglRef.current === addon) webglRef.current = null; });
+        term.loadAddon(addon);
+        webglRef.current = addon;
+      } catch {
+        webglRef.current?.dispose();
+        webglRef.current = null;
+        webglFailedRef.current = true; // no GL context available at all — don't retry
+      }
+    } else if (!shouldHave && webglRef.current) {
+      webglRef.current.dispose();
+      webglRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current!;
@@ -120,19 +155,9 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
     // GPU renderer. xterm's default DOM renderer chokes on high-throughput
     // streaming output (e.g. an active Claude Code session) and on scrolling
     // through a large buffer, which shows up as visible lag. WebGL fixes that.
-    // It can fail (no GL context, lost context after sleep/GPU reset); in that
-    // case dispose it and fall back to the DOM renderer rather than crash.
-    let webgl: WebglAddon | null = null;
-    if (!window.api.disableWebgl) {
-      try {
-        webgl = new WebglAddon();
-        webgl.onContextLoss(() => { webgl?.dispose(); webgl = null; });
-        term.loadAddon(webgl);
-      } catch {
-        webgl?.dispose();
-        webgl = null;
-      }
-    }
+    // Only acquired while the workspace is active (see syncWebgl); failures fall
+    // back to the DOM renderer rather than crash.
+    syncWebgl(activeRef.current);
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.
     const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
@@ -485,7 +510,8 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
       unregisterTerminalFocus(paneId);
-      webgl?.dispose();
+      webglRef.current?.dispose();
+      webglRef.current = null;
       term.dispose();
       termRef.current = null;
     };
@@ -502,6 +528,21 @@ export function TerminalView({ paneId, cwd }: Props): React.JSX.Element {
       syncBackgrounds(hostRef.current, bgColor(themeId, opacity, customBg));
     }
   }, [themeId, opacity, customBg]);
+
+  // Acquire/release the GPU context as this pane's workspace becomes active or
+  // inactive. The xterm buffer is untouched, so switching back is still instant —
+  // only the WebGL renderer is re-attached. On re-activation force one repaint so
+  // the fresh renderer paints the existing buffer right away rather than waiting
+  // for the next output or resize.
+  useEffect(() => {
+    const wasActive = activeRef.current;
+    activeRef.current = active;
+    syncWebgl(active);
+    if (active && !wasActive) {
+      const term = termRef.current;
+      if (term) term.refresh(0, Math.max(0, term.rows - 1));
+    }
+  }, [active, syncWebgl]);
 
   const scrollToBottom = (): void => { termRef.current?.scrollToBottom(); };
 

@@ -7,6 +7,9 @@ import { Pane } from './Pane';
 interface Props {
   node: LayoutNode;
   cwd: string;
+  // True when this layout belongs to the visible workspace. Threaded down to each
+  // pane so only the active workspace's terminals hold a WebGL/GPU context.
+  active?: boolean;
   // When set, this pane is maximized: its siblings are kept mounted but hidden
   // (display:none) and the maximized pane's branch fills the whole area. Keeping
   // siblings mounted preserves their terminals (shell + scrollback) so restoring
@@ -14,11 +17,11 @@ interface Props {
   maximizedPaneId?: string | null;
 }
 
-export function LayoutRenderer({ node, cwd, maximizedPaneId = null }: Props): React.JSX.Element {
+export function LayoutRenderer({ node, cwd, active = true, maximizedPaneId = null }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (node.type === 'pane') {
-    return <Pane paneId={node.id} cwd={cwd} />;
+    return <Pane paneId={node.id} cwd={cwd} active={active} />;
   }
 
   const horizontal = node.direction === 'h';
@@ -46,13 +49,13 @@ export function LayoutRenderer({ node, cwd, maximizedPaneId = null }: Props): Re
   return (
     <div ref={containerRef} className={`split-container ${node.direction}`}>
       <div style={firstStyle} className="split-child">
-        <LayoutRenderer node={node.children[0]} cwd={cwd} maximizedPaneId={maximizedPaneId} />
+        <LayoutRenderer node={node.children[0]} cwd={cwd} active={active} maximizedPaneId={maximizedPaneId} />
       </div>
       {!maximizingHere && (
         <Splitter splitId={node.id} direction={node.direction} containerRef={containerRef} />
       )}
       <div style={secondStyle} className="split-child">
-        <LayoutRenderer node={node.children[1]} cwd={cwd} maximizedPaneId={maximizedPaneId} />
+        <LayoutRenderer node={node.children[1]} cwd={cwd} active={active} maximizedPaneId={maximizedPaneId} />
       </div>
     </div>
   );
