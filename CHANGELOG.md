@@ -2,6 +2,9 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.7.16 – 2026-06-13
+- fix: Das „Was ist neu"- und das Update-Fenster sind jetzt etwas breiter (so breit wie das Einstellungen-Menü), damit der Text nicht mehr gequetscht wirkt
+
 ## 0.7.15 – 2026-06-13
 - feat: Beim Ziehen einer Datei über das Terminal erscheint jetzt eine schicke Ablegefläche – der Hintergrund wird weichgezeichnet und ein Hinweis zeigt, dass der Pfad eingefügt wird
 - feat: Klick auf die Versionsnummer unten links öffnet ein „Was ist neu"-Fenster mit den letzten Änderungen
