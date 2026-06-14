@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { renderMarkdown } from '../markdown';
 import { basename } from '../../shared/fs-path';
@@ -16,14 +16,23 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
   const [saveError, setSaveError] = useState(false);
   const [mode, setMode] = useState<'edit' | 'render'>('edit');
 
+  // Tracks the file currently loaded so an in-flight save/load that resolves
+  // after the user navigates to another file can't write back stale state.
+  const pathRef = useRef(path);
+
   const isMd = MD_RE.test(path);
   const dirty = content !== saved;
 
   useEffect(() => {
+    pathRef.current = path;
     let cancelled = false;
     setState('loading');
     setSaveError(false);
     setMode('edit');
+    // Clear content/saved so a stale dirty state from the previous file can't
+    // be force-written to this path during the async load window.
+    setContent('');
+    setSaved('');
     window.api.readTextFile(path).then((res) => {
       if (cancelled) return;
       if (res.ok) { setContent(res.content); setSaved(res.content); setState('ok'); }
@@ -34,20 +43,34 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
 
   const save = useCallback(() => {
     if (content === saved) return;
-    window.api.writeTextFile(path, content)
-      .then(() => { setSaved(content); setSaveError(false); })
-      .catch(() => setSaveError(true));
+    const target = path;
+    window.api.writeTextFile(target, content)
+      .then(() => { if (pathRef.current === target) { setSaved(content); setSaveError(false); } })
+      .catch(() => { if (pathRef.current === target) setSaveError(true); });
   }, [content, saved, path]);
 
-  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-      e.preventDefault();
-      save();
-    }
+  // Cmd/Ctrl+S saves from anywhere in the panel — including markdown preview
+  // mode, where the textarea is unmounted and a div-level handler never fires.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 's') {
+        e.preventDefault();
+        save();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [save]);
 
+  // Guard the markdown render: bad input throwing here would crash the whole
+  // renderer (no error boundary exists). Fall back to a notice instead.
+  const renderedHtml = useMemo(() => {
+    try { return renderMarkdown(content); }
+    catch { return '<p><em>Vorschau konnte nicht gerendert werden.</em></p>'; }
+  }, [content]);
+
   return (
-    <div className="feditor" onKeyDown={onKeyDown}>
+    <div className="feditor">
       <div className="feditor-chrome">
         <button type="button" className="icon-btn" title="Zurück zu Files" onClick={() => setPanelTab('files')}>
           <Icon name="back" />
@@ -71,7 +94,7 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
         {state === 'error' && <div className="feditor-notice">Datei konnte nicht geladen werden.</div>}
         {state === 'ok' && (
           mode === 'render'
-            ? <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+            ? <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             : <textarea
                 className="feditor-textarea"
                 value={content}
