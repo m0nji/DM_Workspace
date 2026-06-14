@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { resolveShortcuts, formatShortcut, type ShortcutAction } from '../../shared/shortcuts';
 import { Icon } from './Icon';
@@ -32,6 +33,7 @@ function score(haystack: string, query: string): number {
 }
 
 export function CommandPalette(): React.JSX.Element | null {
+  const { t } = useTranslation();
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const workspaces = useStore((s) => s.workspaces);
@@ -54,38 +56,42 @@ export function CommandPalette(): React.JSX.Element | null {
     const close = (): void => setOpen(false);
     const act = (fn: () => void) => () => { close(); fn(); };
 
+    const catActions = t('palette.group.actions');
+    const catTemplates = t('palette.group.templates');
+    const catWorkspaces = t('palette.group.workspaces');
+
     const list: CommandItem[] = [];
 
-    list.push({ id: 'new-workspace', title: 'New workspace', category: 'Actions', hint: hint('newWorkspace'), run: act(() => s.addWorkspace()) });
+    list.push({ id: 'new-workspace', title: t('palette.cmd.newWorkspace'), category: catActions, hint: hint('newWorkspace'), run: act(() => s.addWorkspace()) });
 
     if (focusedPaneId) {
       list.push(
-        { id: 'split-h', title: 'Split focused pane left and right', category: 'Actions', hint: hint('splitHorizontal'), run: act(() => s.splitActivePane(focusedPaneId, 'h')) },
-        { id: 'split-v', title: 'Split focused pane top and bottom', category: 'Actions', hint: hint('splitVertical'), run: act(() => s.splitActivePane(focusedPaneId, 'v')) },
-        { id: 'maximize', title: 'Toggle focused pane maximize', category: 'Actions', hint: hint('toggleMaximize'), run: act(() => s.toggleMaximize(focusedPaneId)) },
-        { id: 'search', title: 'Search focused pane', category: 'Actions', hint: hint('searchPane'), run: act(() => s.setSearchOpen(focusedPaneId)) },
-        { id: 'close-pane', title: 'Close focused pane', category: 'Actions', hint: hint('closePane'), run: act(() => s.closeActivePane(focusedPaneId)) }
+        { id: 'split-h', title: t('palette.cmd.splitHorizontal'), category: catActions, hint: hint('splitHorizontal'), run: act(() => s.splitActivePane(focusedPaneId, 'h')) },
+        { id: 'split-v', title: t('palette.cmd.splitVertical'), category: catActions, hint: hint('splitVertical'), run: act(() => s.splitActivePane(focusedPaneId, 'v')) },
+        { id: 'maximize', title: t('palette.cmd.toggleMaximize'), category: catActions, hint: hint('toggleMaximize'), run: act(() => s.toggleMaximize(focusedPaneId)) },
+        { id: 'search', title: t('palette.cmd.searchPane'), category: catActions, hint: hint('searchPane'), run: act(() => s.setSearchOpen(focusedPaneId)) },
+        { id: 'close-pane', title: t('palette.cmd.closePane'), category: catActions, hint: hint('closePane'), run: act(() => s.closeActivePane(focusedPaneId)) }
       );
     }
 
     list.push(
-      { id: 'toggle-preview', title: 'Toggle preview panel', category: 'Actions', hint: hint('togglePreview'), run: act(() => s.togglePreview()) },
-      { id: 'open-file-browser', title: 'Open file browser', category: 'Actions', run: act(() => s.openFiles()) },
-      { id: 'open-settings', title: 'Open settings', category: 'Actions', hint: hint('openSettings'), run: act(() => s.setSettingsOpen(true)) },
-      { id: 'open-shortcuts', title: 'Open keyboard shortcut settings', category: 'Actions', keywords: 'keybindings rebind', run: act(() => s.setSettingsOpen(true, 'shortcuts')) }
+      { id: 'toggle-preview', title: t('palette.cmd.togglePreview'), category: catActions, hint: hint('togglePreview'), run: act(() => s.togglePreview()) },
+      { id: 'open-file-browser', title: t('palette.cmd.openFileBrowser'), category: catActions, run: act(() => s.openFiles()) },
+      { id: 'open-settings', title: t('palette.cmd.openSettings'), category: catActions, hint: hint('openSettings'), run: act(() => s.setSettingsOpen(true)) },
+      { id: 'open-shortcuts', title: t('palette.cmd.openShortcuts'), category: catActions, keywords: 'keybindings rebind', run: act(() => s.setSettingsOpen(true, 'shortcuts')) }
     );
 
     if (activeWs?.layout) {
-      list.push({ id: 'save-template', title: 'Save current workspace as template', category: 'Templates', run: act(() => s.setTemplateWizard({ open: true, templateId: null })) });
+      list.push({ id: 'save-template', title: t('palette.cmd.saveTemplate'), category: catTemplates, run: act(() => s.setTemplateWizard({ open: true, templateId: null })) });
     }
 
     workspaces.forEach((w, idx) => {
       if (w.id === activeWorkspaceId) return;
       list.push({
         id: `switch-${w.id}`,
-        title: `Switch to workspace: ${w.name}`,
+        title: t('palette.cmd.switchToWorkspace', { name: w.name }),
         subtitle: w.cwd,
-        category: 'Workspaces',
+        category: catWorkspaces,
         // Mod+1..9 jumps to the workspace at that position in the sidebar.
         hint: idx < 9 ? formatShortcut(`Mod+${idx + 1}`, isMac) : undefined,
         keywords: w.cwd,
@@ -93,16 +99,16 @@ export function CommandPalette(): React.JSX.Element | null {
       });
     });
 
-    templates.forEach((t) => {
+    templates.forEach((tpl) => {
       // requestTemplateLaunch closes the palette itself (it may instead open the
       // confirm dialog), so it is NOT wrapped in act() to avoid a double-close.
-      list.push({ id: `tpl-run-${t.id}`, title: `New workspace from template: ${t.name}`, subtitle: t.cwd, category: 'Templates', run: () => s.requestTemplateLaunch(t.id) });
-      list.push({ id: `tpl-edit-${t.id}`, title: `Edit template: ${t.name}`, category: 'Templates', run: act(() => s.setTemplateWizard({ open: true, templateId: t.id })) });
-      list.push({ id: `tpl-del-${t.id}`, title: `Delete template: ${t.name}`, category: 'Templates', run: act(() => s.deleteWorkspaceTemplate(t.id)) });
+      list.push({ id: `tpl-run-${tpl.id}`, title: t('palette.cmd.newFromTemplate', { name: tpl.name }), subtitle: tpl.cwd, category: catTemplates, run: () => s.requestTemplateLaunch(tpl.id) });
+      list.push({ id: `tpl-edit-${tpl.id}`, title: t('palette.cmd.editTemplate', { name: tpl.name }), category: catTemplates, run: act(() => s.setTemplateWizard({ open: true, templateId: tpl.id })) });
+      list.push({ id: `tpl-del-${tpl.id}`, title: t('palette.cmd.deleteTemplate', { name: tpl.name }), category: catTemplates, run: act(() => s.deleteWorkspaceTemplate(tpl.id)) });
     });
 
     return list;
-  }, [workspaces, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, setOpen]);
+  }, [workspaces, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, setOpen, t]);
 
   const filtered = useMemo(() => {
     return commands
@@ -150,7 +156,7 @@ export function CommandPalette(): React.JSX.Element | null {
           <input
             ref={inputRef}
             className="command-input"
-            placeholder="Type a command or search…"
+            placeholder={t('palette.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             spellCheck={false}
@@ -158,7 +164,7 @@ export function CommandPalette(): React.JSX.Element | null {
           />
         </div>
         <div className="command-list" ref={listRef} role="listbox">
-          {filtered.length === 0 && <div className="command-empty">No matching commands</div>}
+          {filtered.length === 0 && <div className="command-empty">{t('palette.empty')}</div>}
           {filtered.map((c, i) => {
             const header = c.category !== lastCategory ? c.category : null;
             lastCategory = c.category;

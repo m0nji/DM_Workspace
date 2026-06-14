@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { ChangelogModal } from './ChangelogModal';
 import { parseChangelog, type ChangelogVersion } from '../../shared/changelog';
@@ -21,6 +22,7 @@ function DownloadIcon(): React.JSX.Element {
 // relaunches once the download finishes). Downloading/downloaded states surface
 // progress and a restart fallback.
 export function UpdateBadge(): React.JSX.Element | null {
+  const { t } = useTranslation();
   const status = useStore((s) => s.update.status);
   const version = useStore((s) => s.update.version);
   const percent = useStore((s) => s.update.percent);
@@ -42,25 +44,27 @@ export function UpdateBadge(): React.JSX.Element | null {
     }
   };
 
+  const versionSuffix = version ? ` ${version}` : '';
+
   if (status === 'available') {
     return (
       <>
         <button type="button" className="update-badge"
-                title={`Update${version ? ` ${version}` : ''} verfügbar`}
+                title={t('update.availableTitle', { version: versionSuffix })}
                 onClick={openDialog}>
           <DownloadIcon />
-          <span>Update{version ? ` ${version}` : ''}</span>
+          <span>{t('update.availableLabel', { version: versionSuffix })}</span>
         </button>
         {dialogOpen && (
           <ChangelogModal
-            title={`Update verfügbar${version ? ` – v${version}` : ''}`}
+            title={t('update.dialogTitle', { version: version ? ` – v${version}` : '' })}
             versions={notes?.versions ?? []}
             fallbackText={notes === null
-              ? 'Änderungen werden geladen …'
-              : (notes.raw ?? 'Die Änderungshinweise konnten nicht geladen werden. Du kannst das Update trotzdem installieren.')}
+              ? t('update.notesLoading')
+              : (notes.raw ?? t('update.notesError'))}
             confirm={{
-              label: 'Jetzt aktualisieren',
-              cancelLabel: 'Später',
+              label: t('update.updateNow'),
+              cancelLabel: t('common.later'),
               onConfirm: () => { downloadUpdate(); setDialogOpen(false); }
             }}
             onClose={() => setDialogOpen(false)}
@@ -71,18 +75,18 @@ export function UpdateBadge(): React.JSX.Element | null {
   }
   if (status === 'downloading') {
     return (
-      <span className="update-badge downloading" title="Update wird heruntergeladen">
-        Update lädt… {percent ?? 0}%
+      <span className="update-badge downloading" title={t('update.downloadingTitle')}>
+        {t('update.downloadingLabel', { percent: percent ?? 0 })}
       </span>
     );
   }
   if (status === 'downloaded') {
     return (
       <button type="button" className="update-badge ready"
-              title={`Update${version ? ` ${version}` : ''} heruntergeladen – neu starten & installieren`}
+              title={t('update.readyTitle', { version: versionSuffix })}
               onClick={installUpdate}>
         <DownloadIcon />
-        <span>Neu starten</span>
+        <span>{t('update.restart')}</span>
       </button>
     );
   }

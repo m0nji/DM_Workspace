@@ -127,6 +127,68 @@
       "disabled": "Updates are available only in the installed app."
     }
   },
+  "palette": {
+    "placeholder": "Type a command or search…",
+    "empty": "No matching commands",
+    "group": {
+      "actions": "Actions",
+      "templates": "Templates",
+      "workspaces": "Workspaces"
+    },
+    "cmd": {
+      "newWorkspace": "New workspace",
+      "splitHorizontal": "Split focused pane left and right",
+      "splitVertical": "Split focused pane top and bottom",
+      "toggleMaximize": "Toggle focused pane maximize",
+      "searchPane": "Search focused pane",
+      "closePane": "Close focused pane",
+      "togglePreview": "Toggle preview panel",
+      "openFileBrowser": "Open file browser",
+      "openSettings": "Open settings",
+      "openShortcuts": "Open keyboard shortcut settings",
+      "saveTemplate": "Save current workspace as template",
+      "switchToWorkspace": "Switch to workspace: {{name}}",
+      "newFromTemplate": "New workspace from template: {{name}}",
+      "editTemplate": "Edit template: {{name}}",
+      "deleteTemplate": "Delete template: {{name}}"
+    }
+  },
+  "welcome": {
+    "heading": "How many terminals do you want to open?",
+    "workingDirectory": "Working directory",
+    "chooseFolder": "Choose folder…",
+    "enableTasks": "Enable tasks for this workspace",
+    "orTemplate": "…or start from a template",
+    "noTemplates": "No templates yet — save a workspace layout from Settings or the command palette to reuse it here.",
+    "templateStartupCommands_one": "{{count}} startup command",
+    "templateStartupCommands_other": "{{count}} startup commands",
+    "preset": {
+      "single": "1 Pane",
+      "sideBySide": "2 side by side",
+      "stacked": "2 stacked",
+      "quad": "4 (2×2)",
+      "eight": "8 (2×4)"
+    }
+  },
+  "titlebar": {
+    "commandPalette": "Command palette",
+    "togglePreview": "Toggle preview / browser",
+    "view": "View",
+    "terminals": "Terminals",
+    "tasks": "Tasks"
+  },
+  "update": {
+    "availableTitle": "Update{{version}} available",
+    "availableLabel": "Update{{version}}",
+    "dialogTitle": "Update available{{version}}",
+    "notesLoading": "Loading changes …",
+    "notesError": "The release notes could not be loaded. You can install the update anyway.",
+    "updateNow": "Update now",
+    "downloadingTitle": "Downloading update",
+    "downloadingLabel": "Downloading… {{percent}}%",
+    "readyTitle": "Update{{version}} downloaded – restart & install",
+    "restart": "Restart"
+  },
   "changelog": {
     "whatsNew": "What's new",
     "kindFeat": "Feature",

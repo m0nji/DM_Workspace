@@ -1,20 +1,20 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import type { PresetKind } from '../../shared/types';
 
-interface PresetDef { kind: PresetKind; label: string; cols: number; rows: number; cells: number; }
-
-const PRESETS: PresetDef[] = [
-  { kind: '1',  label: '1 Pane',       cols: 1, rows: 1, cells: 1 },
-  { kind: '2h', label: '2 side by side', cols: 2, rows: 1, cells: 2 },
-  { kind: '2v', label: '2 stacked',    cols: 1, rows: 2, cells: 2 },
-  { kind: '4',  label: '4 (2×2)',      cols: 2, rows: 2, cells: 4 },
-  { kind: '8',  label: '8 (2×4)',      cols: 4, rows: 2, cells: 8 }
-];
+const PRESETS = [
+  { kind: '1',  labelKey: 'welcome.preset.single',     cols: 1, rows: 1, cells: 1 },
+  { kind: '2h', labelKey: 'welcome.preset.sideBySide', cols: 2, rows: 1, cells: 2 },
+  { kind: '2v', labelKey: 'welcome.preset.stacked',    cols: 1, rows: 2, cells: 2 },
+  { kind: '4',  labelKey: 'welcome.preset.quad',       cols: 2, rows: 2, cells: 4 },
+  { kind: '8',  labelKey: 'welcome.preset.eight',      cols: 4, rows: 2, cells: 8 }
+] as const satisfies ReadonlyArray<{ kind: PresetKind; labelKey: string; cols: number; rows: number; cells: number; }>;
 
 interface Props { workspaceId: string; cwd: string; }
 
 export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const applyPreset = useStore((s) => s.applyPreset);
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
@@ -29,16 +29,16 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
 
   return (
     <div className="welcome">
-      <h2>How many terminals do you want to open?</h2>
+      <h2>{t('welcome.heading')}</h2>
       <div className="welcome-cwd">
-        <span className="label">Working directory</span>
+        <span className="label">{t('welcome.workingDirectory')}</span>
         <code className="cwd-value" title={cwd}>{cwd}</code>
-        <button className="cwd-btn" onClick={chooseFolder}>Choose folder…</button>
+        <button className="cwd-btn" onClick={chooseFolder}>{t('welcome.chooseFolder')}</button>
       </div>
       <label className="welcome-tasks-toggle">
         <input type="checkbox" checked={tasksEnabled}
                onChange={(e) => setTasksEnabled(workspaceId, e.target.checked)} />
-        Tasks für diesen Workspace aktivieren
+        {t('welcome.enableTasks')}
       </label>
       <div className="preset-row">
         {PRESETS.map((p) => (
@@ -53,32 +53,32 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
             >
               {Array.from({ length: p.cells }).map((_, i) => <div key={i} className="cell" />)}
             </div>
-            <div className="label">{p.label}</div>
+            <div className="label">{t(p.labelKey)}</div>
           </div>
         ))}
       </div>
 
       <div className="welcome-templates">
-        <span className="label">…or start from a template</span>
+        <span className="label">{t('welcome.orTemplate')}</span>
         {templates.length === 0 ? (
           <p className="welcome-template-hint">
-            No templates yet — save a workspace layout from Settings or the command palette to reuse it here.
+            {t('welcome.noTemplates')}
           </p>
         ) : (
           <div className="welcome-template-cards">
-            {templates.map((t) => {
-              const cmdCount = t.startupCommands ? Object.keys(t.startupCommands).length : 0;
+            {templates.map((tpl) => {
+              const cmdCount = tpl.startupCommands ? Object.keys(tpl.startupCommands).length : 0;
               return (
                 <button
                   type="button"
-                  key={t.id}
+                  key={tpl.id}
                   className="welcome-template-card"
-                  onClick={() => launchTemplate(workspaceId, t.id)}
-                  title={t.cwd}
+                  onClick={() => launchTemplate(workspaceId, tpl.id)}
+                  title={tpl.cwd}
                 >
-                  <span className="welcome-template-name">{t.name}</span>
+                  <span className="welcome-template-name">{tpl.name}</span>
                   <span className="welcome-template-meta">
-                    {t.cwd}{cmdCount ? ` · ${cmdCount} startup command${cmdCount === 1 ? '' : 's'}` : ''}
+                    {tpl.cwd}{cmdCount ? ` · ${t('welcome.templateStartupCommands', { count: cmdCount })}` : ''}
                   </span>
                 </button>
               );

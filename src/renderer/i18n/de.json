@@ -127,6 +127,68 @@
       "disabled": "Updates sind nur in der installierten App verfügbar."
     }
   },
+  "palette": {
+    "placeholder": "Befehl eingeben oder suchen…",
+    "empty": "Keine passenden Befehle",
+    "group": {
+      "actions": "Aktionen",
+      "templates": "Vorlagen",
+      "workspaces": "Workspaces"
+    },
+    "cmd": {
+      "newWorkspace": "Neuer Workspace",
+      "splitHorizontal": "Fokussierten Bereich links und rechts teilen",
+      "splitVertical": "Fokussierten Bereich oben und unten teilen",
+      "toggleMaximize": "Fokussierten Bereich maximieren umschalten",
+      "searchPane": "Fokussierten Bereich durchsuchen",
+      "closePane": "Fokussierten Bereich schließen",
+      "togglePreview": "Vorschau-Bereich umschalten",
+      "openFileBrowser": "Datei-Browser öffnen",
+      "openSettings": "Einstellungen öffnen",
+      "openShortcuts": "Tastenkürzel-Einstellungen öffnen",
+      "saveTemplate": "Aktuellen Workspace als Vorlage speichern",
+      "switchToWorkspace": "Wechseln zu Workspace: {{name}}",
+      "newFromTemplate": "Neuer Workspace aus Vorlage: {{name}}",
+      "editTemplate": "Vorlage bearbeiten: {{name}}",
+      "deleteTemplate": "Vorlage löschen: {{name}}"
+    }
+  },
+  "welcome": {
+    "heading": "Wie viele Terminals möchtest du öffnen?",
+    "workingDirectory": "Arbeitsverzeichnis",
+    "chooseFolder": "Ordner auswählen…",
+    "enableTasks": "Tasks für diesen Workspace aktivieren",
+    "orTemplate": "…oder aus einer Vorlage starten",
+    "noTemplates": "Noch keine Vorlagen – speichere ein Workspace-Layout über die Einstellungen oder die Befehlspalette, um es hier wiederzuverwenden.",
+    "templateStartupCommands_one": "{{count}} Startbefehl",
+    "templateStartupCommands_other": "{{count}} Startbefehle",
+    "preset": {
+      "single": "1 Bereich",
+      "sideBySide": "2 nebeneinander",
+      "stacked": "2 übereinander",
+      "quad": "4 (2×2)",
+      "eight": "8 (2×4)"
+    }
+  },
+  "titlebar": {
+    "commandPalette": "Befehlspalette",
+    "togglePreview": "Vorschau / Browser umschalten",
+    "view": "Ansicht",
+    "terminals": "Terminals",
+    "tasks": "Tasks"
+  },
+  "update": {
+    "availableTitle": "Update{{version}} verfügbar",
+    "availableLabel": "Update{{version}}",
+    "dialogTitle": "Update verfügbar{{version}}",
+    "notesLoading": "Änderungen werden geladen …",
+    "notesError": "Die Änderungshinweise konnten nicht geladen werden. Du kannst das Update trotzdem installieren.",
+    "updateNow": "Jetzt aktualisieren",
+    "downloadingTitle": "Update wird heruntergeladen",
+    "downloadingLabel": "Update lädt… {{percent}}%",
+    "readyTitle": "Update{{version}} heruntergeladen – neu starten & installieren",
+    "restart": "Neu starten"
+  },
   "changelog": {
     "whatsNew": "Was ist neu",
     "kindFeat": "Feature",
