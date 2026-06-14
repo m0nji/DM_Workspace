@@ -759,6 +759,8 @@ input[type="checkbox"]:checked::after {
 .preview-tab-btn { padding: 3px 10px; border-radius: 5px; font-size: 11px; background: transparent; color: #8a8a8a; border: none; cursor: pointer; }
 .preview-tab-btn.on { background: #0d3a5c; color: #cfe7fb; }
 .preview-tabs-spacer { margin-left: auto; }
+.preview-region { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.preview-tab { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 
 .files-tab { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .files-crumb { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 5px 10px; font-size: 11px; background: #1b1b1b; border-bottom: 1px solid #2c2c2c; }

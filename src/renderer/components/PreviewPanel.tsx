@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { breadcrumbSegments } from '../../shared/fs-path';
 import { Icon } from './Icon';
@@ -21,6 +21,14 @@ export function PreviewPanel(): React.JSX.Element | null {
   const [refreshKey, setRefreshKey] = useState(0);
   const [newName, setNewName] = useState<string | null>(null); // non-null => the new-file input is showing
   const [newError, setNewError] = useState<string | null>(null);
+
+  const tab = panel.tab;
+
+  // Drop a half-typed new-file input when leaving the Files tab so it doesn't
+  // reappear (with a stale error) on return.
+  useEffect(() => {
+    if (tab !== 'files') { setNewName(null); setNewError(null); }
+  }, [tab]);
 
   // Fall back to the active workspace's folder when no root has been chosen yet,
   // so opening the panel (incl. via the keyboard shortcut) always has a folder.
@@ -46,14 +54,19 @@ export function PreviewPanel(): React.JSX.Element | null {
     if (newName === null) return;
     const name = newName.trim();
     if (!name) { setNewName(null); return; }
-    const res = await window.api.createFile(root, name);
-    if (res.ok) {
-      setNewName(null);
-      setNewError(null);
-      setRefreshKey((k) => k + 1);
-      openInEditor(res.path);
-    } else {
-      setNewError(res.code === 'exists' ? 'Existiert bereits' : 'Ungültiger Name');
+    setNewError(null);
+    try {
+      const res = await window.api.createFile(root, name);
+      if (res.ok) {
+        setNewName(null);
+        setNewError(null);
+        setRefreshKey((k) => k + 1);
+        openInEditor(res.path);
+      } else {
+        setNewError(res.code === 'exists' ? 'Existiert bereits' : 'Ungültiger Name');
+      }
+    } catch {
+      setNewError('Datei konnte nicht angelegt werden');
     }
   }, [root, newName, openInEditor]);
 
@@ -66,10 +79,10 @@ export function PreviewPanel(): React.JSX.Element | null {
       <div className="preview-resize" onMouseDown={onDragStart} />
 
       <div className="preview-tabs">
-        <button type="button" className={`preview-tab-btn${panel.tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>Files</button>
-        <button type="button" className={`preview-tab-btn${panel.tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Vorschau</button>
+        <button type="button" className={`preview-tab-btn${tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>Files</button>
+        <button type="button" className={`preview-tab-btn${tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Vorschau</button>
         <span className="preview-tabs-spacer" />
-        {panel.tab === 'files' && (
+        {tab === 'files' && (
           <>
             <button type="button" className="icon-btn" title="Neue Datei" aria-label="Neue Datei" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
             <button type="button" className="icon-btn" title="Aktualisieren" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
@@ -79,39 +92,41 @@ export function PreviewPanel(): React.JSX.Element | null {
         <button type="button" className="icon-btn" title="Schließen" onClick={closePreview}><Icon name="close" /></button>
       </div>
 
-      {panel.tab === 'files' ? (
-        <div className="files-tab">
-          <div className="files-crumb">
-            {crumbs.map((c, i) => (
-              <React.Fragment key={c.path}>
-                {i > 0 && <span className="files-crumb-sep">/</span>}
-                <button type="button" className="files-crumb-seg" onClick={() => setBrowseRoot(c.path)}>{c.label}</button>
-              </React.Fragment>
-            ))}
-          </div>
-          {newName !== null && (
-            <div className="files-newrow">
-              <Icon name="file-text" size={16} />
-              <input
-                className="files-newinput"
-                autoFocus
-                value={newName}
-                placeholder="Dateiname…"
-                onChange={(e) => { setNewName(e.target.value); setNewError(null); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); void submitNewFile(); }
-                  if (e.key === 'Escape') { setNewName(null); setNewError(null); }
-                }}
-                aria-label="Neuer Dateiname"
-              />
-              {newError && <span className="files-newerror">{newError}</span>}
-            </div>
-          )}
-          <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} />
+      {/* Both tabs stay mounted; we toggle visibility so the webview keeps its
+          navigation history and the editor keeps unsaved edits across switches. */}
+      <div className="files-tab" style={{ display: tab === 'files' ? 'flex' : 'none' }}>
+        <div className="files-crumb">
+          {crumbs.map((c, i) => (
+            <React.Fragment key={c.path}>
+              {i > 0 && <span className="files-crumb-sep">/</span>}
+              <button type="button" className="files-crumb-seg" onClick={() => setBrowseRoot(c.path)}>{c.label}</button>
+            </React.Fragment>
+          ))}
         </div>
-      ) : (
-        panel.editPath ? <FileEditor path={panel.editPath} /> : <PreviewBody />
-      )}
+        {newName !== null && (
+          <div className="files-newrow">
+            <Icon name="file-text" size={16} />
+            <input
+              className="files-newinput"
+              autoFocus
+              value={newName}
+              placeholder="Dateiname…"
+              onChange={(e) => { setNewName(e.target.value); setNewError(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); void submitNewFile(); }
+                if (e.key === 'Escape') { setNewName(null); setNewError(null); }
+              }}
+              aria-label="Neuer Dateiname"
+            />
+            {newError && <span className="files-newerror">{newError}</span>}
+          </div>
+        )}
+        <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} />
+      </div>
+
+      <div className="preview-region" style={{ display: tab === 'preview' ? 'flex' : 'none' }}>
+        {panel.editPath ? <FileEditor path={panel.editPath} /> : <PreviewBody />}
+      </div>
     </div>
   );
 }
