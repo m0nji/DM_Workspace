@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { breadcrumbSegments } from '../../shared/fs-path';
+import { breadcrumbSegments, parentDir } from '../../shared/fs-path';
+import type { DirEntry } from '../../shared/types';
 import { Icon } from './Icon';
 import { FileTree } from './FileTree';
 import { FileEditor } from './FileEditor';
 import { PreviewBody } from './PreviewBody';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function PreviewPanel(): React.JSX.Element | null {
   const panel = useStore((s) => s.previewPanel);
@@ -13,6 +15,7 @@ export function PreviewPanel(): React.JSX.Element | null {
   const setPanelTab = useStore((s) => s.setPanelTab);
   const setBrowseRoot = useStore((s) => s.setBrowseRoot);
   const openInEditor = useStore((s) => s.openInEditor);
+  const clearEditor = useStore((s) => s.clearEditor);
   const openPreview = useStore((s) => s.openPreview);
   const activeCwd = useStore((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
@@ -22,6 +25,8 @@ export function PreviewPanel(): React.JSX.Element | null {
   const [refreshKey, setRefreshKey] = useState(0);
   const [newName, setNewName] = useState<string | null>(null); // non-null => the new-file input is showing
   const [newError, setNewError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DirEntry | null>(null); // non-null => confirm is showing
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const tab = panel.tab;
 
@@ -76,6 +81,23 @@ export function PreviewPanel(): React.JSX.Element | null {
     }
   }, [root, newName, openInEditor]);
 
+  const confirmDelete = useCallback(async () => {
+    const entry = pendingDelete;
+    if (!entry) return;
+    setPendingDelete(null);
+    setActionError(null);
+    try {
+      await window.api.deletePath(entry.path);
+      // Drop the inline editor if it (or its parent folder) just went to the trash.
+      if (panel.editPath && (panel.editPath === entry.path || panel.editPath.startsWith(entry.path + '/'))) {
+        clearEditor();
+      }
+      setRefreshKey((k) => k + 1);
+    } catch {
+      setActionError(`Couldn't delete "${entry.name}"`);
+    }
+  }, [pendingDelete, panel.editPath, clearEditor]);
+
   if (!panel.open) return null;
 
   const crumbs = breadcrumbSegments(root);
@@ -90,6 +112,7 @@ export function PreviewPanel(): React.JSX.Element | null {
         <span className="preview-tabs-spacer" />
         {tab === 'files' && (
           <>
+            <button type="button" className="icon-btn" aria-label="Up one folder" disabled={root === '/'} onClick={() => setBrowseRoot(parentDir(root))}><Icon name="arrow-up" /></button>
             <button type="button" className="icon-btn" aria-label="New file" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
             <button type="button" className="icon-btn" aria-label="Refresh" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
             <button type="button" className="icon-btn" aria-label="Choose folder" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
@@ -127,12 +150,25 @@ export function PreviewPanel(): React.JSX.Element | null {
             {newError && <span className="files-newerror">{newError}</span>}
           </div>
         )}
-        <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} onPreviewFile={onPreviewFile} />
+        {actionError && (
+          <div className="files-newrow"><span className="files-newerror">{actionError}</span></div>
+        )}
+        <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} onPreviewFile={onPreviewFile} onRequestDelete={setPendingDelete} />
       </div>
 
       <div className="preview-region" style={{ display: tab === 'preview' ? 'flex' : 'none' }}>
         {panel.editPath ? <FileEditor path={panel.editPath} /> : <PreviewBody />}
       </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={pendingDelete.isDir ? 'Delete folder' : 'Delete file'}
+          message={`Move "${pendingDelete.name}" to the trash?${pendingDelete.isDir ? ' Everything inside it goes too.' : ''}`}
+          confirmLabel="Delete"
+          onConfirm={() => { void confirmDelete(); }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

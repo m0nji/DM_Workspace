@@ -110,9 +110,10 @@ interface FileTreeProps {
   refreshKey: number;       // bump to force a reload of the root
   onOpenFile: (path: string) => void;
   onPreviewFile?: (path: string) => void; // rendered preview (offered for markdown)
+  onRequestDelete: (entry: DirEntry) => void; // open a confirm before trashing
 }
 
-export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onRequestDelete }: FileTreeProps): React.JSX.Element {
   const [entries, setEntries] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -129,9 +130,8 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile }: FileTr
     return () => { cancelled = true; };
   }, [root, refreshKey]);
 
-  // Right-click a file for a Preview/Edit choice (folders have no menu).
+  // Right-click any entry for its actions: Preview/Edit (files) plus Delete.
   const onContext = useCallback((e: React.MouseEvent, entry: DirEntry) => {
-    if (entry.isDir) return; // no menu for folders (yet); native menu already suppressed
     setMenu({ x: e.clientX, y: e.clientY, entry });
   }, []);
 
@@ -141,10 +141,13 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile }: FileTr
 
   const menuItems: MenuItem[] = menu
     ? [
-        ...(onPreviewFile && isMarkdownFile(menu.entry.name)
+        ...(!menu.entry.isDir && onPreviewFile && isMarkdownFile(menu.entry.name)
           ? [{ label: 'Preview', onClick: () => onPreviewFile(menu.entry.path) }]
           : []),
-        { label: 'Edit', onClick: () => onOpenFile(menu.entry.path) }
+        ...(!menu.entry.isDir
+          ? [{ label: 'Edit', onClick: () => onOpenFile(menu.entry.path) }]
+          : []),
+        { label: 'Delete', onClick: () => onRequestDelete(menu.entry) }
       ]
     : [];
 

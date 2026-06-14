@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, shell } from 'electron';
 import { readFileSync, readdirSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
@@ -12,6 +12,7 @@ import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
 import { readPreviewFile } from './preview-file';
 import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from './fs-browser';
+import { expandTilde } from './resolve-cwd';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
@@ -239,6 +240,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
       throw err;
     }
   });
+
+  // Move a file or folder (recursively) to the OS trash, so a delete is always
+  // recoverable. Errors (missing path / permission) reject and surface inline.
+  ipcMain.handle('fs:delete', (_e, path: string) => shell.trashItem(expandTilde(path)));
 
   ipcMain.handle('dialog:pickDirectory', async () => {
     const win = getWindow();

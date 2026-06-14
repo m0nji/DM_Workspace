@@ -146,11 +146,13 @@ export interface RendererApi {
   resolveLink(rel: string, cwd: string, roots: string[]): Promise<string | null>;
   // read a UTF-8 text file (used by the markdown preview)
   readFile(path: string): Promise<string>;
-  // file browser: list a directory, read/write text, create a new empty file
+  // file browser: list a directory, read/write text, create a new empty file,
+  // delete a file/folder (to the OS trash)
   readDir(path: string): Promise<DirEntry[]>;
   readTextFile(path: string): Promise<ReadTextResult>;
   writeTextFile(path: string, content: string): Promise<void>;
   createFile(dir: string, name: string): Promise<CreateFileResult>;
+  deletePath(path: string): Promise<void>;
   // task board (TASKS.md per working dir)
   loadTasks(dir: string): Promise<import('./tasks-markdown').TaskBoard>;
   saveTasks(dir: string, board: import('./tasks-markdown').TaskBoard): void;

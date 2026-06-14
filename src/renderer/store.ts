@@ -93,6 +93,7 @@ interface StoreState extends AppState {
   setPanelTab: (tab: 'files' | 'preview') => void;
   setBrowseRoot: (path: string) => void;
   openInEditor: (path: string) => void;
+  clearEditor: () => void; // drop the inline editor (e.g. its file was deleted)
   // lifecycle
   hydrate: () => Promise<void>;
   // workspaces
@@ -216,7 +217,14 @@ export const useStore = create<StoreState>((set, get) => ({
 
   selectWorkspace: (id) => set((s) => {
     if (!s.workspaces.some((w) => w.id === id)) return s;
-    const next = { ...s, activeWorkspaceId: id, maximizedPaneId: null };
+    // Drop the file-browser folder so the Files tab re-derives it from the newly
+    // active workspace's cwd, instead of clinging to the previous workspace's path.
+    const next = {
+      ...s,
+      activeWorkspaceId: id,
+      maximizedPaneId: null,
+      previewPanel: { ...s.previewPanel, browseRoot: null }
+    };
     persist(next);
     return next;
   }),
@@ -453,6 +461,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
   setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null } })),
   openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, source: null } })),
+  clearEditor: () => set((s) => ({ previewPanel: { ...s.previewPanel, editPath: null, tab: 'files' } })),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
