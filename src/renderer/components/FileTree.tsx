@@ -94,9 +94,9 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext 
       </div>
       {entry.isDir && open && (
         error
-          ? <div className="ftree-error" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Zugriff nicht möglich</div>
+          ? <div className="ftree-error" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Access denied</div>
           : children === null
-            ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Lädt …</div>
+            ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Loading…</div>
             : children.map((c) => (
                 <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
               ))
@@ -135,16 +135,16 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile }: FileTr
     setMenu({ x: e.clientX, y: e.clientY, entry });
   }, []);
 
-  if (error) return <div className="ftree-error">Ordner konnte nicht gelesen werden.</div>;
-  if (entries === null) return <div className="ftree-empty">Lädt …</div>;
-  if (entries.length === 0) return <div className="ftree-empty">Leerer Ordner</div>;
+  if (error) return <div className="ftree-error">Couldn't read folder.</div>;
+  if (entries === null) return <div className="ftree-empty">Loading…</div>;
+  if (entries.length === 0) return <div className="ftree-empty">Empty folder</div>;
 
   const menuItems: MenuItem[] = menu
     ? [
         ...(onPreviewFile && isMarkdownFile(menu.entry.name)
-          ? [{ label: 'Vorschau', onClick: () => onPreviewFile(menu.entry.path) }]
+          ? [{ label: 'Preview', onClick: () => onPreviewFile(menu.entry.path) }]
           : []),
-        { label: 'Bearbeiten', onClick: () => onOpenFile(menu.entry.path) }
+        { label: 'Edit', onClick: () => onOpenFile(menu.entry.path) }
       ]
     : [];
 

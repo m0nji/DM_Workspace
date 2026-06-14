@@ -15,7 +15,7 @@ interface WebviewEl extends HTMLElement {
   getURL(): string;
 }
 
-// Renders the "Vorschau" tab content for a PreviewSource (markdown or web/url).
+// Renders the "Preview" tab content for a PreviewSource (markdown or web/url).
 // This is the pre-existing preview behaviour, unchanged, minus the outer panel
 // shell and resize handle (now owned by PreviewPanel).
 export function PreviewBody(): React.JSX.Element {
@@ -35,7 +35,7 @@ export function PreviewBody(): React.JSX.Element {
     setAddr(source.target);
     window.api.readFile(source.target)
       .then((text) => { if (!cancelled) setMdHtml(renderMarkdown(text)); })
-      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`); });
+      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Couldn't load file: ${escapeHtml(String(err))}</p>`); });
     return () => { cancelled = true; };
   }, [panel.open, source]);
 
@@ -60,7 +60,7 @@ export function PreviewBody(): React.JSX.Element {
     if (isMarkdown) {
       if (source?.resolved) window.api.readFile(source.target)
         .then((t) => setMdHtml(renderMarkdown(t)))
-        .catch((err) => setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`));
+        .catch((err) => setMdHtml(`<p class="preview-error">Couldn't load file: ${escapeHtml(String(err))}</p>`));
     } else {
       webviewRef.current?.reload();
     }
@@ -93,28 +93,28 @@ export function PreviewBody(): React.JSX.Element {
       <div className="preview-chrome">
         {!isMarkdown && !notFound && (
           <>
-            <button type="button" className="icon-btn" aria-label="Zurück" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
-            <button type="button" className="icon-btn" aria-label="Vor" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
+            <button type="button" className="icon-btn" aria-label="Back" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
+            <button type="button" className="icon-btn" aria-label="Forward" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" aria-label="Neu laden" onClick={reload}><Icon name="reload" /></button>
+        <button type="button" className="icon-btn" aria-label="Reload" onClick={reload}><Icon name="reload" /></button>
         <input
           className="preview-addr"
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           onKeyDown={submitAddr}
           readOnly={!notFound}
-          aria-label="Vorschau-Adresse"
+          aria-label="Preview address"
           title={addr}
         />
-        {notFound && <button type="button" className="icon-btn" aria-label="Ordner wählen" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
+        {notFound && <button type="button" className="icon-btn" aria-label="Choose folder" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
       </div>
       <div className="preview-body">
         {!source ? (
-          <div className="preview-empty">Keine Vorschau</div>
+          <div className="preview-empty">No preview</div>
         ) : notFound ? (
           <div className="preview-notfound">
-            Datei nicht gefunden — Pfad in der Adresszeile korrigieren oder mit 📁 den richtigen Ordner wählen.
+            File not found — fix the path in the address bar or pick the right folder with 📁.
           </div>
         ) : isMarkdown ? (
           <div className="markdown-body" dangerouslySetInnerHTML={{ __html: mdHtml }} />

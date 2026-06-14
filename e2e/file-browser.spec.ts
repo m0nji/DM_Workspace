@@ -33,7 +33,7 @@ test('file browser: set root, create a file, edit, save, verify on disk', async 
     await expect(win.locator('.ftree-row', { hasText: 'sub' })).toBeVisible();
 
     // Create a new file in the current folder.
-    await win.locator('.icon-btn[aria-label="Neue Datei"]').click();
+    await win.locator('.icon-btn[aria-label="New file"]').click();
     await win.locator('.files-newinput').fill('notes.txt');
     await win.locator('.files-newinput').press('Enter');
 
@@ -47,14 +47,14 @@ test('file browser: set root, create a file, edit, save, verify on disk', async 
     // The file really exists on disk with the typed content.
     await expect.poll(() => readFileSync(join(work, 'notes.txt'), 'utf8')).toBe('hello from e2e');
 
-    // Right-click the markdown file → context menu offers Vorschau + Bearbeiten.
+    // Right-click the markdown file → context menu offers Preview + Edit.
     await win.locator('.preview-tab-btn', { hasText: 'Files' }).click();
     await win.locator('.ftree-row', { hasText: 'guide.md' }).click({ button: 'right' });
-    await expect(win.locator('.context-menu-item', { hasText: 'Vorschau' })).toBeVisible();
-    await expect(win.locator('.context-menu-item', { hasText: 'Bearbeiten' })).toBeVisible();
+    await expect(win.locator('.context-menu-item', { hasText: 'Preview' })).toBeVisible();
+    await expect(win.locator('.context-menu-item', { hasText: 'Edit' })).toBeVisible();
 
-    // Choosing Vorschau renders the markdown read-only in the preview tab.
-    await win.locator('.context-menu-item', { hasText: 'Vorschau' }).click();
+    // Choosing Preview renders the markdown read-only in the preview tab.
+    await win.locator('.context-menu-item', { hasText: 'Preview' }).click();
     await expect(win.locator('.markdown-body')).toContainText('Hello from markdown');
   } finally {
     await app.close();

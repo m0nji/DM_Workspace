@@ -51,7 +51,7 @@ export function PreviewPanel(): React.JSX.Element | null {
     if (dir) setBrowseRoot(dir);
   }, [setBrowseRoot]);
 
-  // "Vorschau" from a file's context menu: render it read-only in the preview tab.
+  // "Preview" from a file's context menu: render it read-only in the preview tab.
   const onPreviewFile = useCallback((path: string) => {
     openPreview({ kind: 'markdown', target: path, resolved: true });
   }, [openPreview]);
@@ -69,10 +69,10 @@ export function PreviewPanel(): React.JSX.Element | null {
         setRefreshKey((k) => k + 1);
         openInEditor(res.path);
       } else {
-        setNewError(res.code === 'exists' ? 'Existiert bereits' : 'Ungültiger Name');
+        setNewError(res.code === 'exists' ? 'Already exists' : 'Invalid name');
       }
     } catch {
-      setNewError('Datei konnte nicht angelegt werden');
+      setNewError('Couldn\'t create file');
     }
   }, [root, newName, openInEditor]);
 
@@ -86,16 +86,16 @@ export function PreviewPanel(): React.JSX.Element | null {
 
       <div className="preview-tabs">
         <button type="button" className={`preview-tab-btn${tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>Files</button>
-        <button type="button" className={`preview-tab-btn${tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Vorschau</button>
+        <button type="button" className={`preview-tab-btn${tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Preview</button>
         <span className="preview-tabs-spacer" />
         {tab === 'files' && (
           <>
-            <button type="button" className="icon-btn" aria-label="Neue Datei" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
-            <button type="button" className="icon-btn" aria-label="Aktualisieren" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
-            <button type="button" className="icon-btn" aria-label="Ordner wählen" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
+            <button type="button" className="icon-btn" aria-label="New file" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
+            <button type="button" className="icon-btn" aria-label="Refresh" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
+            <button type="button" className="icon-btn" aria-label="Choose folder" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" aria-label="Schließen" onClick={closePreview}><Icon name="close" /></button>
+        <button type="button" className="icon-btn" aria-label="Close" onClick={closePreview}><Icon name="close" /></button>
       </div>
 
       {/* Both tabs stay mounted; we toggle visibility so the webview keeps its
@@ -116,13 +116,13 @@ export function PreviewPanel(): React.JSX.Element | null {
               className="files-newinput"
               autoFocus
               value={newName}
-              placeholder="Dateiname…"
+              placeholder="File name…"
               onChange={(e) => { setNewName(e.target.value); setNewError(null); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') { e.preventDefault(); void submitNewFile(); }
                 if (e.key === 'Escape') { setNewName(null); setNewError(null); }
               }}
-              aria-label="Neuer Dateiname"
+              aria-label="New file name"
             />
             {newError && <span className="files-newerror">{newError}</span>}
           </div>
