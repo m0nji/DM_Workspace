@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { breadcrumbSegments, parentDir } from '../../shared/fs-path';
 import type { DirEntry } from '../../shared/types';
@@ -9,6 +10,7 @@ import { PreviewBody } from './PreviewBody';
 import { ConfirmDialog } from './ConfirmDialog';
 
 export function PreviewPanel(): React.JSX.Element | null {
+  const { t } = useTranslation();
   const panel = useStore((s) => s.previewPanel);
   const closePreview = useStore((s) => s.closePreview);
   const setPreviewWidth = useStore((s) => s.setPreviewWidth);
@@ -74,12 +76,12 @@ export function PreviewPanel(): React.JSX.Element | null {
         setRefreshKey((k) => k + 1);
         openInEditor(res.path);
       } else {
-        setNewError(res.code === 'exists' ? 'Already exists' : 'Invalid name');
+        setNewError(res.code === 'exists' ? t('files.errorExists') : t('files.errorInvalidName'));
       }
     } catch {
-      setNewError('Couldn\'t create file');
+      setNewError(t('files.errorCreate'));
     }
-  }, [root, newName, openInEditor]);
+  }, [root, newName, openInEditor, t]);
 
   const confirmDelete = useCallback(async () => {
     const entry = pendingDelete;
@@ -94,9 +96,9 @@ export function PreviewPanel(): React.JSX.Element | null {
       }
       setRefreshKey((k) => k + 1);
     } catch {
-      setActionError(`Couldn't delete "${entry.name}"`);
+      setActionError(t('files.errorDelete', { name: entry.name }));
     }
-  }, [pendingDelete, panel.editPath, clearEditor]);
+  }, [pendingDelete, panel.editPath, clearEditor, t]);
 
   if (!panel.open) return null;
 
@@ -107,18 +109,18 @@ export function PreviewPanel(): React.JSX.Element | null {
       <div className="preview-resize" onMouseDown={onDragStart} />
 
       <div className="preview-tabs">
-        <button type="button" className={`preview-tab-btn${tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>Files</button>
-        <button type="button" className={`preview-tab-btn${tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Preview</button>
+        <button type="button" className={`preview-tab-btn${tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>{t('files.tabFiles')}</button>
+        <button type="button" className={`preview-tab-btn${tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>{t('files.tabPreview')}</button>
         <span className="preview-tabs-spacer" />
         {tab === 'files' && (
           <>
-            <button type="button" className="icon-btn" aria-label="Up one folder" disabled={root === '/'} onClick={() => setBrowseRoot(parentDir(root))}><Icon name="arrow-up" /></button>
-            <button type="button" className="icon-btn" aria-label="New file" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
-            <button type="button" className="icon-btn" aria-label="Refresh" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
-            <button type="button" className="icon-btn" aria-label="Choose folder" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
+            <button type="button" className="icon-btn" aria-label={t('files.upOneFolder')} disabled={root === '/'} onClick={() => setBrowseRoot(parentDir(root))}><Icon name="arrow-up" /></button>
+            <button type="button" className="icon-btn" aria-label={t('files.newFile')} onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
+            <button type="button" className="icon-btn" aria-label={t('files.refresh')} onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
+            <button type="button" className="icon-btn" aria-label={t('files.chooseFolder')} onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" aria-label="Close" onClick={closePreview}><Icon name="close" /></button>
+        <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={closePreview}><Icon name="close" /></button>
       </div>
 
       {/* Both tabs stay mounted; we toggle visibility so the webview keeps its
@@ -139,13 +141,13 @@ export function PreviewPanel(): React.JSX.Element | null {
               className="files-newinput"
               autoFocus
               value={newName}
-              placeholder="File name…"
+              placeholder={t('files.namePlaceholder')}
               onChange={(e) => { setNewName(e.target.value); setNewError(null); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') { e.preventDefault(); void submitNewFile(); }
                 if (e.key === 'Escape') { setNewName(null); setNewError(null); }
               }}
-              aria-label="New file name"
+              aria-label={t('files.newFileName')}
             />
             {newError && <span className="files-newerror">{newError}</span>}
           </div>
@@ -162,9 +164,11 @@ export function PreviewPanel(): React.JSX.Element | null {
 
       {pendingDelete && (
         <ConfirmDialog
-          title={pendingDelete.isDir ? 'Delete folder' : 'Delete file'}
-          message={`Move "${pendingDelete.name}" to the trash?${pendingDelete.isDir ? ' Everything inside it goes too.' : ''}`}
-          confirmLabel="Delete"
+          title={pendingDelete.isDir ? t('files.deleteFolderTitle') : t('files.deleteFileTitle')}
+          message={pendingDelete.isDir
+            ? t('files.deleteMessageFolder', { name: pendingDelete.name })
+            : t('files.deleteMessage', { name: pendingDelete.name })}
+          confirmLabel={t('common.delete')}
           onConfirm={() => { void confirmDelete(); }}
           onCancel={() => setPendingDelete(null)}
         />

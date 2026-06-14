@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { findNext, findPrevious, clearSearch } from '../search-registry';
 
@@ -8,6 +9,7 @@ interface Props { paneId: string; }
 // matches this pane (set by the Cmd/Ctrl+F shortcut). Enter / Shift+Enter cycle
 // matches; Esc closes.
 export function SearchBar({ paneId }: Props): React.JSX.Element | null {
+  const { t } = useTranslation();
   const open = useStore((s) => s.searchOpenPaneId === paneId);
   const setSearchOpen = useStore((s) => s.setSearchOpen);
   const [query, setQuery] = useState('');
@@ -26,7 +28,7 @@ export function SearchBar({ paneId }: Props): React.JSX.Element | null {
       <input
         ref={inputRef}
         className="search-input"
-        placeholder="Find"
+        placeholder={t('search.placeholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); findNext(paneId, e.target.value); }}
         onKeyDown={(e) => {
@@ -34,9 +36,9 @@ export function SearchBar({ paneId }: Props): React.JSX.Element | null {
           else if (e.key === 'Escape') { e.preventDefault(); close(); }
         }}
       />
-      <button className="search-btn" title="Previous" onClick={() => findPrevious(paneId, query)}>↑</button>
-      <button className="search-btn" title="Next" onClick={() => findNext(paneId, query)}>↓</button>
-      <button className="search-btn" title="Close" onClick={close}>✕</button>
+      <button className="search-btn" title={t('search.previous')} onClick={() => findPrevious(paneId, query)}>↑</button>
+      <button className="search-btn" title={t('search.next')} onClick={() => findNext(paneId, query)}>↓</button>
+      <button className="search-btn" title={t('common.close')} onClick={close}>✕</button>
     </div>
   );
 }

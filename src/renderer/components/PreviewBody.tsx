@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { renderMarkdown } from '../markdown';
 import { resolveSource, fileTarget } from '../../shared/link-detect';
@@ -19,6 +20,7 @@ interface WebviewEl extends HTMLElement {
 // This is the pre-existing preview behaviour, unchanged, minus the outer panel
 // shell and resize handle (now owned by PreviewPanel).
 export function PreviewBody(): React.JSX.Element {
+  const { t } = useTranslation();
   const panel = useStore((s) => s.previewPanel);
   const openPreview = useStore((s) => s.openPreview);
 
@@ -35,9 +37,9 @@ export function PreviewBody(): React.JSX.Element {
     setAddr(source.target);
     window.api.readFile(source.target)
       .then((text) => { if (!cancelled) setMdHtml(renderMarkdown(text)); })
-      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Couldn't load file: ${escapeHtml(String(err))}</p>`); });
+      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">${t('files.loadError', { error: escapeHtml(String(err)), interpolation: { escapeValue: false } })}</p>`); });
     return () => { cancelled = true; };
-  }, [panel.open, source]);
+  }, [panel.open, source, t]);
 
   useEffect(() => {
     if (source && !source.resolved) setAddr(source.target);
@@ -59,12 +61,12 @@ export function PreviewBody(): React.JSX.Element {
   const reload = useCallback(() => {
     if (isMarkdown) {
       if (source?.resolved) window.api.readFile(source.target)
-        .then((t) => setMdHtml(renderMarkdown(t)))
-        .catch((err) => setMdHtml(`<p class="preview-error">Couldn't load file: ${escapeHtml(String(err))}</p>`));
+        .then((text) => setMdHtml(renderMarkdown(text)))
+        .catch((err) => setMdHtml(`<p class="preview-error">${t('files.loadError', { error: escapeHtml(String(err)), interpolation: { escapeValue: false } })}</p>`));
     } else {
       webviewRef.current?.reload();
     }
-  }, [isMarkdown, source]);
+  }, [isMarkdown, source, t]);
 
   const submitAddr = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
@@ -93,28 +95,28 @@ export function PreviewBody(): React.JSX.Element {
       <div className="preview-chrome">
         {!isMarkdown && !notFound && (
           <>
-            <button type="button" className="icon-btn" aria-label="Back" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
-            <button type="button" className="icon-btn" aria-label="Forward" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
+            <button type="button" className="icon-btn" aria-label={t('common.back')} onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
+            <button type="button" className="icon-btn" aria-label={t('common.forward')} onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" aria-label="Reload" onClick={reload}><Icon name="reload" /></button>
+        <button type="button" className="icon-btn" aria-label={t('common.reload')} onClick={reload}><Icon name="reload" /></button>
         <input
           className="preview-addr"
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           onKeyDown={submitAddr}
           readOnly={!notFound}
-          aria-label="Preview address"
+          aria-label={t('files.previewAddress')}
           title={addr}
         />
-        {notFound && <button type="button" className="icon-btn" aria-label="Choose folder" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
+        {notFound && <button type="button" className="icon-btn" aria-label={t('files.chooseFolder')} onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
       </div>
       <div className="preview-body">
         {!source ? (
-          <div className="preview-empty">No preview</div>
+          <div className="preview-empty">{t('files.noPreview')}</div>
         ) : notFound ? (
           <div className="preview-notfound">
-            File not found — fix the path in the address bar or pick the right folder with 📁.
+            {t('files.notFound')}
           </div>
         ) : isMarkdown ? (
           <div className="markdown-body" dangerouslySetInnerHTML={{ __html: mdHtml }} />

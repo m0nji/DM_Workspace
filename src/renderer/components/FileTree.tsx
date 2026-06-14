@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Icon, IconName } from './Icon';
 import { ContextMenu, MenuItem } from './ContextMenu';
 import { isMarkdownFile } from '../markdown';
@@ -36,6 +37,7 @@ interface NodeProps {
 }
 
 function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,9 +96,9 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext 
       </div>
       {entry.isDir && open && (
         error
-          ? <div className="ftree-error" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Access denied</div>
+          ? <div className="ftree-error" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>{t('files.accessDenied')}</div>
           : children === null
-            ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Loading…</div>
+            ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>{t('files.loading')}</div>
             : children.map((c) => (
                 <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
               ))
@@ -114,6 +116,7 @@ interface FileTreeProps {
 }
 
 export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onRequestDelete }: FileTreeProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -135,19 +138,19 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onReques
     setMenu({ x: e.clientX, y: e.clientY, entry });
   }, []);
 
-  if (error) return <div className="ftree-error">Couldn't read folder.</div>;
-  if (entries === null) return <div className="ftree-empty">Loading…</div>;
-  if (entries.length === 0) return <div className="ftree-empty">Empty folder</div>;
+  if (error) return <div className="ftree-error">{t('files.readError')}</div>;
+  if (entries === null) return <div className="ftree-empty">{t('files.loading')}</div>;
+  if (entries.length === 0) return <div className="ftree-empty">{t('files.emptyFolder')}</div>;
 
   const menuItems: MenuItem[] = menu
     ? [
         ...(!menu.entry.isDir && onPreviewFile && isMarkdownFile(menu.entry.name)
-          ? [{ label: 'Preview', onClick: () => onPreviewFile(menu.entry.path) }]
+          ? [{ label: t('files.preview'), onClick: () => onPreviewFile(menu.entry.path) }]
           : []),
         ...(!menu.entry.isDir
-          ? [{ label: 'Edit', onClick: () => onOpenFile(menu.entry.path) }]
+          ? [{ label: t('files.edit'), onClick: () => onOpenFile(menu.entry.path) }]
           : []),
-        { label: 'Delete', onClick: () => onRequestDelete(menu.entry) }
+        { label: t('common.delete'), onClick: () => onRequestDelete(menu.entry) }
       ]
     : [];
 
