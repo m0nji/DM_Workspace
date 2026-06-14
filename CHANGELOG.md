@@ -2,6 +2,10 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.9.0 – 2026-06-14
+- feat: Die gesamte Programmoberfläche gibt es jetzt auf Englisch und Deutsch; die Sprache lässt sich in den Einstellungen (unter „Darstellung") umschalten – Standard ist Englisch, beim ersten Start wird die Systemsprache erkannt und die Auswahl bleibt gespeichert
+- feat: Übersetzt sind sämtliche Beschriftungen, Menüs, Dialoge, Tooltips und Platzhalter – u. a. Einstellungen, Workspace-Editor, Befehlspalette, Willkommensbildschirm, Datei-Browser, Vorlagen-Assistent, Task-Board und Terminal-Kontextmenü
+
 ## 0.8.1 – 2026-06-14
 - feat: Im Datei-Browser springt ein neuer „nach oben"-Knopf eine Ordnerebene höher
 - feat: Dateien und Ordner lassen sich jetzt per Rechtsklick löschen – sie wandern in den Papierkorb (wiederherstellbar), mit Sicherheitsabfrage vorab
