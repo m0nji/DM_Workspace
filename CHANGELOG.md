@@ -1,57 +1,60 @@
 # Changelog
 
-Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
+All notable changes to DM Workspace. Newest version first. Always written in English.
+
+## 0.9.1 – 2026-06-14
+- fix: The "What's new" window is now always shown in English – including its title, badges and entries – regardless of the selected UI language, since the changelog mirrors CHANGELOG.md
 
 ## 0.9.0 – 2026-06-14
-- feat: Die gesamte Programmoberfläche gibt es jetzt auf Englisch und Deutsch; die Sprache lässt sich in den Einstellungen (unter „Darstellung") umschalten – Standard ist Englisch, beim ersten Start wird die Systemsprache erkannt und die Auswahl bleibt gespeichert
-- feat: Übersetzt sind sämtliche Beschriftungen, Menüs, Dialoge, Tooltips und Platzhalter – u. a. Einstellungen, Workspace-Editor, Befehlspalette, Willkommensbildschirm, Datei-Browser, Vorlagen-Assistent, Task-Board und Terminal-Kontextmenü
+- feat: The entire app interface is now available in English and German; the language can be switched in Settings (under "Appearance") – the default is English, the system language is detected on first launch, and the choice is remembered
+- feat: All labels, menus, dialogs, tooltips and placeholders are translated – including Settings, the workspace editor, command palette, welcome screen, file browser, template wizard, task board and terminal context menu
 
 ## 0.8.1 – 2026-06-14
-- feat: Im Datei-Browser springt ein neuer „nach oben"-Knopf eine Ordnerebene höher
-- feat: Dateien und Ordner lassen sich jetzt per Rechtsklick löschen – sie wandern in den Papierkorb (wiederherstellbar), mit Sicherheitsabfrage vorab
-- feat: Der Workspace-Editor (Name, Farbe, Basisordner, Tasks) öffnet jetzt als zentriertes Fenster statt im engen Seitenleisten-Panel; Doppelklick oder das Stift-Symbol öffnet ihn, Escape/Klick daneben schließt
-- fix: Beim Wechsel in einen anderen Workspace zeigt der Datei-Browser jetzt den Ordner des aktiven Workspaces an, statt am Pfad des vorherigen Workspaces zu hängen
-- refactor: Emoji-Symbole durch einheitliche, flache SVG-Icons ersetzt (passend zum übrigen Erscheinungsbild)
+- feat: A new "up" button in the file browser jumps one folder level higher
+- feat: Files and folders can now be deleted via right-click – they move to the trash (recoverable), with a confirmation prompt first
+- feat: The workspace editor (name, color, base folder, tasks) now opens as a centered window instead of in the cramped sidebar panel; a double-click or the pencil icon opens it, Escape/clicking outside closes it
+- fix: When switching to another workspace, the file browser now shows the active workspace's folder instead of staying on the previous workspace's path
+- refactor: Replaced emoji symbols with consistent, flat SVG icons (matching the rest of the look)
 
 ## 0.8.0 – 2026-06-14
-- feat: Neuer Datei-Browser als Tab im rechten Panel – durch die Ordnerstruktur navigieren und Dateien ansehen, mit Dateityp-Symbolen und einer anklickbaren Pfadleiste
-- feat: Textdateien lassen sich direkt im Panel bearbeiten und speichern (Speichern-Knopf oder Cmd/Strg+S); neue Dateien legt der „+"-Knopf an
-- feat: Rechtsklick auf eine Markdown-Datei bietet „Preview" (gerendert) und „Edit"; eine Datei aus dem Browser ins Terminal ziehen fügt deren Pfad ein
-- fix: Der Hintergrund des rechten Panels passt jetzt exakt zur linken Seitenleiste
+- feat: New file browser as a tab in the right panel – navigate the folder structure and view files, with file-type icons and a clickable path bar
+- feat: Text files can be edited and saved directly in the panel (Save button or Cmd/Ctrl+S); the "+" button creates new files
+- feat: Right-clicking a Markdown file offers "Preview" (rendered) and "Edit"; dragging a file from the browser into the terminal inserts its path
+- fix: The right panel's background now matches the left sidebar exactly
 
 ## 0.7.18 – 2026-06-14
-- fix: Das „Was ist neu"-Fenster ist jetzt wirklich so breit wie das Einstellungen-Menü – der vorige Versuch hatte technisch nicht gegriffen
-- fix: Kurze „unerwartet beendet"-Fehlermeldung direkt nach einem Update behoben – beim Einspielen werden die Terminals jetzt sauber beendet, bevor sich das Programm schließt
+- fix: The "What's new" window is now genuinely as wide as the Settings menu – the previous attempt did not take effect technically
+- fix: Fixed a brief "unexpectedly terminated" error right after an update – terminals are now shut down cleanly before the app closes during installation
 
 ## 0.7.17 – 2026-06-13
-- perf: Inaktive Workspaces geben ihren Grafikspeicher (WebGL) wieder frei – deutlich weniger Arbeitsspeicher- und GPU-Verbrauch bei vielen Workspaces. Der Terminalinhalt bleibt erhalten, und beim Zurückwechseln ist das Terminal sofort wieder da
+- perf: Inactive workspaces now release their graphics memory (WebGL) again – significantly less RAM and GPU usage with many workspaces. The terminal contents are preserved, and switching back brings the terminal up instantly
 
 ## 0.7.16 – 2026-06-13
-- fix: Das „Was ist neu"- und das Update-Fenster sind jetzt etwas breiter (so breit wie das Einstellungen-Menü), damit der Text nicht mehr gequetscht wirkt
+- fix: The "What's new" and update windows are now a bit wider (as wide as the Settings menu) so the text no longer looks cramped
 
 ## 0.7.15 – 2026-06-13
-- feat: Beim Ziehen einer Datei über das Terminal erscheint jetzt eine schicke Ablegefläche – der Hintergrund wird weichgezeichnet und ein Hinweis zeigt, dass der Pfad eingefügt wird
-- feat: Klick auf die Versionsnummer unten links öffnet ein „Was ist neu"-Fenster mit den letzten Änderungen
-- feat: Ist ein Update verfügbar, zeigt ein Dialog die Neuerungen und fragt vor dem Einspielen noch einmal nach
+- feat: Dragging a file over the terminal now shows a sleek drop area – the background blurs and a hint indicates that the path will be inserted
+- feat: Clicking the version number at the bottom left opens a "What's new" window with the latest changes
+- feat: When an update is available, a dialog shows the new features and asks for confirmation before installing
 
 ## 0.7.14 – 2026-06-11
-- feat: Bilder lassen sich jetzt zuverlässig per Strg+V / Cmd+V ins Terminal einfügen – plattformübergreifend und unabhängig vom Tool (Claude, Codex, opencode …)
-- feat: Dateien aus dem Datei-Explorer per Drag & Drop ins Terminal ziehen fügt deren Pfad ein
-- fix: Die Ziel-Auswahl beim Ausführen eines Tasks heißt jetzt verständlich „Terminal oben/unten/links/rechts" statt eines kryptischen Kürzels
-- fix: Das Auswahlmenü für das Ziel-Terminal wird nicht mehr abgeschnitten
+- feat: Images can now be reliably pasted into the terminal via Ctrl+V / Cmd+V – cross-platform and independent of the tool (Claude, Codex, opencode …)
+- feat: Dragging files from the file explorer into the terminal inserts their path
+- fix: The target selection when running a task is now clearly labeled "Terminal top/bottom/left/right" instead of a cryptic abbreviation
+- fix: The target-terminal selection menu is no longer cut off
 
 ## 0.7.13 – 2026-06-11
-- fix: Beim Ziehen des Trenners (reine Höhenänderung) passt sich das Terminal wieder korrekt an
+- fix: When dragging the divider (height change only), the terminal now adjusts correctly again
 
 ## 0.7.12 – 2026-06-10
-- fix: Keine grellen nativen Scrollbalken mehr unter macOS bei aktiver Einstellung „Scrollleisten immer einblenden"
+- fix: No more glaring native scrollbars on macOS when "Always show scrollbars" is enabled
 
 ## 0.7.11 – 2026-06-09
-- feat: Terminal-Transparenz standardmäßig auf 0,95 gesetzt für besseren Kontrast
-- fix: Schlanker Scrollbalken im macOS-Stil ohne Streifen am rechten Rand
-- fix: Scrollbalken-Griff bleibt verborgen, bis man darüberfährt
+- feat: Terminal transparency set to 0.95 by default for better contrast
+- fix: Slim macOS-style scrollbar without a stripe on the right edge
+- fix: The scrollbar handle stays hidden until you hover over it
 
 ## 0.7.10 – 2026-06-08
-- feat: Automatische Update-Prüfung alle 60 Minuten mit gut sichtbarem Hinweis oben rechts
-- fix: Schwarzer Balken am unteren Rand jedes Panes entfernt
-- perf: WebGL-Renderer aktiviert – flüssigeres Scrollen und Tippen
+- feat: Automatic update check every 60 minutes with a clearly visible notice in the top right
+- fix: Removed the black bar at the bottom of every pane
+- perf: Enabled WebGL renderer – smoother scrolling and typing

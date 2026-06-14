@@ -97,7 +97,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
       {showChangelog && (
         <ChangelogModal
-          title={t('changelog.whatsNew')}
+          title="What's new"
           versions={changelogVersions}
           highlightVersion={__APP_VERSION__}
           onClose={() => setShowChangelog(false)}

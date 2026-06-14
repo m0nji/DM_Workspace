@@ -28,10 +28,14 @@ interface Props {
 // dialog (confirm action set).
 export function ChangelogModal({ title, versions, highlightVersion, fallbackText, confirm, onClose }: Props): React.JSX.Element {
   const { t } = useTranslation();
+  // The changelog is always shown in English, regardless of the UI language: it
+  // mirrors CHANGELOG.md (authored in English) and the GitHub release notes, so
+  // the same wording reads identically for every user. Hence these labels are
+  // fixed English literals rather than translated strings.
   const kindLabel: Record<ChangelogKind, string> = {
-    feat: t('changelog.kindFeat'),
-    fix: t('changelog.kindFix'),
-    other: t('changelog.kindOther'),
+    feat: 'Feature',
+    fix: 'Fix',
+    other: 'Change',
   };
   const primaryRef = useRef<HTMLButtonElement>(null);
 
@@ -56,13 +60,13 @@ export function ChangelogModal({ title, versions, highlightVersion, fallbackText
         </div>
 
         <div className="changelog-body">
-          {!hasContent && <div className="changelog-fallback">{fallbackText ?? t('changelog.noChanges')}</div>}
+          {!hasContent && <div className="changelog-fallback">{fallbackText ?? 'No changes found.'}</div>}
           {versions.map((v) => (
             <div key={v.version} className="changelog-version">
               <div className="changelog-version-head">
                 <span className="changelog-version-num">
                   v{v.version}
-                  {highlightVersion === v.version && <span className="changelog-current">{t('changelog.current')}</span>}
+                  {highlightVersion === v.version && <span className="changelog-current">current</span>}
                 </span>
                 {v.date && <span className="changelog-date">{v.date}</span>}
               </div>
@@ -85,7 +89,7 @@ export function ChangelogModal({ title, versions, highlightVersion, fallbackText
               <button type="button" ref={primaryRef} className="btn-primary" onClick={confirm.onConfirm}>{confirm.label}</button>
             </>
           ) : (
-            <button type="button" ref={primaryRef} className="btn-primary" onClick={onClose}>{t('common.close')}</button>
+            <button type="button" ref={primaryRef} className="btn-primary" onClick={onClose}>Close</button>
           )}
         </div>
       </div>

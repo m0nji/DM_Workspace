@@ -189,14 +189,6 @@
     "readyTitle": "Update{{version}} heruntergeladen – neu starten & installieren",
     "restart": "Neu starten"
   },
-  "changelog": {
-    "whatsNew": "Was ist neu",
-    "kindFeat": "Feature",
-    "kindFix": "Fix",
-    "kindOther": "Änderung",
-    "current": "aktuell",
-    "noChanges": "Keine Änderungen gefunden."
-  },
   "dialog": {
     "startup": {
       "title": "Startbefehle ausführen?",

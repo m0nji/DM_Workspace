@@ -189,14 +189,6 @@
     "readyTitle": "Update{{version}} downloaded – restart & install",
     "restart": "Restart"
   },
-  "changelog": {
-    "whatsNew": "What's new",
-    "kindFeat": "Feature",
-    "kindFix": "Fix",
-    "kindOther": "Change",
-    "current": "current",
-    "noChanges": "No changes found."
-  },
   "dialog": {
     "startup": {
       "title": "Run startup commands?",
