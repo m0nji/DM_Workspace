@@ -1,5 +1,6 @@
 // src/renderer/components/TaskCard.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds, panePositionLabel } from '../../shared/layout-tree';
 import type { Task } from '../../shared/types';
@@ -14,6 +15,7 @@ interface Props {
 // One task card. The Run button targets the last-focused pane by default and
 // exposes a picker (⌄) to choose another pane or spawn a new one.
 export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [picker, setPicker] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -46,7 +48,7 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   // unten links", …) instead of the opaque pane id ("p18").
   const labelFor = (pid: string): string => {
     const pos = panePositionLabel(ws?.layout ?? null, pid);
-    return paneTitle(pid, pos ? `Terminal ${pos}` : 'Terminal');
+    return paneTitle(pid, pos ? t('tasks.paneNamed', { pos }) : t('tasks.paneDefault'));
   };
 
   // The pane picker is positioned as a fixed overlay (not absolute) so it isn't
@@ -79,18 +81,18 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
         <input className="task-edit-title" autoFocus value={title}
                onChange={(e) => setTitle(e.target.value)}
                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-               placeholder="Titel" />
+               placeholder={t('tasks.titlePlaceholder')} />
         <textarea className="task-edit-desc" value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-                  placeholder="Beschreibung (optional)" rows={3} />
+                  placeholder={t('tasks.descPlaceholder')} rows={3} />
         <input className="task-edit-cmd" value={command}
                onChange={(e) => setCommand(e.target.value)}
                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-               placeholder="Befehl (optional)" />
+               placeholder={t('tasks.commandPlaceholder')} />
         <div className="task-edit-actions">
-          <button type="button" onClick={commitEdit}>Speichern</button>
-          <button type="button" onClick={() => setEditing(false)}>Abbrechen</button>
+          <button type="button" onClick={commitEdit}>{t('common.save')}</button>
+          <button type="button" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
         </div>
       </div>
     );
@@ -107,17 +109,17 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
         {task.command ? (
           <div className="task-run">
             <button type="button" className="task-run-btn" disabled={!defaultPane}
-                    title={defaultPane ? `Ausführen in: ${labelFor(defaultPane)}` : 'Kein Terminal vorhanden'}
+                    title={defaultPane ? t('tasks.runIn', { name: labelFor(defaultPane) }) : t('tasks.noTerminal')}
                     onClick={() => defaultPane && runTaskInPane(defaultPane, text)}>
-              ▶ Run{defaultPane ? ` → ${labelFor(defaultPane)}` : ''}
+              {defaultPane ? t('tasks.runTo', { name: labelFor(defaultPane) }) : t('tasks.run')}
             </button>
-            <button type="button" ref={caretRef} className="task-run-caret" title="Ziel-Terminal wählen"
+            <button type="button" ref={caretRef} className="task-run-caret" title={t('tasks.chooseTarget')}
                     onClick={togglePicker}>⌄</button>
             {picker && (
               <>
                 <div className="task-pane-backdrop" onClick={() => setPicker(false)} />
                 <div className="task-pane-picker" style={pickerStyle}>
-                  <div className="task-pane-picker-label">In welches Terminal?</div>
+                  <div className="task-pane-picker-label">{t('tasks.whichTerminal')}</div>
                   {paneIds.map((pid) => (
                     <button type="button" key={pid} className="task-pane-item"
                             onClick={() => { runTaskInPane(pid, text); setPicker(false); }}>
@@ -126,16 +128,16 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
                   ))}
                   <button type="button" className="task-pane-item task-pane-new"
                           onClick={() => { runTaskInNewPane(text); setPicker(false); }}>
-                    ＋ neues Pane
+                    {t('tasks.newPane')}
                   </button>
                 </div>
               </>
             )}
           </div>
         ) : (
-          <span className="task-no-cmd">— kein Befehl —</span>
+          <span className="task-no-cmd">{t('tasks.noCommand')}</span>
         )}
-        <button type="button" className="task-del" title="Löschen" onClick={onDelete}>✕</button>
+        <button type="button" className="task-del" title={t('common.delete')} onClick={onDelete}>✕</button>
       </div>
     </div>
   );

@@ -274,5 +274,52 @@
     "next": "Next",
     "saveChanges": "Save changes",
     "saveTemplate": "Save template"
+  },
+  "pane": {
+    "splitHorizontal": "Split into left & right",
+    "splitVertical": "Split into top & bottom",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "status": {
+      "idle": "idle",
+      "busy": "busy",
+      "done": "done"
+    }
+  },
+  "tasks": {
+    "loading": "Loading tasks…",
+    "newTask": "New task",
+    "add": "Add task",
+    "titlePlaceholder": "Title",
+    "descPlaceholder": "Description (optional)",
+    "commandPlaceholder": "Command (optional)",
+    "chooseTarget": "Choose target terminal",
+    "run": "▶ Run",
+    "runTo": "▶ Run → {{name}}",
+    "runIn": "Run in: {{name}}",
+    "noTerminal": "No terminal available",
+    "whichTerminal": "Which terminal?",
+    "newPane": "＋ new pane",
+    "noCommand": "— no command —",
+    "paneNamed": "Terminal {{pos}}",
+    "paneDefault": "Terminal"
+  },
+  "terminal": {
+    "processExited": "Process exited — code {{code}}",
+    "dropFiles": "Drop files here",
+    "dropFilesSub": "inserts the path into the terminal",
+    "scrollToBottom": "Scroll to bottom",
+    "clearAllTitle": "Clear all windows?",
+    "clearAllMessage": "All panes in this workspace will be cleared and their scrollback history lost.",
+    "clearAllConfirm": "Clear all"
+  },
+  "menu": {
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select all",
+    "clearWindow": "Clear window",
+    "clearAllWindows": "Clear all windows",
+    "search": "Search",
+    "closeTerminal": "Close terminal"
   }
 }

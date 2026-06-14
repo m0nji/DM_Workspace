@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Terminal } from '@xterm/xterm';
 import type { ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -78,6 +79,7 @@ function syncBackgrounds(host: HTMLElement | null, background: string | undefine
 }
 
 export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   // The pane holds a WebGL/GPU context only while its workspace is active. Electron
@@ -418,7 +420,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       activity.onOutput();
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
-      term.write(`\r\n[Process exited — code ${exitCode}]\r\n`);
+      term.write(`\r\n[${t('terminal.processExited', { code: exitCode })}]\r\n`);
     });
     const inputDisp = term.onData((data) => {
       window.api.input({ paneId, data });
@@ -561,7 +563,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const hasSelection = !!term?.hasSelection();
     return [
       {
-        label: 'Copy',
+        label: t('menu.copy'),
         disabled: !hasSelection,
         // Refocus the terminal: clicking a menu button moves focus onto the
         // button, and on close it falls to <body>, not back to xterm's hidden
@@ -570,20 +572,20 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(sel); term?.focus(); }
       },
       {
-        label: 'Paste',
+        label: t('menu.paste'),
         onClick: async () => {
           const text = await window.api.clipboardRead();
           if (text) term?.paste(text);
           term?.focus();
         }
       },
-      { label: 'Select All', onClick: () => { term?.selectAll(); term?.focus(); } },
+      { label: t('menu.selectAll'), onClick: () => { term?.selectAll(); term?.focus(); } },
       { label: '-' },
-      { label: 'Clear Window', onClick: () => { clearTerminal(paneId); term?.focus(); } },
-      { label: 'Clear All Windows', onClick: () => setConfirmClearAll(true) },
+      { label: t('menu.clearWindow'), onClick: () => { clearTerminal(paneId); term?.focus(); } },
+      { label: t('menu.clearAllWindows'), onClick: () => setConfirmClearAll(true) },
       { label: '-' },
-      { label: 'Search', onClick: () => setSearchOpen(paneId) },
-      { label: 'Close Terminal', onClick: () => closeActivePane(paneId) }
+      { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
+      { label: t('menu.closeTerminal'), onClick: () => closeActivePane(paneId) }
     ];
   };
 
@@ -606,16 +608,16 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
             <circle cx="8.5" cy="8.5" r="1.5" />
             <path d="M21 15l-5-5L5 21" />
           </svg>
-          <div className="drop-overlay-text">Dateien hier ablegen</div>
-          <div className="drop-overlay-sub">fügt den Pfad ins Terminal ein</div>
+          <div className="drop-overlay-text">{t('terminal.dropFiles')}</div>
+          <div className="drop-overlay-sub">{t('terminal.dropFilesSub')}</div>
         </div>
       </div>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
       {confirmClearAll && (
         <ConfirmDialog
-          title="Clear all windows?"
-          message="All panes in this workspace will be cleared and their scrollback history lost."
-          confirmLabel="Clear all"
+          title={t('terminal.clearAllTitle')}
+          message={t('terminal.clearAllMessage')}
+          confirmLabel={t('terminal.clearAllConfirm')}
           onConfirm={() => {
             const ws = useStore.getState().activeWorkspace();
             clearTerminals(collectPaneIds(ws?.layout ?? null));
@@ -625,7 +627,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         />
       )}
       {!atBottom && (
-        <button className="scroll-bottom-btn" title="Scroll to bottom" onClick={scrollToBottom}>
+        <button className="scroll-bottom-btn" title={t('terminal.scrollToBottom')} onClick={scrollToBottom}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 6l4 4 4-4" />

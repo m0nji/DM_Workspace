@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
@@ -65,6 +66,7 @@ function Close(): React.JSX.Element {
 }
 
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
+  const { t } = useTranslation();
   const splitActivePane = useStore((s) => s.splitActivePane);
   const closeActivePane = useStore((s) => s.closeActivePane);
   const toggleMaximize = useStore((s) => s.toggleMaximize);
@@ -83,15 +85,15 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
       onMouseDownCapture={() => setFocusedPane(paneId)}
     >
       <div className="pane-header">
-        <span className={`status-dot ${status}`} title={status} />
+        <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
         <span className="pane-title" title={title}>{title}</span>
-        <button className="pane-btn" title="Split into left & right"
+        <button className="pane-btn" title={t('pane.splitHorizontal')}
                 onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
-        <button className="pane-btn" title="Split into top & bottom"
+        <button className="pane-btn" title={t('pane.splitVertical')}
                 onClick={() => splitActivePane(paneId, 'v')}><SplitTopBottom /></button>
-        <button className="pane-btn" title={maximized ? 'Restore' : 'Maximize'}
+        <button className="pane-btn" title={maximized ? t('pane.restore') : t('pane.maximize')}
                 onClick={() => toggleMaximize(paneId)}>{maximized ? <Restore /> : <Maximize />}</button>
-        <button className="pane-btn" title="Close"
+        <button className="pane-btn" title={t('common.close')}
                 onClick={() => closeActivePane(paneId)}><Close /></button>
       </div>
       <div className="pane-body">

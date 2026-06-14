@@ -274,5 +274,52 @@
     "next": "Weiter",
     "saveChanges": "Änderungen speichern",
     "saveTemplate": "Vorlage speichern"
+  },
+  "pane": {
+    "splitHorizontal": "Links und rechts teilen",
+    "splitVertical": "Oben und unten teilen",
+    "maximize": "Maximieren",
+    "restore": "Wiederherstellen",
+    "status": {
+      "idle": "untätig",
+      "busy": "beschäftigt",
+      "done": "fertig"
+    }
+  },
+  "tasks": {
+    "loading": "Lade Tasks…",
+    "newTask": "Neue Task",
+    "add": "Task hinzufügen",
+    "titlePlaceholder": "Titel",
+    "descPlaceholder": "Beschreibung (optional)",
+    "commandPlaceholder": "Befehl (optional)",
+    "chooseTarget": "Ziel-Terminal wählen",
+    "run": "▶ Ausführen",
+    "runTo": "▶ Ausführen → {{name}}",
+    "runIn": "Ausführen in: {{name}}",
+    "noTerminal": "Kein Terminal vorhanden",
+    "whichTerminal": "In welches Terminal?",
+    "newPane": "＋ neues Pane",
+    "noCommand": "— kein Befehl —",
+    "paneNamed": "Terminal {{pos}}",
+    "paneDefault": "Terminal"
+  },
+  "terminal": {
+    "processExited": "Prozess beendet — Code {{code}}",
+    "dropFiles": "Dateien hier ablegen",
+    "dropFilesSub": "fügt den Pfad ins Terminal ein",
+    "scrollToBottom": "Nach unten scrollen",
+    "clearAllTitle": "Alle Fenster leeren?",
+    "clearAllMessage": "Alle Bereiche in diesem Workspace werden geleert und ihr Scrollback-Verlauf geht verloren.",
+    "clearAllConfirm": "Alle leeren"
+  },
+  "menu": {
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "selectAll": "Alles auswählen",
+    "clearWindow": "Fenster leeren",
+    "clearAllWindows": "Alle Fenster leeren",
+    "search": "Suchen",
+    "closeTerminal": "Terminal schließen"
   }
 }
