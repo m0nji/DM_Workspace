@@ -19,3 +19,12 @@ describe('icon registry', () => {
     }
   });
 });
+
+describe('file-browser icons', () => {
+  it('defines non-empty paths for the new icons', () => {
+    for (const name of ['folder-open', 'file-code', 'file-text', 'file-config', 'chevron-down', 'file-plus', 'save'] as const) {
+      expect(Array.isArray(ICON_PATHS[name])).toBe(true);
+      expect(ICON_PATHS[name].length).toBeGreaterThan(0);
+    }
+  });
+});

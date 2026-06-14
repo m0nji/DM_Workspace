@@ -4,7 +4,9 @@ export const ICON_VIEWBOX = '0 0 24 24';
 
 export type IconName =
   | 'command-palette' | 'settings' | 'preview' | 'search'
-  | 'back' | 'forward' | 'reload' | 'folder' | 'close';
+  | 'back' | 'forward' | 'reload' | 'folder' | 'close'
+  | 'folder-open' | 'file-code' | 'file-text' | 'file-config'
+  | 'chevron-down' | 'file-plus' | 'save';
 
 // Every icon authored on a 24×24 canvas as stroked paths so they share weight,
 // scale and optical size. Values are arrays of SVG path `d` strings.
@@ -33,7 +35,39 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   folder: [
     'M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2'
   ],
-  close: ['M18 6l-12 12', 'M6 6l12 12']
+  close: ['M18 6l-12 12', 'M6 6l12 12'],
+  'folder-open': [
+    'M5 19l2.757 -7.351a1 1 0 0 1 .936 -.649h12.307a1 1 0 0 1 .986 1.164l-.996 5a1 1 0 0 1 -.986 .836h-13a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v2'
+  ],
+  'file-code': [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+    'M10 13l-1 2l1 2',
+    'M14 13l1 2l-1 2'
+  ],
+  'file-text': [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+    'M9 13h6',
+    'M9 17h4'
+  ],
+  'file-config': [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+    'M11 14a1 1 0 1 0 2 0a1 1 0 0 0 -2 0'
+  ],
+  'chevron-down': ['M6 9l6 6l6 -6'],
+  'file-plus': [
+    'M14 3v4a1 1 0 0 0 1 1h4',
+    'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+    'M12 11l0 6',
+    'M9 14l6 0'
+  ],
+  save: [
+    'M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2',
+    'M14 4l0 4l-6 0l0 -4',
+    'M8 14a2 2 0 1 0 4 0a2 2 0 0 0 -4 0'
+  ]
 };
 
 export interface IconProps { name: IconName; size?: number; }
