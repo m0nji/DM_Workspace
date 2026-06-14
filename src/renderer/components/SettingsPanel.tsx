@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import { Icon } from './Icon';
 import type { SettingsSection } from '../../shared/types';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
 import {
@@ -222,7 +223,7 @@ export function SettingsPanel(): React.JSX.Element | null {
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span>Settings</span>
-          <button className="modal-close" title="Close" onClick={() => setOpen(false)}>✕</button>
+          <button className="modal-close" title="Close" onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
         </div>
 
         <div className="settings-body">

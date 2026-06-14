@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../store';
+import { Icon } from './Icon';
 
 // Shown before creating a workspace from a template that carries startup
 // commands (when the template asks for confirmation). Lets the user run the
@@ -34,7 +35,7 @@ export function StartupCommandConfirmDialog(): React.JSX.Element | null {
       <div className="modal startup-confirm" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span>Run startup commands?</span>
-          <button className="modal-close" title="Close" onClick={close}>✕</button>
+          <button className="modal-close" title="Close" onClick={close}><Icon name="close" size={16} /></button>
         </div>
         <p className="modal-hint" style={{ marginTop: 0 }}>
           <strong>{tpl.name}</strong> will run these commands in its panes. Review them before continuing.

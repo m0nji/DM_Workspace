@@ -86,7 +86,8 @@ body {
 .ws-item:hover, .workspace-tab:hover { background: #2a2a2a; }
 .ws-item:hover .ws-actions, .workspace-tab:hover .ws-actions { visibility: visible; }
 .ws-item .rename, .ws-item .del,
-.workspace-tab .rename, .workspace-tab .del { color: var(--muted); cursor: pointer; }
+.workspace-tab .rename, .workspace-tab .del { color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; }
 .ws-item .rename:hover, .ws-item .del:hover,
 .workspace-tab .rename:hover, .workspace-tab .del:hover { color: var(--text); }
 .add-ws { color: var(--muted); cursor: pointer; padding: 7px 8px; margin-top: 4px; }
@@ -221,7 +222,7 @@ body {
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
 .modal-close { background: none; border: none; color: var(--muted); cursor: pointer;
-  font-size: 14px; }
+  font-size: 14px; display: inline-flex; align-items: center; padding: 2px; }
 .modal-close:hover { color: var(--text); }
 .modal-section-label { color: var(--muted); font-size: 11px; text-transform: uppercase;
   letter-spacing: .05em; margin-bottom: 10px; }
@@ -311,9 +312,6 @@ input[type="checkbox"]:checked::after {
 }
 .update-badge.ready { animation: update-badge-pulse 1.6s ease-in-out infinite; }
 @keyframes update-badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
-.ws-rename-input { flex: 1; background: #000; color: var(--text);
-  border: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; }
-
 .workspace-view { flex: 1; position: relative; overflow: hidden; }
 /* Each workspace is mounted and absolutely fills the view; only the active one is
    shown (display toggled inline). The opaque background guarantees the active
@@ -435,24 +433,44 @@ input[type="checkbox"]:checked::after {
 }
 
 /* Workspace rename + color picker (stacked, so the swatches are fully visible) */
-.ws-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.ws-edit .ws-rename-input { width: 100%; }
-.ws-cwd { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.ws-cwd-path {
+/* Workspace editor modal — name / colour / base folder / tasks, each section
+   evenly spaced on the shared .modal canvas. */
+.modal.ws-edit-modal { width: 400px; }
+.ws-edit-field { margin-bottom: 18px; }
+.ws-edit-name {
+  width: 100%; box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.25); color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 9px 11px; font-size: 14px;
+}
+.ws-edit-name:focus { outline: none; border-color: var(--accent); }
+.ws-edit-swatches { display: flex; gap: 12px; }
+.ws-edit-swatch {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: transform .1s ease;
+}
+.ws-edit-swatch:hover { transform: scale(1.12); }
+.ws-edit-swatch.active { outline: 2px solid var(--text); outline-offset: 2px; }
+.ws-edit-folder { display: flex; align-items: center; gap: 8px; }
+.ws-edit-folder-path {
   flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 11px; opacity: 0.8;
+  background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 11px; font-size: 12px; color: var(--muted);
+  font-family: Menlo, monospace;
 }
-.ws-cwd-btn {
-  flex: none; cursor: pointer; background: none; border: none;
-  padding: 0 2px; display: flex; align-items: center; color: inherit; opacity: 0.8;
+.ws-edit-folder-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  background: #2a2a2a; color: var(--text); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 12px; cursor: pointer; font-size: 12px;
 }
-.ws-cwd-btn:hover { opacity: 1; }
-.ws-colors { display: flex; gap: 6px; align-items: center; }
-.ws-color { width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.25); flex-shrink: 0; }
-.ws-color:hover { transform: scale(1.15); }
-.ws-color.active { outline: 2px solid var(--text); outline-offset: 1px; }
+.ws-edit-folder-btn:hover { border-color: var(--accent); }
+.ws-edit-tasks {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  color: var(--text); font-size: 13px;
+}
+.ws-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
 /* Terminal host wrapper holds the floating scroll-to-bottom button */
 .xterm-host-wrap { position: relative; height: 100%; }
@@ -748,7 +766,6 @@ input[type="checkbox"]:checked::after {
 .task-edit-actions { display: flex; gap: 6px; }
 .task-edit-actions button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
 .welcome-tasks-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; color: var(--text); font-size: 13px; cursor: pointer; }
-.ws-tasks-toggle { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--text); font-size: 12px; cursor: pointer; }
 .view-stack { flex: 1; min-width: 0; display: flex; }
 .view-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .view-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; margin-right: 8px; -webkit-app-region: no-drag; }

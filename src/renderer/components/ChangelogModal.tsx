@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import type { ChangelogVersion, ChangelogKind } from '../../shared/changelog';
+import { Icon } from './Icon';
 
 interface ConfirmAction {
   label: string;
@@ -46,7 +47,7 @@ export function ChangelogModal({ title, versions, highlightVersion, fallbackText
       <div className="modal changelog-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span>{title}</span>
-          <button type="button" className="modal-close" title="Schließen" onClick={onClose}>✕</button>
+          <button type="button" className="modal-close" title="Schließen" onClick={onClose}><Icon name="close" size={16} /></button>
         </div>
 
         <div className="changelog-body">

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import type { LayoutNode } from '../../shared/types';
+import { Icon } from './Icon';
 
 // A compact schematic of a layout tree, echoing the preset glyphs on the welcome
 // screen so the user recognizes the captured shape at a glance.
@@ -96,7 +97,7 @@ export function TemplateWizard(): React.JSX.Element | null {
       <div className="modal-backdrop" onMouseDown={close}>
         <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
           <div className="modal-header"><span>Save as template</span>
-            <button className="modal-close" onClick={close}>✕</button></div>
+            <button className="modal-close" onClick={close}><Icon name="close" size={16} /></button></div>
           <p className="modal-hint">Open a layout first — there's nothing to capture from the welcome screen.</p>
           <div className="confirm-actions"><button className="confirm-btn primary" onClick={close}>OK</button></div>
         </div>
@@ -139,7 +140,7 @@ export function TemplateWizard(): React.JSX.Element | null {
       <div className="modal wizard" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span>{editing ? 'Edit template' : 'Save workspace as template'}</span>
-          <button className="modal-close" title="Close" onClick={close}>✕</button>
+          <button className="modal-close" title="Close" onClick={close}><Icon name="close" size={16} /></button>
         </div>
 
         <ol className="wizard-rail">
