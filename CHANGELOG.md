@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.8.0 – 2026-06-14
+- feat: Neuer Datei-Browser als Tab im rechten Panel – durch die Ordnerstruktur navigieren und Dateien ansehen, mit Dateityp-Symbolen und einer anklickbaren Pfadleiste
+- feat: Textdateien lassen sich direkt im Panel bearbeiten und speichern (Speichern-Knopf oder Cmd/Strg+S); neue Dateien legt der „+"-Knopf an
+- feat: Rechtsklick auf eine Markdown-Datei bietet „Preview" (gerendert) und „Edit"; eine Datei aus dem Browser ins Terminal ziehen fügt deren Pfad ein
+- fix: Der Hintergrund des rechten Panels passt jetzt exakt zur linken Seitenleiste
+
 ## 0.7.18 – 2026-06-14
 - fix: Das „Was ist neu"-Fenster ist jetzt wirklich so breit wie das Einstellungen-Menü – der vorige Versuch hatte technisch nicht gegriffen
 - fix: Kurze „unerwartet beendet"-Fehlermeldung direkt nach einem Update behoben – beim Einspielen werden die Terminals jetzt sauber beendet, bevor sich das Programm schließt
