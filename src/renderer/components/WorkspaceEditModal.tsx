@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { Icon } from './Icon';
@@ -19,6 +20,7 @@ interface WorkspaceEditModalProps {
  * Escape close, Enter commits the name.
  */
 export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalProps): React.JSX.Element | null {
+  const { t } = useTranslation();
   const ws = useStore((s) => s.workspaces.find((w) => w.id === workspaceId));
   const renameWorkspace = useStore((s) => s.renameWorkspace);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
@@ -57,9 +59,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     // Changing the folder restarts the workspace's open terminals in the new
     // directory, so confirm first when there are running panes to lose.
     const hasPanes = collectPaneIds(ws.layout ?? null).length > 0;
-    if (hasPanes && !window.confirm(
-      'Restart this workspace in the new folder? The running terminals will be terminated.'
-    )) return;
+    if (hasPanes && !window.confirm(t('workspace.folderRestartConfirm'))) return;
     setWorkspaceCwd(ws.id, dir);
   };
 
@@ -69,14 +69,14 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal ws-edit-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>Edit workspace</span>
-          <button type="button" className="modal-close" title="Close" onClick={onClose}>
+          <span>{t('workspace.edit.title')}</span>
+          <button type="button" className="modal-close" title={t('common.close')} onClick={onClose}>
             <Icon name="close" size={16} />
           </button>
         </div>
 
         <div className="ws-edit-field">
-          <div className="modal-section-label">Name</div>
+          <div className="modal-section-label">{t('workspace.edit.name')}</div>
           <input
             ref={inputRef}
             className="ws-edit-name"
@@ -86,7 +86,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         </div>
 
         <div className="ws-edit-field">
-          <div className="modal-section-label">Color</div>
+          <div className="modal-section-label">{t('workspace.edit.color')}</div>
           <div className="ws-edit-swatches">
             {WS_COLORS.map((c) => (
               <button
@@ -94,7 +94,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
                 type="button"
                 className={`ws-edit-swatch ${ws.color === c ? 'active' : ''}`}
                 style={{ background: c }}
-                title="Set color"
+                title={t('workspace.edit.setColor')}
                 onClick={() => setWorkspaceColor(ws.id, c)}
               />
             ))}
@@ -102,12 +102,12 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         </div>
 
         <div className="ws-edit-field">
-          <div className="modal-section-label">Base folder</div>
+          <div className="modal-section-label">{t('workspace.edit.baseFolder')}</div>
           <div className="ws-edit-folder">
             <code className="ws-edit-folder-path" title={ws.cwd}>{ws.cwd}</code>
             <button type="button" className="ws-edit-folder-btn" onClick={() => void chooseFolder()}>
               <Icon name="folder" size={15} />
-              Change
+              {t('common.change')}
             </button>
           </div>
         </div>
@@ -118,12 +118,12 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
             checked={ws.tasksEnabled ?? false}
             onChange={(e) => setTasksEnabled(ws.id, e.target.checked)}
           />
-          Enable tasks
+          {t('workspace.edit.enableTasks')}
         </label>
 
         <div className="ws-edit-actions">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={commit}>Done</button>
+          <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+          <button type="button" className="btn-primary" onClick={commit}>{t('common.done')}</button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import type { WorkspaceNavigationPlacement } from '../../shared/types';
@@ -13,6 +14,7 @@ interface WorkspaceNavigationProps {
 }
 
 export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): React.JSX.Element {
+  const { t } = useTranslation();
   const workspaces = useStore((s) => s.workspaces);
   const activeId = useStore((s) => s.activeWorkspaceId);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
@@ -35,7 +37,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
   return (
     <div className={rootClass}>
-      {!top && <div className="sidebar-header"><span>WORKSPACES</span></div>}
+      {!top && <div className="sidebar-header"><span>{t('workspace.sectionTitle')}</span></div>}
       {workspaces.map((w) => {
         const paneIds = collectPaneIds(w.layout);
         const count = paneIds.length;
@@ -56,16 +58,16 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
               <span className="ws-actions">
                 <span
                   className="rename"
-                  title="Edit workspace"
+                  title={t('tooltip.editWorkspace')}
                   onClick={(e) => { e.stopPropagation(); setEditingId(w.id); }}
                 ><Icon name="edit" size={14} /></span>
                 <span
                   className="del"
-                  title="Delete workspace"
+                  title={t('tooltip.deleteWorkspace')}
                   onClick={(e) => { e.stopPropagation(); setPendingDeleteId(w.id); }}
                 ><Icon name="close" size={14} /></span>
               </span>
-              {doneCount > 0 && <span className="done-badge" title="Terminals ready">{doneCount}</span>}
+              {doneCount > 0 && <span className="done-badge" title={t('tooltip.terminalsReady')}>{doneCount}</span>}
               <span className="badge">{count}</span>
             </span>
           </div>
@@ -73,15 +75,15 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
       })}
       <div
         className={top ? 'add-workspace-tab' : 'add-ws'}
-        title={top ? 'Add workspace' : undefined}
+        title={top ? t('tooltip.addWorkspace') : undefined}
         onClick={addWorkspace}
       >
-        {top ? '+' : '+ Workspace'}
+        {top ? '+' : t('workspace.addWorkspace')}
       </div>
 
       {!top && (
         <div className="sidebar-footer">
-          <button type="button" className="app-version" title="Was ist neu – Changelog anzeigen"
+          <button type="button" className="app-version" title={t('tooltip.whatsNewChangelog')}
                   onClick={() => setShowChangelog(true)}>v{__APP_VERSION__}</button>
         </div>
       )}
@@ -95,7 +97,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
       {showChangelog && (
         <ChangelogModal
-          title="Was ist neu"
+          title={t('changelog.whatsNew')}
           versions={changelogVersions}
           highlightVersion={__APP_VERSION__}
           onClose={() => setShowChangelog(false)}
@@ -104,8 +106,8 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
       {pendingWs && (
         <ConfirmDialog
-          title="Close workspace?"
-          message={`“${pendingWs.name}” will be closed. Any running terminals will be terminated.`}
+          title={t('workspace.deleteTitle')}
+          message={t('workspace.deleteMessage', { name: pendingWs.name })}
           onConfirm={() => { deleteWorkspace(pendingWs.id); setPendingDeleteId(null); }}
           onCancel={() => setPendingDeleteId(null)}
         />
