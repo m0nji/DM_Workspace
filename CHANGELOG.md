@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an DM Workspace. Neueste Version zuerst.
 
+## 0.8.1 – 2026-06-14
+- feat: Im Datei-Browser springt ein neuer „nach oben"-Knopf eine Ordnerebene höher
+- feat: Dateien und Ordner lassen sich jetzt per Rechtsklick löschen – sie wandern in den Papierkorb (wiederherstellbar), mit Sicherheitsabfrage vorab
+- feat: Der Workspace-Editor (Name, Farbe, Basisordner, Tasks) öffnet jetzt als zentriertes Fenster statt im engen Seitenleisten-Panel; Doppelklick oder das Stift-Symbol öffnet ihn, Escape/Klick daneben schließt
+- fix: Beim Wechsel in einen anderen Workspace zeigt der Datei-Browser jetzt den Ordner des aktiven Workspaces an, statt am Pfad des vorherigen Workspaces zu hängen
+- refactor: Emoji-Symbole durch einheitliche, flache SVG-Icons ersetzt (passend zum übrigen Erscheinungsbild)
+
 ## 0.8.0 – 2026-06-14
 - feat: Neuer Datei-Browser als Tab im rechten Panel – durch die Ordnerstruktur navigieren und Dateien ansehen, mit Dateityp-Symbolen und einer anklickbaren Pfadleiste
 - feat: Textdateien lassen sich direkt im Panel bearbeiten und speichern (Speichern-Knopf oder Cmd/Strg+S); neue Dateien legt der „+"-Knopf an
