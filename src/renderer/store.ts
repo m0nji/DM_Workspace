@@ -83,7 +83,7 @@ interface StoreState extends AppState {
     source: PreviewSource | null;
     tab: 'files' | 'preview';
     browseRoot: string | null; // current folder shown in the Files tab
-    editPath: string | null;   // file open in the inline editor (Vorschau tab)
+    editPath: string | null;   // file open in the inline editor (preview tab)
   };
   openPreview: (source: PreviewSource) => void;
   closePreview: () => void;
@@ -448,11 +448,11 @@ export const useStore = create<StoreState>((set, get) => ({
   openFiles: () => set((s) => {
     const cwd = s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.cwd ?? '~';
     const browseRoot = s.previewPanel.browseRoot ?? cwd;
-    return { previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot } };
+    return { previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot, editPath: null } };
   }),
   setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
   setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null } })),
-  openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path } })),
+  openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, source: null } })),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };

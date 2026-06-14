@@ -34,12 +34,20 @@ describe('file browser store', () => {
     expect(p.editPath).toBe(null);
   });
 
-  it('openInEditor switches to the Vorschau tab with the edit path', () => {
+  it('openInEditor switches to the preview tab, sets editPath, and clears source', () => {
+    useStore.setState({ previewPanel: { ...blankPanel, source: { kind: 'web', target: 'https://x.com', resolved: true } } });
     useStore.getState().openInEditor('/tmp/proj/readme.md');
     const p = useStore.getState().previewPanel;
     expect(p.tab).toBe('preview');
     expect(p.editPath).toBe('/tmp/proj/readme.md');
     expect(p.open).toBe(true);
+    expect(p.source).toBe(null);
+  });
+
+  it('openFiles clears any open editor', () => {
+    useStore.setState({ previewPanel: { ...blankPanel, editPath: '/x/a.txt' } });
+    useStore.getState().openFiles();
+    expect(useStore.getState().previewPanel.editPath).toBe(null);
   });
 
   it('setPanelTab back to files leaves editPath intact for return', () => {
