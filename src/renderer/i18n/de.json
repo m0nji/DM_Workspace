@@ -131,6 +131,45 @@
     "whatsNew": "Was ist neu",
     "kindFeat": "Feature",
     "kindFix": "Fix",
-    "kindOther": "Änderung"
+    "kindOther": "Änderung",
+    "current": "aktuell",
+    "noChanges": "Keine Änderungen gefunden."
+  },
+  "dialog": {
+    "startup": {
+      "title": "Startbefehle ausführen?",
+      "body": "führt diese Befehle in seinen Bereichen aus. Prüfe sie, bevor du fortfährst.",
+      "skip": "Ohne Befehle erstellen",
+      "run": "Erstellen und ausführen"
+    }
+  },
+  "template": {
+    "saveTitle": "Als Vorlage speichern",
+    "saveWorkspaceTitle": "Workspace als Vorlage speichern",
+    "editTitle": "Vorlage bearbeiten",
+    "openLayoutFirst": "Öffne zuerst ein Layout – vom Willkommensbildschirm gibt es nichts zu erfassen.",
+    "ok": "OK",
+    "stepNameFolder": "Name & Ordner",
+    "stepPanes": "Bereiche",
+    "stepReview": "Überprüfen",
+    "defaultName": "{{name}}-Vorlage",
+    "nameLabel": "Vorlagenname",
+    "namePlaceholder": "z. B. Frontend Dev",
+    "workingDirectory": "Arbeitsverzeichnis",
+    "choose": "Auswählen…",
+    "capturedLayout": "Erfasstes Layout",
+    "paneCount_one": "{{count}} Bereich",
+    "paneCount_other": "{{count}} Bereiche",
+    "pane": "Bereich {{index}}",
+    "paneTitlePlaceholder": "Bereichstitel (optional)",
+    "startupCommandPlaceholder": "Startbefehl (optional)",
+    "reviewName": "Name",
+    "reviewFolder": "Ordner",
+    "reviewPanes": "Bereiche",
+    "untitled": "ohne Titel",
+    "confirmStartupToggle": "Vor dem Ausführen von Startbefehlen fragen, wenn aus dieser Vorlage erstellt wird",
+    "next": "Weiter",
+    "saveChanges": "Änderungen speichern",
+    "saveTemplate": "Vorlage speichern"
   }
 }

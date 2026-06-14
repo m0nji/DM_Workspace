@@ -131,6 +131,45 @@
     "whatsNew": "What's new",
     "kindFeat": "Feature",
     "kindFix": "Fix",
-    "kindOther": "Change"
+    "kindOther": "Change",
+    "current": "current",
+    "noChanges": "No changes found."
+  },
+  "dialog": {
+    "startup": {
+      "title": "Run startup commands?",
+      "body": "will run these commands in its panes. Review them before continuing.",
+      "skip": "Create without commands",
+      "run": "Create and run"
+    }
+  },
+  "template": {
+    "saveTitle": "Save as template",
+    "saveWorkspaceTitle": "Save workspace as template",
+    "editTitle": "Edit template",
+    "openLayoutFirst": "Open a layout first — there's nothing to capture from the welcome screen.",
+    "ok": "OK",
+    "stepNameFolder": "Name & folder",
+    "stepPanes": "Panes",
+    "stepReview": "Review",
+    "defaultName": "{{name}} template",
+    "nameLabel": "Template name",
+    "namePlaceholder": "e.g. Frontend Dev",
+    "workingDirectory": "Working directory",
+    "choose": "Choose…",
+    "capturedLayout": "Captured layout",
+    "paneCount_one": "{{count}} pane",
+    "paneCount_other": "{{count}} panes",
+    "pane": "Pane {{index}}",
+    "paneTitlePlaceholder": "Pane title (optional)",
+    "startupCommandPlaceholder": "Startup command (optional)",
+    "reviewName": "Name",
+    "reviewFolder": "Folder",
+    "reviewPanes": "Panes",
+    "untitled": "untitled",
+    "confirmStartupToggle": "Ask before running startup commands when creating from this template",
+    "next": "Next",
+    "saveChanges": "Save changes",
+    "saveTemplate": "Save template"
   }
 }

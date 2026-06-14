@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { Icon } from './Icon';
 
@@ -6,6 +7,7 @@ import { Icon } from './Icon';
 // commands (when the template asks for confirmation). Lets the user run the
 // commands, skip them, or cancel entirely.
 export function StartupCommandConfirmDialog(): React.JSX.Element | null {
+  const { t } = useTranslation();
   const pending = useStore((s) => s.pendingTemplateLaunch);
   const setPending = useStore((s) => s.setPendingTemplateLaunch);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
@@ -21,7 +23,7 @@ export function StartupCommandConfirmDialog(): React.JSX.Element | null {
   }, [pending, setPending]);
 
   if (!pending) return null;
-  const tpl = templates.find((t) => t.id === pending.templateId);
+  const tpl = templates.find((item) => item.id === pending.templateId);
   if (!tpl) return null;
 
   const commands = tpl.startupCommands ?? {};
@@ -34,11 +36,11 @@ export function StartupCommandConfirmDialog(): React.JSX.Element | null {
     <div className="modal-backdrop" onMouseDown={close}>
       <div className="modal startup-confirm" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>Run startup commands?</span>
-          <button className="modal-close" title="Close" onClick={close}><Icon name="close" size={16} /></button>
+          <span>{t('dialog.startup.title')}</span>
+          <button className="modal-close" title={t('common.close')} onClick={close}><Icon name="close" size={16} /></button>
         </div>
         <p className="modal-hint" style={{ marginTop: 0 }}>
-          <strong>{tpl.name}</strong> will run these commands in its panes. Review them before continuing.
+          <strong>{tpl.name}</strong> {t('dialog.startup.body')}
         </p>
         <div className="startup-cmd-list">
           {entries.map(([paneId, cmd]) => (
@@ -49,9 +51,9 @@ export function StartupCommandConfirmDialog(): React.JSX.Element | null {
           ))}
         </div>
         <div className="confirm-actions">
-          <button className="confirm-btn" onClick={close}>Cancel</button>
-          <button className="confirm-btn" onClick={createWithout}>Create without commands</button>
-          <button className="confirm-btn primary" onClick={createWith} autoFocus>Create and run</button>
+          <button className="confirm-btn" onClick={close}>{t('common.cancel')}</button>
+          <button className="confirm-btn" onClick={createWithout}>{t('dialog.startup.skip')}</button>
+          <button className="confirm-btn primary" onClick={createWith} autoFocus>{t('dialog.startup.run')}</button>
         </div>
       </div>
     </div>

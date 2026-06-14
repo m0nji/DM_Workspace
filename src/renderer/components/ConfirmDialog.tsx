@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogProps {
   title: string;
@@ -17,11 +18,14 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Close',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const confirmText = confirmLabel ?? t('common.close');
+  const cancelText = cancelLabel ?? t('common.cancel');
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export function ConfirmDialog({
         <p className="confirm-message">{message}</p>
         <div className="confirm-actions">
           <button type="button" className="confirm-btn" onClick={onCancel}>
-            {cancelLabel}
+            {cancelText}
           </button>
           <button
             type="button"
@@ -49,7 +53,7 @@ export function ConfirmDialog({
             className="confirm-btn confirm-btn-danger"
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmText}
           </button>
         </div>
       </div>
