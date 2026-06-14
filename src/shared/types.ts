@@ -60,6 +60,7 @@ export interface Settings {
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
   shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts
+  locale?: 'en' | 'de';        // UI language; unset => detect from OS, fallback 'en'
 }
 
 export interface WindowBounds {

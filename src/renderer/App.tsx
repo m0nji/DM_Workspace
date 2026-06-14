@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from './store';
+import i18n, { resolveLocale } from './i18n';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { WorkspaceView } from './components/WorkspaceView';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -27,9 +28,16 @@ export function App(): React.JSX.Element {
   // case where you switch to a non-task workspace while the board is open.
   const showBoard = taskView && tasksEnabled;
 
+  const locale = useStore((s) => s.settings.locale);
+
   useKeyboardShortcuts();
 
   useEffect(() => { void hydrate(); }, [hydrate]);
+
+  useEffect(() => {
+    const target = resolveLocale(locale);
+    if (i18n.language !== target) void i18n.changeLanguage(target);
+  }, [locale]);
 
   // Subscribe to update events and check for updates on startup.
   useEffect(() => {

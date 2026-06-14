@@ -1,0 +1,58 @@
+{
+  "common": {
+    "close": "Schließen",
+    "cancel": "Abbrechen",
+    "done": "Fertig",
+    "save": "Speichern",
+    "change": "Ändern",
+    "delete": "Löschen",
+    "back": "Zurück",
+    "forward": "Vor",
+    "reload": "Neu laden",
+    "later": "Später",
+    "optional": "optional"
+  },
+  "workspace": {
+    "sectionTitle": "WORKSPACES",
+    "addWorkspace": "+ Workspace",
+    "edit": {
+      "title": "Workspace bearbeiten",
+      "name": "Name",
+      "color": "Farbe",
+      "setColor": "Farbe festlegen",
+      "baseFolder": "Basis-Ordner",
+      "enableTasks": "Tasks aktivieren"
+    },
+    "folderRestartConfirm": "Diesen Workspace im neuen Ordner neu starten? Die laufenden Terminals werden beendet.",
+    "deleteTitle": "Workspace schließen?",
+    "deleteMessage": "„{{name}}“ wird geschlossen. Laufende Terminals werden beendet."
+  },
+  "tooltip": {
+    "editWorkspace": "Workspace bearbeiten",
+    "deleteWorkspace": "Workspace löschen",
+    "terminalsReady": "Terminals bereit",
+    "addWorkspace": "Workspace hinzufügen",
+    "whatsNewChangelog": "Was ist neu – Changelog anzeigen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "nav": {
+      "appearance": "Darstellung",
+      "shortcuts": "Tastenkürzel",
+      "templates": "Vorlagen",
+      "notifications": "Benachrichtigungen",
+      "updates": "Updates"
+    },
+    "language": {
+      "label": "Sprache",
+      "en": "English",
+      "de": "Deutsch"
+    }
+  },
+  "changelog": {
+    "whatsNew": "Was ist neu",
+    "kindFeat": "Feature",
+    "kindFix": "Fix",
+    "kindOther": "Änderung"
+  }
+}
