@@ -77,11 +77,22 @@ interface StoreState extends AppState {
   templateWizard: TemplateWizardState;
   pendingTemplateLaunch: { templateId: string; workspaceId?: string } | null;
   shortcutRecordingAction: ShortcutAction | null; // set while the editor captures a key; gates global shortcuts
-  previewPanel: { open: boolean; widthPx: number; source: PreviewSource | null };
+  previewPanel: {
+    open: boolean;
+    widthPx: number;
+    source: PreviewSource | null;
+    tab: 'files' | 'preview';
+    browseRoot: string | null; // current folder shown in the Files tab
+    editPath: string | null;   // file open in the inline editor (Vorschau tab)
+  };
   openPreview: (source: PreviewSource) => void;
   closePreview: () => void;
   togglePreview: () => void;
   setPreviewWidth: (px: number) => void;
+  openFiles: () => void;
+  setPanelTab: (tab: 'files' | 'preview') => void;
+  setBrowseRoot: (path: string) => void;
+  openInEditor: (path: string) => void;
   // lifecycle
   hydrate: () => Promise<void>;
   // workspaces
@@ -179,7 +190,7 @@ export const useStore = create<StoreState>((set, get) => ({
   pendingTemplateLaunch: null,
   shortcutRecordingAction: null,
   update: { status: 'idle' },
-  previewPanel: { open: false, widthPx: 480, source: null },
+  previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null },
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -426,12 +437,22 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  openPreview: (source) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, source } })),
+  openPreview: (source) => set((s) => ({
+    previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: null, source }
+  })),
   closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),
   togglePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: !s.previewPanel.open } })),
   setPreviewWidth: (px) => set((s) => ({
     previewPanel: { ...s.previewPanel, widthPx: Math.min(1200, Math.max(240, px)) }
   })),
+  openFiles: () => set((s) => {
+    const cwd = s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.cwd ?? '~';
+    const browseRoot = s.previewPanel.browseRoot ?? cwd;
+    return { previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot } };
+  }),
+  setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
+  setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null } })),
+  openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path } })),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
