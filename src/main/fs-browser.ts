@@ -1,17 +1,10 @@
 import { readdirSync, statSync, readFileSync, writeFileSync, renameSync, openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { expandTilde } from './resolve-cwd';
+import type { DirEntry } from '../shared/types';
 
 // 2 MB cap for inline editing — past this we refuse to load into a <textarea>.
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024;
-
-export interface DirEntry {
-  name: string;
-  path: string;   // absolute path (node join, correct per-OS separator)
-  isDir: boolean;
-  size: number;
-  mtimeMs: number;
-}
 
 export type FsBrowserCode = 'binary' | 'too-large' | 'exists' | 'invalid-name';
 

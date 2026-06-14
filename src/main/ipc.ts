@@ -207,8 +207,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     return readPreviewFile(path);
   });
 
-  // File browser. readDir errors (ENOENT/EACCES) propagate to the renderer as a
-  // rejected promise (shown as an inline error row). read/create surface their
+  // File browser. Unlike file:read (whose paths come from terminal output and are
+  // therefore extension-restricted), these paths come from user-driven UI
+  // navigation, so arbitrary paths are intentional here; size/binary guards live
+  // in fs-browser.ts. readDir errors (ENOENT/EACCES) propagate to the renderer as
+  // a rejected promise (shown as an inline error row). read/create surface their
   // expected FsBrowserError codes as a discriminated result so the UI can react
   // (binary/too-large => read-only; exists/invalid-name => inline message).
   ipcMain.handle('fs:readdir', (_e, path: string) => readDir(path));
