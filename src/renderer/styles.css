@@ -753,3 +753,45 @@ input[type="checkbox"]:checked::after {
 .view-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; margin-right: 8px; -webkit-app-region: no-drag; }
 .view-toggle-btn { background: transparent; border: none; color: var(--muted); padding: 3px 10px; font-size: 12px; cursor: pointer; }
 .view-toggle-btn.active { background: var(--accent); color: #fff; }
+
+/* File browser ------------------------------------------------------------ */
+.preview-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 8px; background: var(--chrome-bg, #252526); border-bottom: 1px solid var(--chrome-border, #333); }
+.preview-tab-btn { padding: 3px 10px; border-radius: 5px; font-size: 11px; background: transparent; color: #8a8a8a; border: none; cursor: pointer; }
+.preview-tab-btn.on { background: #0d3a5c; color: #cfe7fb; }
+.preview-tabs-spacer { margin-left: auto; }
+
+.files-tab { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.files-crumb { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 5px 10px; font-size: 11px; background: #1b1b1b; border-bottom: 1px solid #2c2c2c; }
+.files-crumb-seg { background: none; border: none; color: #9bb; font-size: 11px; cursor: pointer; padding: 0 1px; }
+.files-crumb-seg:hover { color: #cfe7fb; text-decoration: underline; }
+.files-crumb-sep { color: #556; }
+
+.files-newrow { display: flex; align-items: center; gap: 6px; padding: 3px 10px; }
+.files-newinput { flex: 1; background: #111; border: 1px solid #3a6ea5; border-radius: 4px; color: #eee; font-size: 12px; padding: 2px 6px; }
+.files-newerror { color: #e06c6c; font-size: 10px; }
+
+.ftree { overflow: auto; flex: 1; padding: 2px 0; }
+.ftree-empty, .ftree-error { padding: 10px; color: #888; font-size: 12px; }
+.ftree-error { color: #e06c6c; }
+.ftree-row { display: flex; align-items: center; gap: 7px; padding: 2px 8px; line-height: 1.55; font-size: 12.5px; color: #cfcfcf; cursor: default; white-space: nowrap; }
+.ftree-row:hover { background: #2a2d2e; }
+.ftree-row.sel { background: #094771; }
+.ftree-row:focus { outline: 1px solid #3a6ea5; outline-offset: -1px; }
+.ftree-chev { width: 12px; display: inline-flex; color: #777; }
+.ftree-ic { display: inline-flex; }
+.ftree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.ftree-meta { color: #666; font-size: 10px; }
+.ft-dir { color: #d9b873; }
+.ft-code { color: #6fa8d6; }
+.ft-doc { color: #79c98c; }
+.ft-cfg { color: #cdb05f; }
+
+.feditor { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.feditor-chrome { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #2c2c2c; }
+.feditor-name { flex: 1; font-size: 12px; color: #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feditor-dirty { color: #e0b34a; margin-left: 6px; }
+.feditor-save:disabled { opacity: 0.35; cursor: default; }
+.feditor-body { flex: 1; min-height: 0; overflow: auto; }
+.feditor-textarea { width: 100%; height: 100%; box-sizing: border-box; resize: none; border: none; outline: none; background: #1b1b1b; color: #e6e6e6; font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; line-height: 1.5; padding: 8px 10px; }
+.feditor-notice { padding: 16px; color: #999; font-size: 12px; }
+.feditor-saveerror { padding: 4px 10px; color: #e06c6c; font-size: 11px; }

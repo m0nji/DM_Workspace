@@ -1,66 +1,31 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useStore } from '../store';
-import { renderMarkdown } from '../markdown';
-import { resolveSource, fileTarget } from '../../shared/link-detect';
-import { escapeHtml } from '../../shared/html';
+import { breadcrumbSegments } from '../../shared/fs-path';
 import { Icon } from './Icon';
-
-// Minimal typing for the Electron <webview> element methods we call.
-interface WebviewEl extends HTMLElement {
-  src: string;
-  canGoBack(): boolean;
-  canGoForward(): boolean;
-  goBack(): void;
-  goForward(): void;
-  reload(): void;
-  getURL(): string;
-}
+import { FileTree } from './FileTree';
+import { FileEditor } from './FileEditor';
+import { PreviewBody } from './PreviewBody';
 
 export function PreviewPanel(): React.JSX.Element | null {
   const panel = useStore((s) => s.previewPanel);
   const closePreview = useStore((s) => s.closePreview);
   const setPreviewWidth = useStore((s) => s.setPreviewWidth);
-  const openPreview = useStore((s) => s.openPreview);
+  const setPanelTab = useStore((s) => s.setPanelTab);
+  const setBrowseRoot = useStore((s) => s.setBrowseRoot);
+  const openInEditor = useStore((s) => s.openInEditor);
+  const activeCwd = useStore((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    return ws?.cwd ?? '~';
+  });
 
-  const webviewRef = useRef<WebviewEl | null>(null);
-  const [mdHtml, setMdHtml] = useState<string>('');
-  const [addr, setAddr] = useState<string>('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [newName, setNewName] = useState<string | null>(null); // non-null => the new-file input is showing
+  const [newError, setNewError] = useState<string | null>(null);
 
-  const source = panel.source;
-  const isMarkdown = source?.kind === 'markdown';
+  // Fall back to the active workspace's folder when no root has been chosen yet,
+  // so opening the panel (incl. via the keyboard shortcut) always has a folder.
+  const root = panel.browseRoot ?? activeCwd;
 
-  // Load + render markdown when the source changes (skip unresolved sources).
-  useEffect(() => {
-    if (!panel.open || !source || source.kind !== 'markdown' || !source.resolved) return;
-    let cancelled = false;
-    setAddr(source.target);
-    window.api
-      .readFile(source.target)
-      .then((text) => { if (!cancelled) setMdHtml(renderMarkdown(text)); })
-      .catch((err) => { if (!cancelled) setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`); });
-    return () => { cancelled = true; };
-  }, [panel.open, source]);
-
-  // Keep the address field populated for unresolved sources so it can be edited.
-  useEffect(() => {
-    if (source && !source.resolved) setAddr(source.target);
-  }, [source]);
-
-  // Reflect webview navigation into the address field.
-  useEffect(() => {
-    if (isMarkdown) return;
-    const wv = webviewRef.current;
-    if (!wv) return;
-    const onNav = (): void => setAddr(wv.getURL());
-    wv.addEventListener('did-navigate', onNav as EventListener);
-    wv.addEventListener('did-navigate-in-page', onNav as EventListener);
-    return () => {
-      wv.removeEventListener('did-navigate', onNav as EventListener);
-      wv.removeEventListener('did-navigate-in-page', onNav as EventListener);
-    };
-  }, [isMarkdown, panel.open, source]);
-
-  // Drag the left edge to resize. Width = distance from the cursor to the window's right edge.
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const onMove = (ev: MouseEvent): void => setPreviewWidth(window.innerWidth - ev.clientX);
@@ -72,82 +37,81 @@ export function PreviewPanel(): React.JSX.Element | null {
     window.addEventListener('mouseup', onUp);
   }, [setPreviewWidth]);
 
-  const reload = useCallback(() => {
-    if (isMarkdown) {
-      if (source?.resolved) window.api.readFile(source.target).then((t) => setMdHtml(renderMarkdown(t))).catch((err) => {
-        setMdHtml(`<p class="preview-error">Datei konnte nicht geladen werden: ${escapeHtml(String(err))}</p>`);
-      });
-    } else {
-      webviewRef.current?.reload();
-    }
-  }, [isMarkdown, source]);
-
-  // Enter in the address bar: treat the typed value as an absolute path / url and open it.
-  // Relative input is ignored — the panel has no cwd to resolve it against.
-  const submitAddr = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter') return;
-    const v = addr.trim();
-    if (!v || (!v.startsWith('/') && !/^https?:\/\//i.test(v) && !/^[A-Za-z]:[\\/]/.test(v))) return;
-    const s = resolveSource(v, '/');
-    if (s) openPreview(s);
-  }, [addr, openPreview]);
-
-  // Pick a folder and re-resolve the original relative path against it.
-  const pickAndResolve = useCallback(async () => {
-    const snap = source;
-    if (!snap?.rel) return;
-    const rel = snap.rel;
+  const pickRoot = useCallback(async () => {
     const dir = await window.api.pickDirectory();
-    if (!dir) return;
-    const base = dir.replace(/\/+$/, '');
-    const abs = await window.api.resolveLink(rel, base, []);
-    if (abs) {
-      openPreview({ ...snap, target: fileTarget(snap.kind, abs), resolved: true });
+    if (dir) setBrowseRoot(dir);
+  }, [setBrowseRoot]);
+
+  const submitNewFile = useCallback(async () => {
+    if (newName === null) return;
+    const name = newName.trim();
+    if (!name) { setNewName(null); return; }
+    const res = await window.api.createFile(root, name);
+    if (res.ok) {
+      setNewName(null);
+      setNewError(null);
+      setRefreshKey((k) => k + 1);
+      openInEditor(res.path);
     } else {
-      openPreview({ ...snap, target: fileTarget(snap.kind, `${base}/${rel}`), resolved: false });
+      setNewError(res.code === 'exists' ? 'Existiert bereits' : 'Ungültiger Name');
     }
-  }, [source, openPreview]);
+  }, [root, newName, openInEditor]);
 
   if (!panel.open) return null;
 
-  const notFound = !!source && !source.resolved;
+  const crumbs = breadcrumbSegments(root);
 
   return (
     <div className="preview-panel" style={{ width: panel.widthPx }}>
       <div className="preview-resize" onMouseDown={onDragStart} />
-      <div className="preview-chrome">
-        {!isMarkdown && !notFound && (
+
+      <div className="preview-tabs">
+        <button type="button" className={`preview-tab-btn${panel.tab === 'files' ? ' on' : ''}`} onClick={() => setPanelTab('files')}>Files</button>
+        <button type="button" className={`preview-tab-btn${panel.tab === 'preview' ? ' on' : ''}`} onClick={() => setPanelTab('preview')}>Vorschau</button>
+        <span className="preview-tabs-spacer" />
+        {panel.tab === 'files' && (
           <>
-            <button type="button" className="icon-btn" title="Zurück" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
-            <button type="button" className="icon-btn" title="Vor" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
+            <button type="button" className="icon-btn" title="Neue Datei" aria-label="Neue Datei" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
+            <button type="button" className="icon-btn" title="Aktualisieren" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
+            <button type="button" className="icon-btn" title="Ordner wählen" aria-label="Ordner wählen" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" title="Neu laden" onClick={reload}><Icon name="reload" /></button>
-        <input
-          className="preview-addr"
-          value={addr}
-          onChange={(e) => setAddr(e.target.value)}
-          onKeyDown={submitAddr}
-          readOnly={!notFound}
-          aria-label="Vorschau-Adresse"
-          title={addr}
-        />
-        {notFound && <button type="button" className="icon-btn" aria-label="Ordner wählen" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
         <button type="button" className="icon-btn" title="Schließen" onClick={closePreview}><Icon name="close" /></button>
       </div>
-      <div className="preview-body">
-        {!source ? (
-          <div className="preview-empty">Keine Vorschau</div>
-        ) : notFound ? (
-          <div className="preview-notfound">
-            Datei nicht gefunden — Pfad in der Adresszeile korrigieren oder mit 📁 den richtigen Ordner wählen.
+
+      {panel.tab === 'files' ? (
+        <div className="files-tab">
+          <div className="files-crumb">
+            {crumbs.map((c, i) => (
+              <React.Fragment key={c.path}>
+                {i > 0 && <span className="files-crumb-sep">/</span>}
+                <button type="button" className="files-crumb-seg" onClick={() => setBrowseRoot(c.path)}>{c.label}</button>
+              </React.Fragment>
+            ))}
           </div>
-        ) : isMarkdown ? (
-          <div className="markdown-body" dangerouslySetInnerHTML={{ __html: mdHtml }} />
-        ) : (
-          <webview ref={webviewRef as React.Ref<WebviewEl>} src={source.target} className="preview-webview" />
-        )}
-      </div>
+          {newName !== null && (
+            <div className="files-newrow">
+              <Icon name="file-text" size={16} />
+              <input
+                className="files-newinput"
+                autoFocus
+                value={newName}
+                placeholder="Dateiname…"
+                onChange={(e) => { setNewName(e.target.value); setNewError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); void submitNewFile(); }
+                  if (e.key === 'Escape') { setNewName(null); setNewError(null); }
+                }}
+                aria-label="Neuer Dateiname"
+              />
+              {newError && <span className="files-newerror">{newError}</span>}
+            </div>
+          )}
+          <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} />
+        </div>
+      ) : (
+        panel.editPath ? <FileEditor path={panel.editPath} /> : <PreviewBody />
+      )}
     </div>
   );
 }
