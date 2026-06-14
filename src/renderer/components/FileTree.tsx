@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, IconName } from './Icon';
+import { ContextMenu, MenuItem } from './ContextMenu';
+import { isMarkdownFile } from '../markdown';
 import type { DirEntry } from '../../shared/types';
 
 // Map a filename to a flat icon + a tint class. Config patterns win over the
@@ -30,9 +32,10 @@ interface NodeProps {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onOpenFile: (path: string) => void;
+  onContext: (e: React.MouseEvent, entry: DirEntry) => void;
 }
 
-function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile }: NodeProps): React.JSX.Element {
+function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +78,7 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile }: NodeProp
         onDragStart={(e) => setDragPayload(e, entry.path)}
         onClick={onClick}
         onDoubleClick={onDouble}
+        onContextMenu={(e) => { e.preventDefault(); onSelect(entry.path); onContext(e, entry); }}
         onKeyDown={onKeyDown}
         tabIndex={0}
         role="treeitem"
@@ -94,7 +98,7 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile }: NodeProp
           : children === null
             ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Lädt …</div>
             : children.map((c) => (
-                <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} />
+                <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
               ))
       )}
     </>
@@ -105,12 +109,14 @@ interface FileTreeProps {
   root: string;
   refreshKey: number;       // bump to force a reload of the root
   onOpenFile: (path: string) => void;
+  onPreviewFile?: (path: string) => void; // rendered preview (offered for markdown)
 }
 
-export function FileTree({ root, refreshKey, onOpenFile }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile }: FileTreeProps): React.JSX.Element {
   const [entries, setEntries] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; entry: DirEntry } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,15 +129,31 @@ export function FileTree({ root, refreshKey, onOpenFile }: FileTreeProps): React
     return () => { cancelled = true; };
   }, [root, refreshKey]);
 
+  // Right-click a file for a Preview/Edit choice (folders have no menu).
+  const onContext = useCallback((e: React.MouseEvent, entry: DirEntry) => {
+    if (entry.isDir) return; // no menu for folders (yet); native menu already suppressed
+    setMenu({ x: e.clientX, y: e.clientY, entry });
+  }, []);
+
   if (error) return <div className="ftree-error">Ordner konnte nicht gelesen werden.</div>;
   if (entries === null) return <div className="ftree-empty">Lädt …</div>;
   if (entries.length === 0) return <div className="ftree-empty">Leerer Ordner</div>;
 
+  const menuItems: MenuItem[] = menu
+    ? [
+        ...(onPreviewFile && isMarkdownFile(menu.entry.name)
+          ? [{ label: 'Vorschau', onClick: () => onPreviewFile(menu.entry.path) }]
+          : []),
+        { label: 'Bearbeiten', onClick: () => onOpenFile(menu.entry.path) }
+      ]
+    : [];
+
   return (
     <div className="ftree" role="tree">
       {entries.map((e) => (
-        <TreeNode key={e.path} entry={e} depth={0} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} />
+        <TreeNode key={e.path} entry={e} depth={0} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} onContext={onContext} />
       ))}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>
   );
 }

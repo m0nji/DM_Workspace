@@ -93,11 +93,11 @@ export function PreviewBody(): React.JSX.Element {
       <div className="preview-chrome">
         {!isMarkdown && !notFound && (
           <>
-            <button type="button" className="icon-btn" title="Zurück" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
-            <button type="button" className="icon-btn" title="Vor" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
+            <button type="button" className="icon-btn" aria-label="Zurück" onClick={() => webviewRef.current?.goBack()}><Icon name="back" /></button>
+            <button type="button" className="icon-btn" aria-label="Vor" onClick={() => webviewRef.current?.goForward()}><Icon name="forward" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" title="Neu laden" onClick={reload}><Icon name="reload" /></button>
+        <button type="button" className="icon-btn" aria-label="Neu laden" onClick={reload}><Icon name="reload" /></button>
         <input
           className="preview-addr"
           value={addr}
@@ -107,7 +107,7 @@ export function PreviewBody(): React.JSX.Element {
           aria-label="Vorschau-Adresse"
           title={addr}
         />
-        {notFound && <button type="button" className="icon-btn" aria-label="Ordner wählen" title="Ordner wählen" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
+        {notFound && <button type="button" className="icon-btn" aria-label="Ordner wählen" onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
       </div>
       <div className="preview-body">
         {!source ? (

@@ -13,6 +13,7 @@ export function PreviewPanel(): React.JSX.Element | null {
   const setPanelTab = useStore((s) => s.setPanelTab);
   const setBrowseRoot = useStore((s) => s.setBrowseRoot);
   const openInEditor = useStore((s) => s.openInEditor);
+  const openPreview = useStore((s) => s.openPreview);
   const activeCwd = useStore((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
     return ws?.cwd ?? '~';
@@ -50,6 +51,11 @@ export function PreviewPanel(): React.JSX.Element | null {
     if (dir) setBrowseRoot(dir);
   }, [setBrowseRoot]);
 
+  // "Vorschau" from a file's context menu: render it read-only in the preview tab.
+  const onPreviewFile = useCallback((path: string) => {
+    openPreview({ kind: 'markdown', target: path, resolved: true });
+  }, [openPreview]);
+
   const submitNewFile = useCallback(async () => {
     if (newName === null) return;
     const name = newName.trim();
@@ -84,12 +90,12 @@ export function PreviewPanel(): React.JSX.Element | null {
         <span className="preview-tabs-spacer" />
         {tab === 'files' && (
           <>
-            <button type="button" className="icon-btn" title="Neue Datei" aria-label="Neue Datei" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
-            <button type="button" className="icon-btn" title="Aktualisieren" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
-            <button type="button" className="icon-btn" title="Ordner wählen" aria-label="Ordner wählen" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
+            <button type="button" className="icon-btn" aria-label="Neue Datei" onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
+            <button type="button" className="icon-btn" aria-label="Aktualisieren" onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
+            <button type="button" className="icon-btn" aria-label="Ordner wählen" onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>
           </>
         )}
-        <button type="button" className="icon-btn" title="Schließen" onClick={closePreview}><Icon name="close" /></button>
+        <button type="button" className="icon-btn" aria-label="Schließen" onClick={closePreview}><Icon name="close" /></button>
       </div>
 
       {/* Both tabs stay mounted; we toggle visibility so the webview keeps its
@@ -121,7 +127,7 @@ export function PreviewPanel(): React.JSX.Element | null {
             {newError && <span className="files-newerror">{newError}</span>}
           </div>
         )}
-        <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} />
+        <FileTree root={root} refreshKey={refreshKey} onOpenFile={openInEditor} onPreviewFile={onPreviewFile} />
       </div>
 
       <div className="preview-region" style={{ display: tab === 'preview' ? 'flex' : 'none' }}>

@@ -10,3 +10,8 @@ export function renderMarkdown(md: string): string {
     FORBID_ATTR: ['style']
   });
 }
+
+// Markdown file extensions we offer a rendered preview for.
+export function isMarkdownFile(name: string): boolean {
+  return /\.(md|markdown|mdx)$/i.test(name);
+}

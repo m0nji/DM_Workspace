@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { renderMarkdown } from '../markdown';
+import { renderMarkdown, isMarkdownFile } from '../markdown';
 import { basename } from '../../shared/fs-path';
 import { Icon } from './Icon';
 
 type LoadState = 'loading' | 'ok' | 'binary' | 'too-large' | 'error';
-
-const MD_RE = /\.(md|markdown|mdx)$/i;
 
 export function FileEditor({ path }: { path: string }): React.JSX.Element {
   const setPanelTab = useStore((s) => s.setPanelTab);
@@ -20,7 +18,7 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
   // after the user navigates to another file can't write back stale state.
   const pathRef = useRef(path);
 
-  const isMd = MD_RE.test(path);
+  const isMd = isMarkdownFile(path);
   const dirty = content !== saved;
 
   useEffect(() => {
@@ -72,18 +70,18 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
   return (
     <div className="feditor">
       <div className="feditor-chrome">
-        <button type="button" className="icon-btn" title="Zurück zu Files" onClick={() => setPanelTab('files')}>
+        <button type="button" className="icon-btn" aria-label="Zurück zu Files" onClick={() => setPanelTab('files')}>
           <Icon name="back" />
         </button>
         <span className="feditor-name" title={path}>
           {basename(path)}{dirty ? <span className="feditor-dirty" aria-label="ungespeichert">●</span> : null}
         </span>
         {isMd && state === 'ok' && (
-          <button type="button" className="icon-btn" title={mode === 'edit' ? 'Vorschau' : 'Bearbeiten'} onClick={() => setMode(mode === 'edit' ? 'render' : 'edit')}>
+          <button type="button" className="icon-btn" aria-label={mode === 'edit' ? 'Vorschau' : 'Bearbeiten'} onClick={() => setMode(mode === 'edit' ? 'render' : 'edit')}>
             <Icon name="preview" />
           </button>
         )}
-        <button type="button" className="icon-btn feditor-save" title="Speichern" disabled={!dirty} onClick={save}>
+        <button type="button" className="icon-btn feditor-save" aria-label="Speichern" disabled={!dirty} onClick={save}>
           <Icon name="save" />
         </button>
       </div>

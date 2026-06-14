@@ -1,12 +1,13 @@
 import { test, expect, _electron as electron } from '@playwright/test';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 test('file browser: set root, create a file, edit, save, verify on disk', async () => {
-  // A disposable workspace folder with one subdir to prove navigation works.
+  // A disposable workspace folder with one subdir and a markdown file.
   const work = mkdtempSync(join(tmpdir(), 'dmws-e2e-fb-'));
   mkdirSync(join(work, 'sub'));
+  writeFileSync(join(work, 'guide.md'), '# Guide\n\nHello from markdown', 'utf8');
 
   const app = await electron.launch({
     args: ['out/main/index.js'],
@@ -45,6 +46,16 @@ test('file browser: set root, create a file, edit, save, verify on disk', async 
 
     // The file really exists on disk with the typed content.
     await expect.poll(() => readFileSync(join(work, 'notes.txt'), 'utf8')).toBe('hello from e2e');
+
+    // Right-click the markdown file → context menu offers Vorschau + Bearbeiten.
+    await win.locator('.preview-tab-btn', { hasText: 'Files' }).click();
+    await win.locator('.ftree-row', { hasText: 'guide.md' }).click({ button: 'right' });
+    await expect(win.locator('.context-menu-item', { hasText: 'Vorschau' })).toBeVisible();
+    await expect(win.locator('.context-menu-item', { hasText: 'Bearbeiten' })).toBeVisible();
+
+    // Choosing Vorschau renders the markdown read-only in the preview tab.
+    await win.locator('.context-menu-item', { hasText: 'Vorschau' }).click();
+    await expect(win.locator('.markdown-body')).toContainText('Hello from markdown');
   } finally {
     await app.close();
     rmSync(work, { recursive: true, force: true });
