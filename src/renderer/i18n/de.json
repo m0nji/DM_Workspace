@@ -79,7 +79,18 @@
       "reset": "Zurücksetzen",
       "reservedForTerminal": "{{shortcut}} ist für das Terminal reserviert",
       "alreadyAssigned": "{{shortcut}} ist bereits einer anderen Aktion zugewiesen",
-      "hint": "⌘ auf macOS, Ctrl anderswo. Unter Windows/Linux ist ein einfaches Ctrl+Buchstabe reserviert, damit die Shell Ctrl+C/D/W behält."
+      "hint": "⌘ auf macOS, Ctrl anderswo. Unter Windows/Linux ist ein einfaches Ctrl+Buchstabe reserviert, damit die Shell Ctrl+C/D/W behält.",
+      "action": {
+        "commandPalette": "Befehlspalette",
+        "newWorkspace": "Neuer Workspace",
+        "closePane": "Fokussierten Bereich schließen",
+        "searchPane": "Fokussierten Bereich durchsuchen",
+        "splitHorizontal": "Links und rechts teilen",
+        "splitVertical": "Oben und unten teilen",
+        "toggleMaximize": "Fokussierten Bereich maximieren",
+        "openSettings": "Einstellungen öffnen",
+        "togglePreview": "Vorschau-Bereich umschalten"
+      }
     },
     "templates": {
       "title": "Workspace-Vorlagen",

@@ -79,7 +79,18 @@
       "reset": "Reset",
       "reservedForTerminal": "{{shortcut}} is reserved for the terminal",
       "alreadyAssigned": "{{shortcut}} is already assigned to another action",
-      "hint": "⌘ on macOS, Ctrl elsewhere. On Windows/Linux a plain Ctrl+letter is reserved so the shell keeps Ctrl+C/D/W."
+      "hint": "⌘ on macOS, Ctrl elsewhere. On Windows/Linux a plain Ctrl+letter is reserved so the shell keeps Ctrl+C/D/W.",
+      "action": {
+        "commandPalette": "Command palette",
+        "newWorkspace": "New workspace",
+        "closePane": "Close focused pane",
+        "searchPane": "Search focused pane",
+        "splitHorizontal": "Split left and right",
+        "splitVertical": "Split top and bottom",
+        "toggleMaximize": "Maximize focused pane",
+        "openSettings": "Open settings",
+        "togglePreview": "Toggle preview panel"
+      }
     },
     "templates": {
       "title": "Workspace templates",

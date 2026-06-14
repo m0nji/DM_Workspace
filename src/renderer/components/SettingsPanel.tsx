@@ -65,7 +65,7 @@ function ShortcutsSection(): React.JSX.Element {
           const overridden = !!bindings?.[def.action];
           return (
             <div className={`shortcut-row ${isRecording ? 'recording' : ''}`} key={def.action}>
-              <span className="shortcut-label">{def.label}</span>
+              <span className="shortcut-label">{t(`settings.shortcuts.action.${def.action}`)}</span>
               <span className="shortcut-keys">
                 {isRecording
                   ? <span className="shortcut-recording">{t('settings.shortcuts.pressKeys')}</span>
