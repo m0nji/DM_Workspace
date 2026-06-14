@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, IconName } from './Icon';
 import type { DirEntry } from '../../shared/types';
 
@@ -37,10 +37,13 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile }: NodeProp
   const [children, setChildren] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const inFlight = useRef(false);
   const loadChildren = useCallback(() => {
+    if (inFlight.current) return; // ignore a second expand while a read is pending
+    inFlight.current = true;
     window.api.readDir(entry.path)
-      .then((list) => { setChildren(list); setError(null); })
-      .catch((err: unknown) => setError(String(err)));
+      .then((list) => { inFlight.current = false; setChildren(list); setError(null); })
+      .catch((err: unknown) => { inFlight.current = false; setError(String(err)); });
   }, [entry.path]);
 
   const toggle = useCallback(() => {
@@ -88,9 +91,11 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile }: NodeProp
       {entry.isDir && open && (
         error
           ? <div className="ftree-error" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Zugriff nicht möglich</div>
-          : (children ?? []).map((c) => (
-              <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} />
-            ))
+          : children === null
+            ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>Lädt …</div>
+            : children.map((c) => (
+                <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} />
+              ))
       )}
     </>
   );
@@ -111,6 +116,7 @@ export function FileTree({ root, refreshKey, onOpenFile }: FileTreeProps): React
     let cancelled = false;
     setEntries(null);
     setError(null);
+    setSelectedPath(null);
     window.api.readDir(root)
       .then((list) => { if (!cancelled) setEntries(list); })
       .catch((err: unknown) => { if (!cancelled) setError(String(err)); });
