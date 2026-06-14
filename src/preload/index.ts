@@ -45,6 +45,10 @@ const api: RendererApi = {
   resolveLink: (rel: string, cwd: string, roots: string[]) =>
     ipcRenderer.invoke('link:resolve', { rel, cwd, roots }) as Promise<string | null>,
   readFile: (path: string) => ipcRenderer.invoke('file:read', path) as Promise<string>,
+  readDir: (path: string) => ipcRenderer.invoke('fs:readdir', path) as Promise<import('../shared/types').DirEntry[]>,
+  readTextFile: (path: string) => ipcRenderer.invoke('fs:readText', path) as Promise<import('../shared/types').ReadTextResult>,
+  writeTextFile: (path: string, content: string) => ipcRenderer.invoke('fs:writeText', { path, content }) as Promise<void>,
+  createFile: (dir: string, name: string) => ipcRenderer.invoke('fs:createFile', { dir, name }) as Promise<import('../shared/types').CreateFileResult>,
   loadTasks: (dir: string) => ipcRenderer.invoke('tasks:load', dir) as Promise<import('../shared/tasks-markdown').TaskBoard>,
   saveTasks: (dir, board) => ipcRenderer.send('tasks:save', { dir, board }),
   onTasksChanged: (cb) => {

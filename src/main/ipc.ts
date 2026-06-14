@@ -11,6 +11,7 @@ import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
 import { readPreviewFile } from './preview-file';
+import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from './fs-browser';
 import type {
   AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
 } from '../shared/types';
@@ -204,6 +205,36 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // (e.g. a malicious agent printing a clickable ~/.ssh/id_rsa path).
   ipcMain.handle('file:read', (_e, path: string): string => {
     return readPreviewFile(path);
+  });
+
+  // File browser. readDir errors (ENOENT/EACCES) propagate to the renderer as a
+  // rejected promise (shown as an inline error row). read/create surface their
+  // expected FsBrowserError codes as a discriminated result so the UI can react
+  // (binary/too-large => read-only; exists/invalid-name => inline message).
+  ipcMain.handle('fs:readdir', (_e, path: string) => readDir(path));
+
+  ipcMain.handle('fs:readText', (_e, path: string) => {
+    try { return { ok: true as const, content: readTextFile(path) }; }
+    catch (err) {
+      if (err instanceof FsBrowserError && (err.code === 'binary' || err.code === 'too-large')) {
+        return { ok: false as const, code: err.code };
+      }
+      throw err;
+    }
+  });
+
+  ipcMain.handle('fs:writeText', (_e, req: { path: string; content: string }) => {
+    writeTextFile(req.path, req.content);
+  });
+
+  ipcMain.handle('fs:createFile', (_e, req: { dir: string; name: string }) => {
+    try { return { ok: true as const, path: createFile(req.dir, req.name) }; }
+    catch (err) {
+      if (err instanceof FsBrowserError && (err.code === 'exists' || err.code === 'invalid-name')) {
+        return { ok: false as const, code: err.code };
+      }
+      throw err;
+    }
   });
 
   ipcMain.handle('dialog:pickDirectory', async () => {

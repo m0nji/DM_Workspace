@@ -79,6 +79,17 @@ export interface AppState {
   windowBounds?: WindowBounds; // vom Main-Prozess verwaltet; fehlt beim Erststart
 }
 
+// ---- File browser ----
+export interface DirEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+  mtimeMs: number;
+}
+export type ReadTextResult = { ok: true; content: string } | { ok: false; code: 'binary' | 'too-large' };
+export type CreateFileResult = { ok: true; path: string } | { ok: false; code: 'exists' | 'invalid-name' };
+
 export interface AgentDonePayload {
   workspaceId: string;
   workspaceName: string;
@@ -135,6 +146,11 @@ export interface RendererApi {
   resolveLink(rel: string, cwd: string, roots: string[]): Promise<string | null>;
   // read a UTF-8 text file (used by the markdown preview)
   readFile(path: string): Promise<string>;
+  // file browser: list a directory, read/write text, create a new empty file
+  readDir(path: string): Promise<DirEntry[]>;
+  readTextFile(path: string): Promise<ReadTextResult>;
+  writeTextFile(path: string, content: string): Promise<void>;
+  createFile(dir: string, name: string): Promise<CreateFileResult>;
   // task board (TASKS.md per working dir)
   loadTasks(dir: string): Promise<import('./tasks-markdown').TaskBoard>;
   saveTasks(dir: string, board: import('./tasks-markdown').TaskBoard): void;
