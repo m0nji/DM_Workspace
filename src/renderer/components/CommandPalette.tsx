@@ -70,6 +70,7 @@ export function CommandPalette(): React.JSX.Element | null {
 
     list.push(
       { id: 'toggle-preview', title: 'Toggle preview panel', category: 'Actions', hint: hint('togglePreview'), run: act(() => s.togglePreview()) },
+      { id: 'open-file-browser', title: 'Open file browser', category: 'Actions', run: act(() => s.openFiles()) },
       { id: 'open-settings', title: 'Open settings', category: 'Actions', hint: hint('openSettings'), run: act(() => s.setSettingsOpen(true)) },
       { id: 'open-shortcuts', title: 'Open keyboard shortcut settings', category: 'Actions', keywords: 'keybindings rebind', run: act(() => s.setSettingsOpen(true, 'shortcuts')) }
     );

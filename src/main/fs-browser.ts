@@ -1,5 +1,6 @@
 import { readdirSync, statSync, readFileSync, writeFileSync, renameSync, openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { expandTilde } from './resolve-cwd';
 import type { DirEntry } from '../shared/types';
 
@@ -62,7 +63,7 @@ export function readTextFile(path: string): string {
 export function writeTextFile(path: string, content: string): void {
   const full = expandTilde(path);
   // Atomic write: temp sibling then rename, so a crash can't leave a half file.
-  const tmp = `${full}.dmws-tmp-${process.pid}`;
+  const tmp = `${full}.dmws-tmp-${randomUUID()}`;
   writeFileSync(tmp, content, 'utf8');
   renameSync(tmp, full);
 }
