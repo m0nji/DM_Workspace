@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
-import { collectPaneIds, panePositionLabel } from '../../shared/layout-tree';
+import { collectPaneIds, panePositionTokens } from '../../shared/layout-tree';
 import type { Task } from '../../shared/types';
 
 interface Props {
@@ -44,10 +44,11 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
   const defaultPane = focusedPaneId && paneIds.includes(focusedPaneId) ? focusedPaneId : paneIds[0];
 
   // A readable name for a pane: the user's custom title if set, otherwise a
-  // position label derived from the split layout ("Terminal oben", "Terminal
-  // unten links", …) instead of the opaque pane id ("p18").
+  // position label derived from the split layout ("Terminal top", "Terminal
+  // bottom left", …) instead of the opaque pane id ("p18").
   const labelFor = (pid: string): string => {
-    const pos = panePositionLabel(ws?.layout ?? null, pid);
+    const posTokens = panePositionTokens(ws?.layout ?? null, pid);
+    const pos = posTokens.map((tok) => t(`pane.pos.${tok}`)).join(' ');
     return paneTitle(pid, pos ? t('tasks.paneNamed', { pos }) : t('tasks.paneDefault'));
   };
 

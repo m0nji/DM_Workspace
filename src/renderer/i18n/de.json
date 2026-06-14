@@ -284,6 +284,12 @@
       "idle": "untätig",
       "busy": "beschäftigt",
       "done": "fertig"
+    },
+    "pos": {
+      "top": "oben",
+      "bottom": "unten",
+      "left": "links",
+      "right": "rechts"
     }
   },
   "tasks": {

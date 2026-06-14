@@ -13,21 +13,25 @@ export function collectPaneIds(node: LayoutNode | null): string[] {
   return [...collectPaneIds(node.children[0]), ...collectPaneIds(node.children[1])];
 }
 
-// A human-friendly position label for a pane ("oben", "unten links", …) derived
-// from its path in the split tree. Vertical splits ('v') read as oben/unten,
-// horizontal ('h') as links/rechts; vertical words come first for natural German
-// ("oben links"). Returns '' for a single pane, an unknown pane, or a null layout
-// — callers fall back to their own default in that case.
-export function panePositionLabel(node: LayoutNode | null, paneId: string): string {
+// Neutral side tokens describing a pane's position ("top", "bottom left", …)
+// derived from its path in the split tree. Vertical splits ('v') read as
+// top/bottom, horizontal ('h') as left/right; vertical tokens come first.
+// Returns [] for a single pane, an unknown pane, or a null layout — callers
+// translate the tokens (see i18n key `pane.pos.*`) and fall back to their own
+// default when the array is empty.
+export function panePositionTokens(
+  node: LayoutNode | null,
+  paneId: string
+): Array<'top' | 'bottom' | 'left' | 'right'> {
   const path = pathToPane(node, paneId);
-  if (!path) return '';
-  const vertical: string[] = [];
-  const horizontal: string[] = [];
+  if (!path) return [];
+  const vertical: Array<'top' | 'bottom'> = [];
+  const horizontal: Array<'left' | 'right'> = [];
   for (const { direction, side } of path) {
-    if (direction === 'v') vertical.push(side === 0 ? 'oben' : 'unten');
-    else horizontal.push(side === 0 ? 'links' : 'rechts');
+    if (direction === 'v') vertical.push(side === 0 ? 'top' : 'bottom');
+    else horizontal.push(side === 0 ? 'left' : 'right');
   }
-  return [...vertical, ...horizontal].join(' ');
+  return [...vertical, ...horizontal];
 }
 
 // The sequence of split decisions from the root down to `paneId`, or null if the
