@@ -79,6 +79,7 @@ const api: RendererApi = {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   platform: process.platform,
   disableWebgl: process.env.DMWS_DISABLE_WEBGL === '1',
+  isE2E: process.env.DMWS_E2E === '1',
   notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
   onWindowFocus: (cb: (focused: boolean) => void) => {
     const handler = (_e: unknown, focused: boolean) => cb(focused);

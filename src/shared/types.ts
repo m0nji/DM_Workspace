@@ -177,6 +177,8 @@ export interface RendererApi {
   platform: NodeJS.Platform;
   // e2e-only: keep xterm on the DOM renderer for tests that assert terminal text
   disableWebgl: boolean;
+  // e2e-only: true when launched with DMWS_E2E=1, gates the window.__store hook
+  isE2E: boolean;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;
