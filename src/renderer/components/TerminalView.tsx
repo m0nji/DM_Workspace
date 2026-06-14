@@ -274,7 +274,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // insert each dropped file's path (tool-independent — any program reads a
     // path), instead of letting Electron navigate the window to the file.
     const onDragOver = (e: DragEvent): void => {
-      if (!e.dataTransfer?.types.includes('Files')) return;
+      const types = e.dataTransfer?.types;
+      if (!types || (!types.includes('Files') && !types.includes('application/x-dmws-path'))) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
       host.classList.add('drop-target');
@@ -286,6 +287,15 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
     const onDrop = (e: DragEvent): void => {
       host.classList.remove('drop-target');
+      // Internal drag from the file browser: a single absolute path payload.
+      const internal = e.dataTransfer?.getData('application/x-dmws-path');
+      if (internal) {
+        e.preventDefault();
+        term.paste(formatPathsForInsert([internal], window.api.platform));
+        term.focus();
+        activity.onInput();
+        return;
+      }
       const files = e.dataTransfer?.files;
       if (!files || files.length === 0) return;
       e.preventDefault();
