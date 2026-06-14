@@ -1,6 +1,6 @@
 import { readdirSync, statSync, readFileSync, writeFileSync, renameSync, openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { expandTilde } from './resolve-cwd';
 
 // 2 MB cap for inline editing — past this we refuse to load into a <textarea>.
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024;
@@ -22,16 +22,8 @@ export class FsBrowserError extends Error {
   }
 }
 
-// Expand a leading ~ to the home directory so a workspace cwd of '~' (the default)
-// can be browsed directly.
-function expandHome(p: string): string {
-  if (p === '~') return homedir();
-  if (p.startsWith('~/') || p.startsWith('~\\')) return join(homedir(), p.slice(2));
-  return p;
-}
-
 export function readDir(dirPath: string): DirEntry[] {
-  const base = expandHome(dirPath);
+  const base = expandTilde(dirPath);
   const dirents = readdirSync(base, { withFileTypes: true });
   const entries: DirEntry[] = [];
   for (const d of dirents) {
@@ -64,7 +56,7 @@ function isBinary(buf: Buffer): boolean {
 }
 
 export function readTextFile(path: string): string {
-  const full = expandHome(path);
+  const full = expandTilde(path);
   const st = statSync(full);
   if (st.size > MAX_TEXT_BYTES) {
     throw new FsBrowserError('too-large', `File is too large to edit (${st.size} bytes)`);
@@ -75,7 +67,7 @@ export function readTextFile(path: string): string {
 }
 
 export function writeTextFile(path: string, content: string): void {
-  const full = expandHome(path);
+  const full = expandTilde(path);
   // Atomic write: temp sibling then rename, so a crash can't leave a half file.
   const tmp = `${full}.dmws-tmp-${process.pid}`;
   writeFileSync(tmp, content, 'utf8');
@@ -86,7 +78,7 @@ export function createFile(dirPath: string, name: string): string {
   if (!name || name.includes('/') || name.includes('\\') || name === '.' || name === '..' || name.includes('\0')) {
     throw new FsBrowserError('invalid-name', 'Invalid file name');
   }
-  const full = join(expandHome(dirPath), name);
+  const full = join(expandTilde(dirPath), name);
   let fd: number;
   try {
     fd = openSync(full, 'wx'); // 'wx' fails if it already exists (atomic create)

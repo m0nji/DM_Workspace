@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 import {
   readDir, readTextFile, writeTextFile, createFile, MAX_TEXT_BYTES, FsBrowserError
 } from '../src/main/fs-browser';
@@ -34,6 +34,10 @@ describe('readDir', () => {
     expect(f.size).toBe(5);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('expands a leading ~ to the home directory', () => {
+    expect(readDir('~').map((e) => e.name)).toEqual(readDir(homedir()).map((e) => e.name));
+  });
 });
 
 describe('readTextFile', () => {
@@ -49,8 +53,10 @@ describe('readTextFile', () => {
     const dir = tmp();
     const file = join(dir, 'bin');
     writeFileSync(file, Buffer.from([0x41, 0x00, 0x42]));
-    expect(() => readTextFile(file)).toThrow(FsBrowserError);
-    try { readTextFile(file); } catch (e) { expect((e as FsBrowserError).code).toBe('binary'); }
+    let caught: unknown;
+    try { readTextFile(file); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(FsBrowserError);
+    expect((caught as FsBrowserError).code).toBe('binary');
     rmSync(dir, { recursive: true, force: true });
   });
 

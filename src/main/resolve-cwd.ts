@@ -13,7 +13,7 @@ export function expandTilde(cwd: string | undefined | null): string {
   const home = homedir();
   const dir = (cwd ?? '').trim();
   if (dir === '' || dir === '~') return home;
-  if (dir === '~/' || dir.startsWith('~/')) return join(home, dir.slice(2));
+  if (dir === '~/' || dir === '~\\' || dir.startsWith('~/') || dir.startsWith('~\\')) return join(home, dir.slice(2));
   return dir;
 }
 
