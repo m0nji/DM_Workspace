@@ -47,6 +47,73 @@
       "label": "Sprache",
       "en": "English",
       "de": "Deutsch"
+    },
+    "appearance": {
+      "theme": "Theme",
+      "backgroundColor": "Hintergrundfarbe",
+      "customColor": "Eigene Farbe",
+      "backgroundHint": "Überschreibt den Hintergrund des ausgewählten Themes. Wähle erneut ein Theme, um ihn zurückzusetzen.",
+      "opacity": "Deckkraft",
+      "opacityHint": "Geringere Deckkraft gibt den unscharfen Hintergrund hinter den Terminals frei (macOS).",
+      "workspaceNavigation": "Workspace-Navigation",
+      "workspaceNavigationPlacement": "Platzierung der Workspace-Navigation",
+      "leftSidebar": "Linke Seitenleiste",
+      "topTabs": "Tabs oben",
+      "workspaceNavigationHint": "Lege fest, wo der Workspace-Wechsel erscheint. Es ist immer nur eine Platzierung aktiv.",
+      "terminalInput": "Terminal-Eingabe",
+      "clickMovesCursor": "Klick bewegt den Eingabe-Cursor",
+      "clickMovesCursorHint": "Wenn aktiviert, bewegt ein einfacher Klick den Cursor in der Eingabezeile an die angeklickte Stelle. Option/Alt+Klick tut dies immer, unabhängig von dieser Einstellung. Standardmäßig aus.",
+      "preset": {
+        "black": "Schwarz",
+        "darkGray": "Dunkelgrau",
+        "gray": "Grau",
+        "lightGray": "Hellgrau",
+        "white": "Weiß",
+        "darkPurple": "Dunkelviolett"
+      }
+    },
+    "shortcuts": {
+      "title": "Tastenkürzel",
+      "pressKeys": "Tasten drücken…",
+      "record": "Aufnehmen",
+      "reset": "Zurücksetzen",
+      "reservedForTerminal": "{{shortcut}} ist für das Terminal reserviert",
+      "alreadyAssigned": "{{shortcut}} ist bereits einer anderen Aktion zugewiesen",
+      "hint": "⌘ auf macOS, Ctrl anderswo. Unter Windows/Linux ist ein einfaches Ctrl+Buchstabe reserviert, damit die Shell Ctrl+C/D/W behält."
+    },
+    "templates": {
+      "title": "Workspace-Vorlagen",
+      "empty": "Noch keine Vorlagen – speichere ein Workspace-Layout, um es später wiederzuverwenden.",
+      "startupCommands_one": "{{count}} Startbefehl",
+      "startupCommands_other": "{{count}} Startbefehle",
+      "run": "Ausführen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "openLayoutFirst": "Öffne zuerst ein Layout",
+      "saveCurrent": "+ Aktuellen Workspace als Vorlage speichern"
+    },
+    "notifications": {
+      "sidebar": "Seitenleiste",
+      "showReadyBadge": "Badge „Terminals bereit“ anzeigen",
+      "showReadyBadgeHint": "Zeigt eine grüne Anzahl auf inaktiven Workspaces an, wenn deren Terminals fertig sind.",
+      "title": "Benachrichtigungen",
+      "desktopNotifications": "Desktop-Benachrichtigungen",
+      "desktopNotificationsHint": "Zeigt eine Systembenachrichtigung an, wenn ein Terminal in einem Hintergrund-Workspace fertig ist. Standardmäßig aus."
+    },
+    "updates": {
+      "title": "Updates",
+      "checkForUpdates": "Nach Updates suchen",
+      "checking": "Suche nach Updates…",
+      "checkingShort": "Suche…",
+      "available": "Update verfügbar: v{{version}}",
+      "downloadInstall": "Herunterladen & installieren",
+      "downloading": "Herunterladen… {{percent}}%",
+      "downloadingShort": "Herunterladen…",
+      "ready": "Update v{{version}} bereit – Neustart…",
+      "upToDate": "Du bist auf dem neuesten Stand.",
+      "error": "Update-Fehler: {{error}}",
+      "errorUnknown": "unbekannt",
+      "disabled": "Updates sind nur in der installierten App verfügbar."
     }
   },
   "changelog": {

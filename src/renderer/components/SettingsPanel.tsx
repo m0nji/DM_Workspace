@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
 import { Icon } from './Icon';
 import type { SettingsSection } from '../../shared/types';
@@ -14,6 +16,7 @@ const isMac = navigator.userAgent.includes('Mac');
 // capture listener swallows the next key combo; global shortcuts are gated via
 // the store's shortcutRecordingAction so they don't fire mid-recording.
 function ShortcutsSection(): React.JSX.Element {
+  const { t } = useTranslation();
   const bindings = useStore((s) => s.settings.shortcutBindings);
   const updateBinding = useStore((s) => s.updateShortcutBinding);
   const resetBinding = useStore((s) => s.resetShortcutBinding);
@@ -32,12 +35,12 @@ function ShortcutsSection(): React.JSX.Element {
       if (!binding) return; // only a modifier is down — wait for the real key
       const map = resolveShortcuts(useStore.getState().settings.shortcutBindings, isMac);
       if (isReservedTerminalShortcut(binding, isMac)) {
-        setError(`${formatShortcut(binding, isMac)} is reserved for the terminal`);
+        setError(t('settings.shortcuts.reservedForTerminal', { shortcut: formatShortcut(binding, isMac) }));
         setRecording(null);
         return;
       }
       if (isShortcutConflict(binding, recording, map)) {
-        setError(`${formatShortcut(binding, isMac)} is already assigned to another action`);
+        setError(t('settings.shortcuts.alreadyAssigned', { shortcut: formatShortcut(binding, isMac) }));
         setRecording(null);
         return;
       }
@@ -47,14 +50,14 @@ function ShortcutsSection(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [recording, updateBinding, setRecording]);
+  }, [recording, updateBinding, setRecording, t]);
 
   // Clear a transient recording flag if the panel unmounts mid-recording.
   useEffect(() => () => setRecording(null), [setRecording]);
 
   return (
     <div>
-      <div className="modal-section-label">Keyboard shortcuts</div>
+      <div className="modal-section-label">{t('settings.shortcuts.title')}</div>
       {error && <div className="setting-error">{error}</div>}
       <div className="shortcut-list">
         {SHORTCUT_DEFINITIONS.map((def) => {
@@ -65,21 +68,21 @@ function ShortcutsSection(): React.JSX.Element {
               <span className="shortcut-label">{def.label}</span>
               <span className="shortcut-keys">
                 {isRecording
-                  ? <span className="shortcut-recording">Press keys…</span>
+                  ? <span className="shortcut-recording">{t('settings.shortcuts.pressKeys')}</span>
                   : formatShortcutCaps(resolved[def.action], isMac).map((k, i) => <kbd className="key-cap" key={i}>{k}</kbd>)}
               </span>
               <button className="cwd-btn" onClick={() => { setError(null); setRecording(isRecording ? null : def.action); }}>
-                {isRecording ? 'Cancel' : 'Record'}
+                {isRecording ? t('common.cancel') : t('settings.shortcuts.record')}
               </button>
               <button className="cwd-btn ghost" disabled={!overridden} onClick={() => { setError(null); resetBinding(def.action); }}>
-                Reset
+                {t('settings.shortcuts.reset')}
               </button>
             </div>
           );
         })}
       </div>
       <p className="modal-hint">
-        ⌘ on macOS, Ctrl elsewhere. On Windows/Linux a plain Ctrl+letter is reserved so the shell keeps Ctrl+C/D/W.
+        {t('settings.shortcuts.hint')}
       </p>
     </div>
   );
@@ -88,6 +91,7 @@ function ShortcutsSection(): React.JSX.Element {
 // List, run, edit, and delete saved templates; launch the wizard to capture the
 // current workspace.
 function TemplatesSection(): React.JSX.Element {
+  const { t } = useTranslation();
   const templates = useStore((s) => s.workspaceTemplates ?? []);
   const setWizard = useStore((s) => s.setTemplateWizard);
   const requestLaunch = useStore((s) => s.requestTemplateLaunch);
@@ -101,78 +105,79 @@ function TemplatesSection(): React.JSX.Element {
 
   return (
     <>
-      <div className="modal-section-label">Workspace templates</div>
+      <div className="modal-section-label">{t('settings.templates.title')}</div>
       {templates.length === 0 && (
-        <p className="modal-hint" style={{ marginTop: 0 }}>No templates yet — save a workspace layout to reuse it later.</p>
+        <p className="modal-hint" style={{ marginTop: 0 }}>{t('settings.templates.empty')}</p>
       )}
       <div className="template-list">
-        {templates.map((t) => {
-          const cmdCount = t.startupCommands ? Object.keys(t.startupCommands).length : 0;
+        {templates.map((tpl) => {
+          const cmdCount = tpl.startupCommands ? Object.keys(tpl.startupCommands).length : 0;
           return (
-            <div className="template-row" key={t.id}>
+            <div className="template-row" key={tpl.id}>
               <span className="template-info">
-                <span className="template-name">{t.name}</span>
-                <span className="template-meta">{t.cwd}{cmdCount ? ` · ${cmdCount} startup command${cmdCount === 1 ? '' : 's'}` : ''}</span>
+                <span className="template-name">{tpl.name}</span>
+                <span className="template-meta">{tpl.cwd}{cmdCount ? ` · ${t('settings.templates.startupCommands', { count: cmdCount })}` : ''}</span>
               </span>
-              <button className="cwd-btn" onClick={() => run(t.id)}>Run</button>
-              <button className="cwd-btn ghost" onClick={() => edit(t.id)}>Edit</button>
-              <button className="cwd-btn ghost danger" onClick={() => deleteTemplate(t.id)}>Delete</button>
+              <button className="cwd-btn" onClick={() => run(tpl.id)}>{t('settings.templates.run')}</button>
+              <button className="cwd-btn ghost" onClick={() => edit(tpl.id)}>{t('settings.templates.edit')}</button>
+              <button className="cwd-btn ghost danger" onClick={() => deleteTemplate(tpl.id)}>{t('settings.templates.delete')}</button>
             </div>
           );
         })}
       </div>
       <button className="add-template" disabled={!hasLayout} onClick={saveCurrent}
-              title={hasLayout ? undefined : 'Open a layout first'}>
-        + Save current workspace as template
+              title={hasLayout ? undefined : t('settings.templates.openLayoutFirst')}>
+        {t('settings.templates.saveCurrent')}
       </button>
     </>
   );
 }
 
-const COLOR_PRESETS: { label: string; value: string }[] = [
-  { label: 'Black', value: '#000000' },
-  { label: 'Dark gray', value: '#1e1e1e' },
-  { label: 'Gray', value: '#3c3c43' },
-  { label: 'Light gray', value: '#c7c7cc' },
-  { label: 'White', value: '#ffffff' },
-  { label: 'Dark purple', value: '#2d1b46' }
+const COLOR_PRESETS: { labelKey: ParseKeys; value: string }[] = [
+  { labelKey: 'settings.appearance.preset.black', value: '#000000' },
+  { labelKey: 'settings.appearance.preset.darkGray', value: '#1e1e1e' },
+  { labelKey: 'settings.appearance.preset.gray', value: '#3c3c43' },
+  { labelKey: 'settings.appearance.preset.lightGray', value: '#c7c7cc' },
+  { labelKey: 'settings.appearance.preset.white', value: '#ffffff' },
+  { labelKey: 'settings.appearance.preset.darkPurple', value: '#2d1b46' }
 ];
 
 function UpdateSection(): React.JSX.Element {
+  const { t } = useTranslation();
   const update = useStore((s) => s.update);
   const checkForUpdates = useStore((s) => s.checkForUpdates);
   const downloadUpdate = useStore((s) => s.downloadUpdate);
 
   let status: string;
   let button: React.JSX.Element | null = (
-    <button className="cwd-btn" onClick={checkForUpdates}>Check for updates</button>
+    <button className="cwd-btn" onClick={checkForUpdates}>{t('settings.updates.checkForUpdates')}</button>
   );
 
   switch (update.status) {
     case 'checking':
-      status = 'Checking for updates…';
-      button = <button className="cwd-btn" disabled>Checking…</button>;
+      status = t('settings.updates.checking');
+      button = <button className="cwd-btn" disabled>{t('settings.updates.checkingShort')}</button>;
       break;
     case 'available':
-      status = `Update available: v${update.version}`;
-      button = <button className="cwd-btn" onClick={downloadUpdate}>Download &amp; install</button>;
+      status = t('settings.updates.available', { version: update.version });
+      button = <button className="cwd-btn" onClick={downloadUpdate}>{t('settings.updates.downloadInstall')}</button>;
       break;
     case 'downloading':
-      status = `Downloading… ${update.percent ?? 0}%`;
-      button = <button className="cwd-btn" disabled>Downloading…</button>;
+      status = t('settings.updates.downloading', { percent: update.percent ?? 0 });
+      button = <button className="cwd-btn" disabled>{t('settings.updates.downloadingShort')}</button>;
       break;
     case 'downloaded':
-      status = `Update v${update.version} ready — restarting…`;
+      status = t('settings.updates.ready', { version: update.version });
       button = null;
       break;
     case 'not-available':
-      status = "You're up to date.";
+      status = t('settings.updates.upToDate');
       break;
     case 'error':
-      status = `Update error: ${update.error ?? 'unknown'}`;
+      status = t('settings.updates.error', { error: update.error ?? t('settings.updates.errorUnknown') });
       break;
     case 'disabled':
-      status = 'Updates are available only in the installed app.';
+      status = t('settings.updates.disabled');
       button = null;
       break;
     default:
@@ -181,7 +186,7 @@ function UpdateSection(): React.JSX.Element {
 
   return (
     <>
-      <div className="modal-section-label">Updates</div>
+      <div className="modal-section-label">{t('settings.updates.title')}</div>
       <div className="setting-row">
         <span className="update-status">{status}</span>
         {button}
@@ -190,15 +195,16 @@ function UpdateSection(): React.JSX.Element {
   );
 }
 
-const SECTIONS: { id: SettingsSection; label: string }[] = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'shortcuts', label: 'Shortcuts' },
-  { id: 'templates', label: 'Templates' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'updates', label: 'Updates' }
+const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
+  { id: 'appearance', labelKey: 'settings.nav.appearance' },
+  { id: 'shortcuts', labelKey: 'settings.nav.shortcuts' },
+  { id: 'templates', labelKey: 'settings.nav.templates' },
+  { id: 'notifications', labelKey: 'settings.nav.notifications' },
+  { id: 'updates', labelKey: 'settings.nav.updates' }
 ];
 
 export function SettingsPanel(): React.JSX.Element | null {
+  const { t } = useTranslation();
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
   const settings = useStore((s) => s.settings);
@@ -222,8 +228,8 @@ export function SettingsPanel(): React.JSX.Element | null {
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>Settings</span>
-          <button className="modal-close" title="Close" onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
+          <span>{t('settings.title')}</span>
+          <button className="modal-close" title={t('common.close')} onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
         </div>
 
         <div className="settings-body">
@@ -236,7 +242,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                 aria-current={section === s.id ? 'page' : undefined}
                 onClick={() => setSection(s.id)}
               >
-                {s.label}
+                {t(s.labelKey)}
               </button>
             ))}
           </nav>
@@ -244,24 +250,40 @@ export function SettingsPanel(): React.JSX.Element | null {
             {section === 'appearance' && (
               <>
                 <div className="settings-group">
-                <div className="modal-section-label">Theme</div>
+                  <div className="modal-section-label">{t('settings.language.label')}</div>
+                  <div className="segmented-control" role="group" aria-label={t('settings.language.label')}>
+                    {(['en', 'de'] as const).map((lng) => (
+                      <button
+                        key={lng}
+                        type="button"
+                        className={`segmented-control-item ${(settings.locale ?? 'en') === lng ? 'active' : ''}`}
+                        onClick={() => updateSettings({ locale: lng })}
+                      >
+                        {t(`settings.language.${lng}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="settings-group">
+                <div className="modal-section-label">{t('settings.appearance.theme')}</div>
 
                 <div className="theme-gallery">
-                  {BUILTIN_THEMES.map((t) => {
-                    const active = settings.themeId === t.id;
+                  {BUILTIN_THEMES.map((theme) => {
+                    const active = settings.themeId === theme.id;
                     return (
                       <button
-                        key={t.id}
+                        key={theme.id}
                         className={`theme-tile ${active ? 'active' : ''}`}
-                        title={t.name}
-                        onClick={() => updateSettings({ themeId: t.id, terminalBackground: t.background })}
+                        title={theme.name}
+                        onClick={() => updateSettings({ themeId: theme.id, terminalBackground: theme.background })}
                       >
-                        <span className="theme-swatch" style={{ background: t.background }}>
-                          <span style={{ color: t.ansi[1] }}>A</span>
-                          <span style={{ color: t.ansi[2] }}>a</span>
-                          <span style={{ color: t.ansi[4] }}>#</span>
+                        <span className="theme-swatch" style={{ background: theme.background }}>
+                          <span style={{ color: theme.ansi[1] }}>A</span>
+                          <span style={{ color: theme.ansi[2] }}>a</span>
+                          <span style={{ color: theme.ansi[4] }}>#</span>
                         </span>
-                        <span className="theme-name">{t.name}</span>
+                        <span className="theme-name">{theme.name}</span>
                       </button>
                     );
                   })}
@@ -269,10 +291,10 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <div className="settings-group">
-                <div className="modal-section-label">Background color</div>
+                <div className="modal-section-label">{t('settings.appearance.backgroundColor')}</div>
 
                 <div className="setting-row">
-                  <label>Custom color</label>
+                  <label>{t('settings.appearance.customColor')}</label>
                   <input
                     type="color"
                     value={activeBg}
@@ -287,7 +309,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                       <button
                         key={p.value}
                         className={`swatch ${active ? 'active' : ''}`}
-                        title={p.label}
+                        title={t(p.labelKey)}
                         style={{ background: p.value }}
                         onClick={() => updateSettings({ terminalBackground: p.value })}
                       />
@@ -295,10 +317,10 @@ export function SettingsPanel(): React.JSX.Element | null {
                   })}
                 </div>
 
-                <p className="modal-hint">Overrides the selected theme's background. Pick a theme again to reset it.</p>
+                <p className="modal-hint">{t('settings.appearance.backgroundHint')}</p>
 
                 <div className="setting-row">
-                  <label>Opacity</label>
+                  <label>{t('settings.appearance.opacity')}</label>
                   <input
                     type="range"
                     min={10}
@@ -310,21 +332,21 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <p className="modal-hint">
-                  Lower opacity reveals the blurred backdrop behind the terminals (macOS).
+                  {t('settings.appearance.opacityHint')}
                 </p>
                 </div>
 
                 <div className="settings-group">
-                <div className="modal-section-label">Workspace navigation</div>
+                <div className="modal-section-label">{t('settings.appearance.workspaceNavigation')}</div>
 
-                <div className="segmented-control" role="group" aria-label="Workspace navigation placement">
+                <div className="segmented-control" role="group" aria-label={t('settings.appearance.workspaceNavigationPlacement')}>
                   <button
                     type="button"
                     className={`segmented-control-item ${workspaceNavigationPlacement === 'left' ? 'active' : ''}`}
                     aria-pressed={workspaceNavigationPlacement === 'left'}
                     onClick={() => updateSettings({ workspaceNavigationPlacement: 'left' })}
                   >
-                    Left sidebar
+                    {t('settings.appearance.leftSidebar')}
                   </button>
                   <button
                     type="button"
@@ -332,20 +354,20 @@ export function SettingsPanel(): React.JSX.Element | null {
                     aria-pressed={workspaceNavigationPlacement === 'top'}
                     onClick={() => updateSettings({ workspaceNavigationPlacement: 'top' })}
                   >
-                    Top tabs
+                    {t('settings.appearance.topTabs')}
                   </button>
                 </div>
 
                 <p className="modal-hint">
-                  Choose where workspace switching appears. Only one placement is active at a time.
+                  {t('settings.appearance.workspaceNavigationHint')}
                 </p>
                 </div>
 
                 <div className="settings-group">
-                <div className="modal-section-label">Terminal input</div>
+                <div className="modal-section-label">{t('settings.appearance.terminalInput')}</div>
 
                 <div className="setting-row">
-                  <label htmlFor="click-moves-cursor-toggle">Click moves the input cursor</label>
+                  <label htmlFor="click-moves-cursor-toggle">{t('settings.appearance.clickMovesCursor')}</label>
                   <input
                     id="click-moves-cursor-toggle"
                     type="checkbox"
@@ -355,8 +377,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <p className="modal-hint">
-                  When on, a plain click moves the cursor in the input line to the clicked spot.
-                  Option/Alt+click always does this, regardless of this setting. Off by default.
+                  {t('settings.appearance.clickMovesCursorHint')}
                 </p>
                 </div>
               </>
@@ -366,10 +387,10 @@ export function SettingsPanel(): React.JSX.Element | null {
             {section === 'notifications' && (
               <>
                 <div className="settings-group">
-                <div className="modal-section-label">Sidebar</div>
+                <div className="modal-section-label">{t('settings.notifications.sidebar')}</div>
 
                 <div className="setting-row">
-                  <label htmlFor="done-badge-toggle">Show "terminals ready" badge</label>
+                  <label htmlFor="done-badge-toggle">{t('settings.notifications.showReadyBadge')}</label>
                   <input
                     id="done-badge-toggle"
                     type="checkbox"
@@ -379,15 +400,15 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <p className="modal-hint">
-                  Shows a green count on inactive workspaces when their terminals finish working.
+                  {t('settings.notifications.showReadyBadgeHint')}
                 </p>
                 </div>
 
                 <div className="settings-group">
-                <div className="modal-section-label">Notifications</div>
+                <div className="modal-section-label">{t('settings.notifications.title')}</div>
 
                 <div className="setting-row">
-                  <label htmlFor="notifications-toggle">Desktop notifications</label>
+                  <label htmlFor="notifications-toggle">{t('settings.notifications.desktopNotifications')}</label>
                   <input
                     id="notifications-toggle"
                     type="checkbox"
@@ -397,7 +418,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <p className="modal-hint">
-                  Show an OS notification when a terminal finishes in a background workspace. Off by default.
+                  {t('settings.notifications.desktopNotificationsHint')}
                 </p>
                 </div>
               </>
