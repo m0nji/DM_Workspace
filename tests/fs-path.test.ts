@@ -11,8 +11,16 @@ describe('breadcrumbSegments (posix)', () => {
     ]);
   });
 
+  it('returns a single root crumb for /', () => {
+    expect(breadcrumbSegments('/')).toEqual([{ label: '/', path: '/' }]);
+  });
+
   it('ignores a trailing slash', () => {
-    expect(breadcrumbSegments('/a/b/').map((c) => c.path)).toEqual(['/', '/a', '/a/b']);
+    expect(breadcrumbSegments('/a/b/')).toEqual([
+      { label: '/', path: '/' },
+      { label: 'a', path: '/a' },
+      { label: 'b', path: '/a/b' }
+    ]);
   });
 });
 
@@ -29,6 +37,6 @@ describe('parentDir', () => {
 describe('basename', () => {
   it('returns the last segment (posix or windows separator)', () => {
     expect(basename('/a/b/file.txt')).toBe('file.txt');
-    expect(basename('C:\\\\Users\\\\me\\\\f.md')).toBe('f.md');
+    expect(basename('C:\\Users\\me\\f.md')).toBe('f.md');
   });
 });

@@ -13,7 +13,7 @@ export function breadcrumbSegments(abs: string): Crumb[] {
     const seg = parts[i];
     if (i === 0) {
       cur = seg === '' ? '/' : seg;
-      crumbs.push({ label: seg === '' ? '/' : seg, path: cur });
+      crumbs.push({ label: cur, path: cur });
       continue;
     }
     if (seg === '') continue;
