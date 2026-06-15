@@ -3,6 +3,10 @@ import { useStore } from '../src/renderer/store';
 
 describe('workspace store actions', () => {
   const saveState = vi.fn();
+  const flushMicrotasks = async (): Promise<void> => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
 
   beforeEach(() => {
     saveState.mockClear();
@@ -65,5 +69,35 @@ describe('workspace store actions', () => {
 
     useStore.getState().resizeSplit('s1', 0.7, true);
     expect(saveState).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a newer workspace save while an older save is still in flight', async () => {
+    const releases: Array<() => void> = [];
+    saveState.mockImplementation(() => new Promise<void>((resolve) => {
+      releases.push(resolve);
+    }));
+
+    useStore.getState().renameWorkspace('w1', 'First');
+    expect(saveState).toHaveBeenCalledTimes(1);
+    expect(saveState).toHaveBeenLastCalledWith(expect.objectContaining({
+      workspaces: expect.arrayContaining([expect.objectContaining({ id: 'w1', name: 'First' })])
+    }));
+
+    useStore.getState().renameWorkspace('w1', 'Second');
+    await flushMicrotasks();
+
+    expect(useStore.getState().workspaces[0].name).toBe('Second');
+    expect(saveState).toHaveBeenCalledTimes(1);
+
+    releases[0]();
+    await flushMicrotasks();
+
+    expect(saveState).toHaveBeenCalledTimes(2);
+    expect(saveState).toHaveBeenLastCalledWith(expect.objectContaining({
+      workspaces: expect.arrayContaining([expect.objectContaining({ id: 'w1', name: 'Second' })])
+    }));
+
+    releases[1]();
+    await flushMicrotasks();
   });
 });

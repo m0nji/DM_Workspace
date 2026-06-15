@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.2 – 2026-06-15
+- fix: Workspace renames are now persisted in order, preventing an older in-flight save from restoring the previous name on Windows
+
 ## 0.9.1 – 2026-06-14
 - fix: The "What's new" window is now always shown in English – including its title, badges and entries – regardless of the selected UI language, since the changelog mirrors CHANGELOG.md
 

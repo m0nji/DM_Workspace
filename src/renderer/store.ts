@@ -158,14 +158,43 @@ function stripKey(map: Record<string, string> | undefined, key: string): Record<
   return Object.keys(next).length ? next : undefined;
 }
 
-function persist(state: AppState): void {
-  void window.api.saveState({
+let saveInFlight = false;
+let pendingSave: AppState | null = null;
+
+function persistSnapshot(state: AppState): AppState {
+  return {
     version: 1,
     workspaces: state.workspaces,
     workspaceTemplates: state.workspaceTemplates ?? [],
     activeWorkspaceId: state.activeWorkspaceId,
     settings: state.settings
-  });
+  };
+}
+
+function flushPersist(snapshot: AppState): void {
+  saveInFlight = true;
+  void Promise.resolve(window.api.saveState(snapshot))
+    .catch((err) => {
+      console.error('Failed to save app state:', err);
+    })
+    .finally(() => {
+      const next = pendingSave;
+      pendingSave = null;
+      if (next) {
+        flushPersist(next);
+      } else {
+        saveInFlight = false;
+      }
+    });
+}
+
+function persist(state: AppState): void {
+  const snapshot = persistSnapshot(state);
+  if (saveInFlight) {
+    pendingSave = snapshot;
+    return;
+  }
+  flushPersist(snapshot);
 }
 
 export const useStore = create<StoreState>((set, get) => ({
