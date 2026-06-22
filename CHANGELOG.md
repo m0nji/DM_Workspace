@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.3 – 2026-06-22
+- change: The app icon now uses the modern DM Workspace brand mark across macOS, Windows and Linux
+
 ## 0.9.2 – 2026-06-15
 - fix: Workspace renames are now persisted in order, preventing an older in-flight save from restoring the previous name on Windows
 
