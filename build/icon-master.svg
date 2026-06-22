@@ -1,77 +1,40 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" data-variant="modern">
   <defs>
-    <!-- Dark base background -->
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1f1f24"/>
-      <stop offset="1" stop-color="#08080a"/>
+    <linearGradient id="workspace-modern-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24242d"/>
+      <stop offset="1" stop-color="#08080d"/>
     </linearGradient>
-    <!-- Subtle radial vibrancy glow behind tiles -->
-    <radialGradient id="vibrancy" cx="0.5" cy="0.42" r="0.62">
-      <stop offset="0" stop-color="#5b6cff" stop-opacity="0.16"/>
-      <stop offset="0.55" stop-color="#2a2f55" stop-opacity="0.07"/>
-      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    <clipPath id="workspace-modern-clip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
+    <linearGradient id="workspace-modern-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="workspace-modern-accent" cx="0.45" cy="0.35" r="0.42">
+      <stop offset="0" stop-color="#ee9a5d" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#c97b4a" stop-opacity="0"/>
     </radialGradient>
-    <!-- Translucent glass tile fill -->
-    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4a4a55" stop-opacity="0.92"/>
-      <stop offset="0.5" stop-color="#2a2a32" stop-opacity="0.9"/>
-      <stop offset="1" stop-color="#141418" stop-opacity="0.9"/>
+    <linearGradient id="workspace-modern-panel-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5f5f7" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#f5f5f7" stop-opacity="0.08"/>
     </linearGradient>
-    <!-- Specular gloss highlight, strong at top -->
-    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
-      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <!-- Top-edge background sheen -->
-    <linearGradient id="bgGloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
-      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.02"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <!-- Soft drop shadow for tile depth -->
-    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="7" stdDeviation="12" flood-color="#000" flood-opacity="0.5"/>
-    </filter>
-    <!-- Inner shadow for glass recess on each tile -->
-    <filter id="inner" x="-25%" y="-25%" width="150%" height="150%">
-      <feOffset dx="0" dy="3"/>
-      <feGaussianBlur stdDeviation="4" result="off"/>
-      <feComposite in="SourceGraphic" in2="off" operator="out" result="inv"/>
-      <feFlood flood-color="#000000" flood-opacity="0.4"/>
-      <feComposite in2="inv" operator="in"/>
-      <feComposite in2="SourceGraphic" operator="over"/>
+    <filter id="workspace-modern-depth" x="-28%" y="-24%" width="156%" height="164%">
+      <feDropShadow dx="0" dy="26" stdDeviation="10" flood-color="#000000" flood-opacity="0.62"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="4" flood-color="#c97b4a" flood-opacity="0.18"/>
+      <feDropShadow dx="0" dy="-4" stdDeviation="2" flood-color="#ffffff" flood-opacity="0.16"/>
     </filter>
   </defs>
-
-  <!-- Background plate -->
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#vibrancy)"/>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bgGloss)"/>
-  <!-- Subtle hairline rim -->
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
-
-  <!-- Glass tiles (2x2) with drop shadow + inner recess -->
-  <g filter="url(#soft)">
-    <rect x="178" y="178" width="312" height="312" rx="58" fill="url(#tile)"/>
-    <rect x="534" y="178" width="312" height="312" rx="58" fill="url(#tile)"/>
-    <rect x="178" y="534" width="312" height="312" rx="58" fill="url(#tile)"/>
-    <rect x="534" y="534" width="312" height="312" rx="58" fill="url(#tile)"/>
+  <g id="workspace-modern-surface" clip-path="url(#workspace-modern-clip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#workspace-modern-bg)"/>
+    <rect x="100" y="100" width="824" height="412" fill="url(#workspace-modern-rim)"/>
+    <circle cx="452" cy="364" r="226" fill="url(#workspace-modern-accent)" data-layer="accent-glint"/>
   </g>
-
-  <!-- Hairline highlight on each tile rim -->
-  <g fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2.5">
-    <rect x="179.5" y="179.5" width="309" height="309" rx="56.5"/>
-    <rect x="535.5" y="179.5" width="309" height="309" rx="56.5"/>
-    <rect x="179.5" y="535.5" width="309" height="309" rx="56.5"/>
-    <rect x="535.5" y="535.5" width="309" height="309" rx="56.5"/>
-  </g>
-
-  <!-- Specular gloss across upper half of each tile -->
-  <g>
-    <rect x="178" y="178" width="312" height="162" rx="58" fill="url(#gloss)"/>
-    <rect x="534" y="178" width="312" height="162" rx="58" fill="url(#gloss)"/>
-    <rect x="178" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
-    <rect x="534" y="534" width="312" height="162" rx="58" fill="url(#gloss)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="3"/>
+  <g id="workspace-modern-mark" fill="url(#workspace-modern-panel-fill)" stroke="#f5f5f7" stroke-opacity="0.86" stroke-width="26" stroke-linejoin="round" filter="url(#workspace-modern-depth)">
+    <rect data-panel="nav" x="292" y="344" width="132" height="336" rx="34"/>
+    <rect data-panel="top" x="462" y="344" width="270" height="140" rx="34"/>
+    <rect data-panel="bottom" x="462" y="532" width="270" height="148" rx="34"/>
   </g>
 </svg>
