@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.4 – 2026-06-23
+- fix: The Windows taskbar/Explorer icon now fills the full icon canvas and ships every size (16–256px) as its own crisp frame, so it no longer looks small, cropped or pixellated (Windows)
+
 ## 0.9.3 – 2026-06-22
 - change: The app icon now uses the modern DM Workspace brand mark across macOS, Windows and Linux
 
