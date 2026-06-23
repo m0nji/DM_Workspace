@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import pngToIco from 'png-to-ico';
 import { execSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,10 +32,23 @@ for (const [name, size] of variants) {
 }
 execSync(`iconutil -c icns -o "${join(dir, 'icon.icns')}" "${iconset}"`);
 writeFileSync(join(dir, 'icon.png'), await render(1024));
-writeFileSync(join(dir, 'icon-256.png'), await render(256));
-const ico = await pngToIco([join(dir, 'icon-256.png')]);
-writeFileSync(join(dir, 'icon.ico'), ico);
-rmSync(join(dir, 'icon-256.png'), { force: true });
+
+// Windows .ico. The macOS/Linux art keeps Apple's safe-area margin (the squircle
+// fills ~80% of the 1024 canvas). On the Windows taskbar/Explorer that margin sits
+// next to full-bleed neighbours (Chrome, etc.), so our icon looks small and cropped
+// — and downscaling a lone 256px frame to 16/24/32px makes it blurry. For Windows we
+// (a) scale the art up to fill the canvas and (b) bake every taskbar size as its own
+// frame so each is crisp. macOS (.icns/.png) and Linux (icons/) stay untouched.
+const WIN_FILL = 1.214; // squircle (824px) -> ~1000px on the 1024 canvas
+const svgInner = readFileSync(svg, 'utf8')
+  .replace(/^[\s\S]*?<svg[^>]*>/, '')
+  .replace(/<\/svg>\s*$/, '');
+const winSvg = `<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><g transform="translate(512 512) scale(${WIN_FILL}) translate(-512 -512)">${svgInner}</g></svg>`;
+const renderWin = (size) => sharp(Buffer.from(winSvg), { density: 384 }).resize(size, size).png().toBuffer();
+const winSizes = [16, 24, 32, 48, 64, 128, 256];
+const winPngs = [];
+for (const size of winSizes) winPngs.push(await renderWin(size));
+writeFileSync(join(dir, 'icon.ico'), await pngToIco(winPngs));
 
 rmSync(linuxIcons, { recursive: true, force: true });
 mkdirSync(linuxIcons, { recursive: true });
