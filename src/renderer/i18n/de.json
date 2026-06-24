@@ -49,10 +49,10 @@
       "de": "Deutsch"
     },
     "appearance": {
-      "theme": "Theme",
+      "theme": "Terminal-Theme",
       "backgroundColor": "Hintergrundfarbe",
       "customColor": "Eigene Farbe",
-      "backgroundHint": "Überschreibt den Hintergrund des ausgewählten Themes. Wähle erneut ein Theme, um ihn zurückzusetzen.",
+      "backgroundHint": "Überschreibt den Hintergrund des ausgewählten Terminal-Themes. Wähle erneut ein Terminal-Theme, um ihn zurückzusetzen.",
       "opacity": "Deckkraft",
       "opacityHint": "Geringere Deckkraft gibt den unscharfen Hintergrund hinter den Terminals frei (macOS).",
       "workspaceNavigation": "Workspace-Navigation",

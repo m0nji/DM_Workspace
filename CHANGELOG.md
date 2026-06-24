@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.6 – 2026-06-24
+- change: The app chrome now follows the DM BrandDesign surface, accent and focus tokens for sidebar, workspace tabs, panes, dialogs and primary controls.
+- change: The top-right titlebar action buttons stay neutral gray on hover and active states, while workspace selection uses a soft DM orange accent.
+- change: Settings now labels the color presets as terminal themes to clarify that they style terminal panes, not the full app chrome.
+
 ## 0.9.5 – 2026-06-23
 - change: The app icon now uses the colorful DM BrandDesign direction across macOS, Windows and Linux, while Windows keeps the full-bleed taskbar export.
 

@@ -1,10 +1,52 @@
 :root {
-  --bg: #0d0d0d;
-  --panel: #1a1a1a;
-  --border: #333;
-  --text: #ddd;
-  --muted: #888;
-  --accent: #c97b4a;
+  --dm-surface-app: #0d0d0d;
+  --dm-surface-panel: #1a1a1a;
+  --dm-surface-panel-elevated: #2c2c2e;
+  --dm-surface-input: #242428;
+  --dm-surface-overlay: rgba(0, 0, 0, 0.5);
+  --dm-text-primary: #dddddd;
+  --dm-text-strong: #ffffff;
+  --dm-text-muted: #888888;
+  --dm-text-disabled: #5f5f66;
+  --dm-text-on-accent: #ffffff;
+  --dm-border-subtle: #2a2a2a;
+  --dm-border-default: #333333;
+  --dm-border-strong: #3a3a3c;
+  --dm-border-focus: #c97b4a;
+  --dm-accent-orange: #c97b4a;
+  --dm-accent-orange-hover: #ee9a5d;
+  --dm-accent-orange-soft: rgba(201, 123, 74, 0.14);
+  --dm-status-success: #30d158;
+  --dm-status-warning: #f59e0b;
+  --dm-status-danger: #ef4444;
+  --dm-status-info: #3b82f6;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --radius-modal: 10px;
+  --shadow-elevated: 0 14px 40px rgba(0, 0, 0, 0.42);
+  --shadow-focus: 0 0 0 1px rgba(201, 123, 74, 0.22), 0 10px 28px rgba(0, 0, 0, 0.24);
+  --chrome-action-bg: transparent;
+  --chrome-action-hover-bg: rgba(255, 255, 255, 0.06);
+  --chrome-action-active-bg: rgba(255, 255, 255, 0.1);
+
+  /* Compatibility aliases used throughout the existing app. */
+  --bg: var(--dm-surface-app);
+  --panel: var(--dm-surface-panel);
+  --panel-elevated: var(--dm-surface-panel-elevated);
+  --input: var(--dm-surface-input);
+  --border: var(--dm-border-default);
+  --border-subtle: var(--dm-border-subtle);
+  --text: var(--dm-text-primary);
+  --text-strong: var(--dm-text-strong);
+  --muted: var(--dm-text-muted);
+  --disabled: var(--dm-text-disabled);
+  --accent: var(--dm-accent-orange);
+  --accent-hover: var(--dm-accent-orange-hover);
+  --accent-soft: var(--dm-accent-orange-soft);
+  --success: var(--dm-status-success);
+  --warning: var(--dm-status-warning);
+  --danger: var(--dm-status-danger);
+  --info: var(--dm-status-info);
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -72,7 +114,7 @@ body {
   color: var(--muted); font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }
 .ws-item { display: flex; align-items: center; gap: 6px; padding: 7px 8px;
   border-radius: 6px; cursor: pointer; }
-.ws-item.active { background: #2a2a2a; }
+.ws-item.active { background: var(--accent-soft); color: var(--text-strong); }
 .ws-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ws-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-item .badge { color: var(--muted); font-size: 11px; }
@@ -82,8 +124,9 @@ body {
 .ws-end { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
 .ws-actions { position: absolute; right: 100%; top: 0; bottom: 0; display: flex;
   align-items: center; gap: 6px; padding: 0 8px 0 18px; visibility: hidden;
-  background: linear-gradient(to right, rgba(42, 42, 42, 0), #2a2a2a 18px); }
-.ws-item:hover, .workspace-tab:hover { background: #2a2a2a; }
+  background: linear-gradient(to right, rgba(201, 123, 74, 0), rgba(201, 123, 74, 0.14) 18px); }
+.ws-item:hover, .workspace-tab:hover { background: rgba(255, 255, 255, 0.055); }
+.ws-item.active:hover { background: var(--accent-soft); color: var(--text-strong); }
 .ws-item:hover .ws-actions, .workspace-tab:hover .ws-actions { visibility: visible; }
 .ws-item .rename, .ws-item .del,
 .workspace-tab .rename, .workspace-tab .del { color: var(--muted); cursor: pointer;
@@ -119,7 +162,7 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-.workspace-tab.active { background: #2a2a2a; }
+.workspace-tab.active { background: var(--accent-soft); color: var(--text-strong); }
 .workspace-tab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .workspace-tab .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-tab .badge { color: var(--muted); font-size: 11px; }
@@ -134,7 +177,7 @@ body {
   color: var(--muted);
   cursor: pointer;
 }
-.add-workspace-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+.add-workspace-tab:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 
 .sidebar-footer { margin-top: auto; display: flex; align-items: center;
   justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); }
@@ -169,10 +212,10 @@ body {
 .badge-other { color: var(--muted); background: rgba(255, 255, 255, 0.07); }
 .changelog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .btn-primary, .btn-secondary { padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.btn-secondary { border: 1px solid var(--border); background: #2a2a2a; color: var(--text); }
-.btn-secondary:hover { background: #333; }
-.btn-primary { border: 1px solid var(--accent); background: var(--accent); color: #1a1a1a; font-weight: 600; }
-.btn-primary:hover { filter: brightness(1.08); }
+.btn-secondary { border: 1px solid var(--border); background: var(--panel-elevated); color: var(--text); }
+.btn-secondary:hover { border-color: var(--accent); background: #343436; }
+.btn-primary { border: 1px solid var(--accent); background: var(--accent); color: #111111; font-weight: 600; }
+.btn-primary:hover { border-color: var(--accent-hover); background: var(--accent-hover); filter: none; }
 .btn-primary:focus-visible, .btn-secondary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* One square, consistently-sized clickable target for every chrome icon. */
@@ -190,14 +233,20 @@ body {
   cursor: pointer;
   position: relative; /* anchors the update dot */
 }
-.icon-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
-.icon-btn.active { color: #6cb6ff; }
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--chrome-action-hover-bg);
+}
+.icon-btn.active {
+  color: var(--text);
+  background: var(--chrome-action-active-bg);
+}
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: center; justify-content: center; z-index: 100;
   -webkit-app-region: no-drag; }
-.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-  padding: 18px; width: 340px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-modal);
+  padding: 18px; width: 340px; box-shadow: var(--shadow-elevated);
   max-height: 85vh; overflow-y: auto; }
 /* The settings modal uses a left nav rail to pick a category and a content area
    that renders one section at a time. */
@@ -254,7 +303,7 @@ input[type="checkbox"]:checked::after {
   position: absolute;
   left: 5px; top: 1px;
   width: 5px; height: 10px;
-  border: solid #1a1a1a;
+  border: solid #111111;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -288,11 +337,11 @@ input[type="checkbox"]:checked::after {
 .confirm-message { margin: 0 0 18px; line-height: 1.5; color: var(--text); }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .confirm-btn { padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border);
-  background: #2a2a2a; color: var(--text); cursor: pointer; font-size: 13px; }
-.confirm-btn:hover { background: #333; }
+  background: var(--panel-elevated); color: var(--text); cursor: pointer; font-size: 13px; }
+.confirm-btn:hover:not(:disabled) { border-color: var(--accent); background: #343436; }
 .confirm-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.confirm-btn-danger { background: #c95a5a; border-color: #c95a5a; color: #fff; }
-.confirm-btn-danger:hover { background: #d46666; }
+.confirm-btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.confirm-btn-danger:hover:not(:disabled) { background: #f25f5f; border-color: #f25f5f; }
 .update-status { flex: 1; color: var(--muted); font-size: 12px; }
 
 /* Top-right update indicator (TitlebarActions → UpdateBadge). Accent pill so an
@@ -330,9 +379,9 @@ input[type="checkbox"]:checked::after {
 .welcome-cwd .cwd-value { color: var(--text); font-family: Menlo, monospace;
   font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   max-width: 360px; }
-.cwd-btn { background: #2a2a2a; color: var(--text); border: 1px solid var(--border);
+.cwd-btn { background: var(--panel-elevated); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
-.cwd-btn:hover { border-color: var(--accent); }
+.cwd-btn:hover:not(:disabled) { border-color: var(--accent); background: #343436; }
 .preset-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .preset { cursor: pointer; text-align: center; }
 .preset .glyph { width: 90px; height: 64px; border: 1px solid var(--border);
@@ -351,15 +400,16 @@ input[type="checkbox"]:checked::after {
 .split-child { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 
 .pane { display: flex; flex-direction: column; border: 1px solid var(--border);
-  border-radius: 6px; overflow: hidden; min-width: 0; min-height: 0; height: 100%; }
+  border-radius: var(--radius-control); overflow: hidden; min-width: 0; min-height: 0; height: 100%;
+  background: #101010; }
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-  background: #141414; border-bottom: 1px solid var(--border); }
+  background: #181818; border-bottom: 1px solid var(--border); }
 .pane-title { flex: 1; color: var(--muted); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 .pane-btn { color: var(--muted); cursor: pointer; padding: 2px 4px; background: none;
   border: none; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 4px; }
-.pane-btn:hover { color: var(--text); background: #2a2a2a; }
+.pane-btn:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 .pane-body { flex: 1; min-height: 0; }
 .pane-body .xterm { height: 100%; padding: 0 4px; }
 /* height:100% lets the wrapper hold a sub-cell themed strip below the pinned
@@ -413,22 +463,22 @@ input[type="checkbox"]:checked::after {
 /* --- v0.2 --- */
 
 /* Pane focus ring */
-.pane.focused { border-color: var(--accent); }
+.pane.focused { border-color: var(--accent); box-shadow: var(--shadow-focus); }
 
 /* Agent status dot in the pane header */
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
-.status-dot.idle { background: #555; }
-.status-dot.busy { background: #e5c100; animation: status-pulse 1.2s ease-in-out infinite; }
-.status-dot.done { background: #3fb950; }
+.status-dot.idle { background: var(--disabled); }
+.status-dot.busy { background: var(--warning); animation: status-pulse 1.2s ease-in-out infinite; }
+.status-dot.done { background: var(--success); }
 @keyframes status-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* Sidebar "terminals ready" badge */
 .ws-item .done-badge {
-  background: #3fb950; color: #07130b; font-size: 10px; font-weight: 600;
+  background: var(--success); color: #07130b; font-size: 10px; font-weight: 600;
   border-radius: 8px; padding: 0 5px; line-height: 15px; min-width: 15px; text-align: center;
 }
 .workspace-tab .done-badge {
-  background: #3fb950; color: #07130b; font-size: 10px; font-weight: 600;
+  background: var(--success); color: #07130b; font-size: 10px; font-weight: 600;
   border-radius: 8px; padding: 0 5px; line-height: 15px; min-width: 15px; text-align: center;
 }
 
@@ -462,10 +512,10 @@ input[type="checkbox"]:checked::after {
 }
 .ws-edit-folder-btn {
   flex: none; display: inline-flex; align-items: center; gap: 6px;
-  background: #2a2a2a; color: var(--text); border: 1px solid var(--border);
+  background: var(--panel-elevated); color: var(--text); border: 1px solid var(--border);
   border-radius: 7px; padding: 8px 12px; cursor: pointer; font-size: 12px;
 }
-.ws-edit-folder-btn:hover { border-color: var(--accent); }
+.ws-edit-folder-btn:hover { border-color: var(--accent); background: #343436; }
 .ws-edit-tasks {
   display: flex; align-items: center; gap: 10px; cursor: pointer;
   color: var(--text); font-size: 13px;
@@ -588,12 +638,12 @@ input[type="checkbox"]:checked::after {
 
 /* ── Shared button variants ─────────────────────────────────────────────── */
 .cwd-btn:disabled { opacity: .4; cursor: default; }
-.cwd-btn.ghost { background: transparent; }
-.cwd-btn.ghost:hover:not(:disabled) { background: #2a2a2a; border-color: var(--border); }
-.cwd-btn.danger:hover:not(:disabled) { border-color: #c95a5a; color: #ff9a9a; }
+.cwd-btn.ghost { background: var(--panel-elevated); }
+.cwd-btn.ghost:hover:not(:disabled) { background: #343436; border-color: var(--accent); }
+.cwd-btn.danger:hover:not(:disabled) { border-color: var(--danger); color: #ff9a9a; }
 .confirm-btn:disabled { opacity: .4; cursor: default; }
-.confirm-btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1a1a; font-weight: 500; }
-.confirm-btn.primary:hover:not(:disabled) { background: #d98a57; }
+.confirm-btn.primary { background: var(--accent); border-color: var(--accent); color: #111111; font-weight: 600; }
+.confirm-btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 
 /* ── Command palette ────────────────────────────────────────────────────── */
 .command-palette-backdrop { position: fixed; inset: 0; z-index: 150; background: rgba(0, 0, 0, .45);
@@ -611,7 +661,7 @@ input[type="checkbox"]:checked::after {
 .command-group { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; padding: 10px 10px 4px; }
 .command-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: transparent;
   border: 0; color: var(--text); padding: 8px 10px; border-radius: 7px; cursor: pointer; position: relative; }
-.command-item.active { background: rgba(201, 123, 74, .16); }
+.command-item.active { background: var(--accent-soft); }
 .command-item.active::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--accent); }
 .command-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .command-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

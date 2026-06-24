@@ -49,10 +49,10 @@
       "de": "Deutsch"
     },
     "appearance": {
-      "theme": "Theme",
+      "theme": "Terminal theme",
       "backgroundColor": "Background color",
       "customColor": "Custom color",
-      "backgroundHint": "Overrides the selected theme's background. Pick a theme again to reset it.",
+      "backgroundHint": "Overrides the selected terminal theme's background. Pick a terminal theme again to reset it.",
       "opacity": "Opacity",
       "opacityHint": "Lower opacity reveals the blurred backdrop behind the terminals (macOS).",
       "workspaceNavigation": "Workspace navigation",
