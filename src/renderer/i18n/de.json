@@ -317,6 +317,7 @@
     "selectAll": "Alles auswählen",
     "clearWindow": "Fenster leeren",
     "clearAllWindows": "Alle Fenster leeren",
+    "resetTerminal": "Terminal zurücksetzen",
     "search": "Suchen",
     "closeTerminal": "Terminal schließen"
   }

@@ -317,6 +317,7 @@
     "selectAll": "Select all",
     "clearWindow": "Clear window",
     "clearAllWindows": "Clear all windows",
+    "resetTerminal": "Reset terminal",
     "search": "Search",
     "closeTerminal": "Close terminal"
   }

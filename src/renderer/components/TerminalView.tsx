@@ -25,6 +25,15 @@ interface Props { paneId: string; cwd: string; active?: boolean; }
 
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
+// A TUI (e.g. Codex) that exits uncleanly can leave xterm stuck in mouse tracking
+// mode, which hijacks the wheel and text selection so the pane can no longer be
+// scrolled or copied. Writing these DECRST resets clears that. Covers X10 (?9),
+// VT200/normal (?1000), highlight (?1001), button-event/drag (?1002) and any-event
+// (?1003) tracking plus the SGR extended encoding (?1006). Driven by the
+// "Reset terminal" context-menu action — an explicit, content-preserving recovery
+// (it does not clear the buffer; that is "Clear window").
+const MOUSE_TRACKING_RESET = '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
+
 // The translucent terminal background as an rgba() string (opacity baked into the
 // alpha so a translucent terminal reveals the window vibrancy). This is painted as
 // a CSS backdrop *behind* the canvas — see bgColor's use in syncBackgrounds. The
@@ -605,6 +614,9 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: '-' },
       { label: t('menu.clearWindow'), onClick: () => { clearTerminal(paneId); term?.focus(); } },
       { label: t('menu.clearAllWindows'), onClick: () => setConfirmClearAll(true) },
+      // Unstick the terminal's input/mouse modes without wiping its contents — e.g.
+      // after a TUI crashed and left mouse tracking on, hijacking the wheel.
+      { label: t('menu.resetTerminal'), onClick: () => { term?.write(MOUSE_TRACKING_RESET); term?.focus(); } },
       { label: '-' },
       { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
       { label: t('menu.closeTerminal'), onClick: () => closeActivePane(paneId) }
