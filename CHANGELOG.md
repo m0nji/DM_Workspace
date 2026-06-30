@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.8 – 2026-06-30
+- change: Terminal panes now have a "Reset terminal" entry in the right-click menu that unsticks the input – e.g. after a tool exits and leaves mouse tracking on, hijacking the scroll wheel and text selection – without clearing the pane's contents (use "Clear window" for that)
+
 ## 0.9.7 – 2026-06-30
 - fix: Terminal panes now automatically restore GPU-accelerated rendering after a graphics context loss (e.g. the GPU going to sleep, a driver reset, or switching graphics cards), instead of staying stuck on the slower software renderer – which showed up as sluggish scrolling and a different scrollbar – until the app was restarted
 
