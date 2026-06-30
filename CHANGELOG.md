@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.7 – 2026-06-30
+- fix: Terminal panes now automatically restore GPU-accelerated rendering after a graphics context loss (e.g. the GPU going to sleep, a driver reset, or switching graphics cards), instead of staying stuck on the slower software renderer – which showed up as sluggish scrolling and a different scrollbar – until the app was restarted
+
 ## 0.9.6 – 2026-06-24
 - change: The app chrome now follows the DM BrandDesign surface, accent and focus tokens for sidebar, workspace tabs, panes, dialogs and primary controls.
 - change: The top-right titlebar action buttons stay neutral gray on hover and active states, while workspace selection uses a soft DM orange accent.
