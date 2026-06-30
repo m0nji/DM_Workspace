@@ -90,6 +90,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   // fallback, same path used on context loss) covers the hidden pane.
   const webglRef = useRef<WebglAddon | null>(null);
   const webglFailedRef = useRef(false); // creation threw (no GL at all) — stop retrying
+  // Pending re-acquire timer after a context loss, plus a short-window loss counter
+  // so a genuinely dead GPU can't spin re-creating contexts forever (see onContextLoss).
+  const webglRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webglLossRef = useRef({ count: 0, last: 0 });
   const activeRef = useRef(active);
   const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
@@ -111,9 +115,26 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     if (shouldHave && !webglRef.current) {
       try {
         const addon = new WebglAddon();
-        // Context loss (GPU sleep/reset) frees the context: drop the addon and let
-        // xterm fall back to the DOM renderer. A later activation re-acquires one.
-        addon.onContextLoss(() => { addon.dispose(); if (webglRef.current === addon) webglRef.current = null; });
+        // Context loss (GPU sleep/reset/switch) frees the context: drop the addon so
+        // xterm falls back to the DOM renderer — then re-acquire WebGL automatically
+        // after a short settle delay, so the pane doesn't stay stuck on the slow DOM
+        // renderer (sluggish scroll + different scrollbar) until the next workspace
+        // switch or restart. Bounded: if losses keep recurring back-to-back the GPU
+        // is genuinely gone, so we stop retrying and stay on the DOM renderer.
+        addon.onContextLoss(() => {
+          addon.dispose();
+          if (webglRef.current === addon) webglRef.current = null;
+          const now = Date.now();
+          const loss = webglLossRef.current;
+          loss.count = now - loss.last < 10_000 ? loss.count + 1 : 1;
+          loss.last = now;
+          if (loss.count > 5) return; // repeated immediate losses → give up
+          if (webglRetryRef.current) clearTimeout(webglRetryRef.current);
+          webglRetryRef.current = setTimeout(() => {
+            webglRetryRef.current = null;
+            if (activeRef.current) syncWebgl(true);
+          }, 1000);
+        });
         term.loadAddon(addon);
         webglRef.current = addon;
       } catch {
@@ -522,6 +543,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
       unregisterTerminalFocus(paneId);
+      if (webglRetryRef.current) { clearTimeout(webglRetryRef.current); webglRetryRef.current = null; }
       webglRef.current?.dispose();
       webglRef.current = null;
       term.dispose();
