@@ -266,6 +266,24 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <div className="settings-group">
+                  <div className="modal-section-label">{t('settings.appearance.brandDesign')}</div>
+                  <div className="segmented-control" role="group" aria-label={t('settings.appearance.brandDesign')}>
+                    {(['black', 'standard'] as const).map((design) => (
+                      <button
+                        key={design}
+                        type="button"
+                        className={`segmented-control-item ${(settings.brandDesign ?? 'black') === design ? 'active' : ''}`}
+                        aria-pressed={(settings.brandDesign ?? 'black') === design}
+                        onClick={() => updateSettings({ brandDesign: design })}
+                      >
+                        {t(`settings.appearance.brandDesign${design === 'black' ? 'Black' : 'Standard'}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="modal-hint">{t('settings.appearance.brandDesignHint')}</p>
+                </div>
+
+                <div className="settings-group">
                 <div className="modal-section-label">{t('settings.appearance.theme')}</div>
 
                 <div className="theme-gallery">

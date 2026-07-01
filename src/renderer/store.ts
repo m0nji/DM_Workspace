@@ -22,7 +22,8 @@ const DEFAULT_SETTINGS: Settings = {
   clickMovesCursor: false,
   showDoneBadge: false,
   notificationsEnabled: false,
-  workspaceNavigationPlacement: 'left'
+  workspaceNavigationPlacement: 'left',
+  brandDesign: 'black'
 };
 
 export type UpdateStatus =

@@ -12,16 +12,53 @@ function ruleBodies(selector: string): string[] {
 }
 
 describe('DM brand styles', () => {
-  it('declares the DM BrandDesign token layer', () => {
-    expect(styles).toContain('--dm-surface-app: #0d0d0d;');
-    expect(styles).toContain('--dm-surface-panel: #1a1a1a;');
-    expect(styles).toContain('--dm-surface-panel-elevated: #2c2c2e;');
-    expect(styles).toContain('--dm-border-default: #333333;');
-    expect(styles).toContain('--dm-text-primary: #dddddd;');
-    expect(styles).toContain('--dm-text-muted: #888888;');
+  it('declares the DM BrandDesign token layer with both design families', () => {
+    // Standard Utility on :root.
+    expect(styles).toContain('--dm-surface-app: #1f1f1f;');
+    expect(styles).toContain('--dm-surface-panel: #212121;');
+    expect(styles).toContain('--dm-surface-panel-elevated: #2f2f32;');
+    expect(styles).toContain('--dm-border-default: #343438;');
+    expect(styles).toContain('--dm-text-primary: #dedee2;');
+    expect(styles).toContain('--dm-text-muted: #9a9aa2;');
     expect(styles).toContain('--dm-accent-orange: #c97b4a;');
     expect(styles).toContain('--dm-accent-orange-hover: #ee9a5d;');
     expect(styles).toContain('--dm-accent-orange-soft: rgba(201, 123, 74, 0.14);');
+    expect(styles).toContain('--dm-on-accent: #1a120b;');
+
+    // Black Utility override family.
+    expect(styles).toContain('.root[data-brand-design="black"]');
+    const blackRules = ruleBodies('.root[data-brand-design="black"]');
+    expect(blackRules).toHaveLength(1);
+    expect(blackRules[0]).toContain('--dm-surface-app: #000000;');
+    expect(blackRules[0]).toContain('--dm-surface-panel: #060606;');
+    expect(blackRules[0]).toContain('--dm-border-default: #222226;');
+    expect(blackRules[0]).toContain('--dm-text-primary: #e6e6ea;');
+
+    // The compatibility aliases must be re-declared inside the black scope:
+    // aliases computed on :root bake in the Standard values, so without these
+    // re-declarations the black design would only affect direct --dm-* users.
+    for (const alias of [
+      '--bg: var(--dm-surface-app);',
+      '--panel: var(--dm-surface-panel);',
+      '--panel-elevated: var(--dm-surface-panel-elevated);',
+      '--input: var(--dm-surface-input);',
+      '--border: var(--dm-border-default);',
+      '--border-strong: var(--dm-border-strong);',
+      '--border-hover: var(--dm-border-hover);',
+      '--text: var(--dm-text-primary);',
+      '--muted: var(--dm-text-muted);',
+      '--accent-soft: var(--dm-accent-orange-soft);'
+    ]) {
+      expect(blackRules[0]).toContain(alias);
+    }
+  });
+
+  it('uses ink text on filled accent controls instead of white', () => {
+    for (const selector of ['.btn-primary', '.confirm-btn.primary', '.update-badge', '.segmented-control-item.active']) {
+      const rules = ruleBodies(selector);
+      expect(rules.length).toBeGreaterThan(0);
+      expect(rules[0]).toContain('color: var(--on-accent);');
+    }
   });
 
   it('keeps titlebar icon buttons neutral on hover and when active', () => {

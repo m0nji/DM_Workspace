@@ -29,6 +29,7 @@ export function App(): React.JSX.Element {
   const showBoard = taskView && tasksEnabled;
 
   const locale = useStore((s) => s.settings.locale);
+  const brandDesign = useStore((s) => s.settings.brandDesign ?? 'black');
 
   useKeyboardShortcuts();
 
@@ -79,7 +80,7 @@ export function App(): React.JSX.Element {
 
   if (!hydrated) {
     return (
-      <div className="root">
+      <div className="root" data-brand-design={brandDesign}>
         <div className="titlebar" />
         <div className="app" />
       </div>
@@ -87,7 +88,7 @@ export function App(): React.JSX.Element {
   }
 
   return (
-    <div className="root">
+    <div className="root" data-brand-design={brandDesign}>
       {/* Draggable strip clearing the macOS traffic lights (hiddenInset). On
           Windows it's a custom row below the native window controls, so both
           platforms have the same titlebar surface for the action buttons. */}

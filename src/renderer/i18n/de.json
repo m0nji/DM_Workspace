@@ -49,6 +49,10 @@
       "de": "Deutsch"
     },
     "appearance": {
+      "brandDesign": "App-Design",
+      "brandDesignBlack": "Black Utility",
+      "brandDesignStandard": "Standard",
+      "brandDesignHint": "Black Utility nutzt reines Schwarz mit feinen Hairline-Controls, Standard ein ruhiges Dunkelgrau. Terminal-Themes bleiben unabhängig.",
       "theme": "Terminal-Theme",
       "backgroundColor": "Hintergrundfarbe",
       "customColor": "Eigene Farbe",
