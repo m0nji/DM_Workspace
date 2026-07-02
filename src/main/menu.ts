@@ -1,4 +1,4 @@
-import { Menu, type MenuItemConstructorOptions } from 'electron';
+import { app, Menu, type MenuItemConstructorOptions } from 'electron';
 
 /**
  * Install a minimal application menu. It stays hidden on Windows/Linux
@@ -9,9 +9,22 @@ import { Menu, type MenuItemConstructorOptions } from 'electron';
  * On Windows we deliberately omit the Edit menu: its default Ctrl+C accelerator
  * would hijack the terminal's Ctrl+C (SIGINT). On macOS the Edit menu is safe
  * (copy/paste use Cmd, not Ctrl) and provides the expected app menu roles.
+ *
+ * reload/forceReload/toggleDevTools are dev-only for the same reason: their
+ * default accelerators (Ctrl+R, Ctrl+Shift+R, Ctrl+Shift+I) would hijack the
+ * shell's Ctrl+R (reverse-i-search) on Windows/Linux in packaged builds, and an
+ * accidental reload tears down every terminal in the window.
  */
 export function installAppMenu(): void {
   const isMac = process.platform === 'darwin';
+  const devItems: MenuItemConstructorOptions[] = app.isPackaged
+    ? []
+    : [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' }
+      ];
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
       ? ([{ role: 'appMenu' }, { role: 'editMenu' }] as MenuItemConstructorOptions[])
@@ -19,10 +32,7 @@ export function installAppMenu(): void {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
+        ...devItems,
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },

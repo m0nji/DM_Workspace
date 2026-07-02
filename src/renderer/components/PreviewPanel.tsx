@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
-import { breadcrumbSegments, parentDir } from '../../shared/fs-path';
+import { breadcrumbSegments, isFsRoot, parentDir } from '../../shared/fs-path';
 import type { DirEntry } from '../../shared/types';
 import { Icon } from './Icon';
 import { FileTree } from './FileTree';
@@ -114,7 +114,7 @@ export function PreviewPanel(): React.JSX.Element | null {
         <span className="preview-tabs-spacer" />
         {tab === 'files' && (
           <>
-            <button type="button" className="icon-btn" aria-label={t('files.upOneFolder')} disabled={root === '/'} onClick={() => setBrowseRoot(parentDir(root))}><Icon name="arrow-up" /></button>
+            <button type="button" className="icon-btn" aria-label={t('files.upOneFolder')} disabled={isFsRoot(root)} onClick={() => setBrowseRoot(parentDir(root))}><Icon name="arrow-up" /></button>
             <button type="button" className="icon-btn" aria-label={t('files.newFile')} onClick={() => { setNewName(''); setNewError(null); }}><Icon name="file-plus" /></button>
             <button type="button" className="icon-btn" aria-label={t('files.refresh')} onClick={() => setRefreshKey((k) => k + 1)}><Icon name="reload" /></button>
             <button type="button" className="icon-btn" aria-label={t('files.chooseFolder')} onClick={() => { void pickRoot(); }}><Icon name="folder" /></button>

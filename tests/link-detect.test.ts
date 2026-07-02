@@ -41,6 +41,10 @@ describe('resolveSource', () => {
     expect(resolveSource('./report.md', '/home/me/proj')).toEqual({ kind: 'markdown', target: '/home/me/proj/report.md', rel: './report.md', resolved: true });
   });
 
+  it('joins a relative path onto a backslash Windows cwd without mixing separators', () => {
+    expect(resolveSource('report.md', 'C:\\Users\\me')).toEqual({ kind: 'markdown', target: 'C:/Users/me/report.md', rel: 'report.md', resolved: true });
+  });
+
   it('keeps an absolute .md path as-is, no rel', () => {
     expect(resolveSource('/tmp/a.md', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/a.md', resolved: true });
   });

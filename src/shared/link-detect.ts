@@ -38,8 +38,11 @@ function isAbsolute(p: string): boolean {
 }
 
 // Join cwd + relative path with a single forward slash, collapsing a leading "./".
+// A Windows drive cwd ('C:\Users\me') is normalized to forward slashes first so
+// the result doesn't mix separators.
 function joinPath(cwd: string, rel: string): string {
-  const base = cwd.replace(/\/+$/, '');
+  const norm = /^[A-Za-z]:[\\/]/.test(cwd) ? cwd.replace(/\\/g, '/') : cwd;
+  const base = norm.replace(/\/+$/, '');
   const clean = rel.replace(/^\.\//, '');
   return `${base}/${clean}`;
 }

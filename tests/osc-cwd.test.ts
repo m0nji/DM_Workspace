@@ -22,6 +22,10 @@ describe('parseOsc7', () => {
     expect(parseOsc7('/var/log')).toBe('/var/log');
   });
 
+  it('normalizes a bare Windows path to forward slashes', () => {
+    expect(parseOsc7('C:\\Users\\m0nji')).toBe('C:/Users/m0nji');
+  });
+
   it('returns null for empty or non-path payloads', () => {
     expect(parseOsc7('')).toBeNull();
     expect(parseOsc7('not-a-path')).toBeNull();
@@ -29,16 +33,20 @@ describe('parseOsc7', () => {
 });
 
 describe('parseOsc9', () => {
-  it('extracts a Windows path from a 9;<path> payload', () => {
-    expect(parseOsc9('9;C:\\Users\\m0nji\\Documents')).toBe('C:\\Users\\m0nji\\Documents');
+  it('extracts a Windows path from a 9;<path> payload, normalized to forward slashes', () => {
+    expect(parseOsc9('9;C:\\Users\\m0nji\\Documents')).toBe('C:/Users/m0nji/Documents');
   });
 
   it('extracts a POSIX path', () => {
     expect(parseOsc9('9;/Users/m0nji')).toBe('/Users/m0nji');
   });
 
+  it('keeps a backslash in a POSIX path intact (no drive prefix)', () => {
+    expect(parseOsc9('9;/Users/me/weird\\name')).toBe('/Users/me/weird\\name');
+  });
+
   it('trims surrounding whitespace', () => {
-    expect(parseOsc9('9; C:\\tmp ')).toBe('C:\\tmp');
+    expect(parseOsc9('9; C:\\tmp ')).toBe('C:/tmp');
   });
 
   it('returns null when the sub-identifier is not 9', () => {

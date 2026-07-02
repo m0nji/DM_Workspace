@@ -268,7 +268,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
     });
     const handleTerminalPasteShortcut = (e: KeyboardEvent): void => {
-      const isPasteKey = e.key.toLowerCase() === 'v' && (e.ctrlKey || e.metaKey) && !e.altKey;
+      // Only the platform's paste chord counts: Cmd+V on macOS, Ctrl+V elsewhere.
+      // On macOS Ctrl+V must reach the shell untouched (readline quoted-insert,
+      // vim's visual block), so ctrlKey may not be treated as a paste modifier there.
+      const primaryMod = window.api.platform === 'darwin'
+        ? e.metaKey && !e.ctrlKey
+        : e.ctrlKey && !e.metaKey;
+      const isPasteKey = e.key.toLowerCase() === 'v' && primaryMod && !e.altKey;
       if (!isPasteKey) return;
 
       e.preventDefault();

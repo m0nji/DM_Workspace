@@ -8,6 +8,15 @@
 //
 // We use OSC 9;9 from PowerShell (plain native path) and OSC 7 from POSIX shells
 // (a file:// URL). Both resolve to a filesystem path for the pane title.
+//
+// Windows drive paths are normalized to forward slashes ("C:/Users/me") so every
+// downstream consumer (breadcrumbs, link resolution, fs IPC) deals with a single
+// separator; Node accepts forward slashes on Windows. Only drive-letter paths are
+// rewritten — a POSIX filename may legally contain a backslash.
+
+function normalizeDrivePath(path: string): string {
+  return /^[A-Za-z]:[\\/]/.test(path) ? path.replace(/\\/g, '/') : path;
+}
 
 /**
  * Parse an OSC 7 payload (`file://host/path`, or a bare path as a fallback).
@@ -29,7 +38,7 @@ export function parseOsc7(payload: string): string | null {
     return path;
   }
   // Bare absolute path fallback (POSIX "/..." or Windows "C:\...").
-  return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p) ? p : null;
+  return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p) ? normalizeDrivePath(p) : null;
 }
 
 /**
@@ -41,5 +50,5 @@ export function parseOsc9(payload: string): string | null {
   const m = /^9;(.*)$/s.exec(payload);
   if (!m) return null;
   const path = m[1].trim();
-  return path || null;
+  return path ? normalizeDrivePath(path) : null;
 }
