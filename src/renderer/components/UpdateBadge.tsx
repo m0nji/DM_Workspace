@@ -38,6 +38,10 @@ export function UpdateBadge(): React.JSX.Element | null {
     if (version) {
       void window.api.fetchUpdateNotes(version).then((body) => {
         setNotes({ versions: body ? parseChangelog(body) : [], raw: body });
+      }).catch(() => {
+        // Failed fetch (offline, GitHub down): show the error text instead of
+        // an eternal "loading…" hint — the update itself stays available.
+        setNotes({ versions: [], raw: null });
       });
     } else {
       setNotes({ versions: [], raw: null });

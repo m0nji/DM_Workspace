@@ -246,13 +246,20 @@ export const useStore = create<StoreState>((set, get) => ({
   activeWorkspace: () => get().workspaces.find((w) => w.id === get().activeWorkspaceId),
 
   selectWorkspace: (id) => set((s) => {
-    if (!s.workspaces.some((w) => w.id === id)) return s;
+    const ws = s.workspaces.find((w) => w.id === id);
+    if (!ws) return s;
+    // Hand keyboard focus to the new workspace's first pane — the previous
+    // focusedPaneId points into the old workspace, where keystrokes would go
+    // nowhere visible. rAF: the pane is un-hidden (display:none -> block) first.
+    const firstPane = collectPaneIds(ws.layout)[0] ?? null;
+    if (firstPane) requestAnimationFrame(() => focusTerminal(firstPane));
     // Drop the file-browser folder so the Files tab re-derives it from the newly
     // active workspace's cwd, instead of clinging to the previous workspace's path.
     const next = {
       ...s,
       activeWorkspaceId: id,
       maximizedPaneId: null,
+      focusedPaneId: firstPane,
       previewPanel: { ...s.previewPanel, browseRoot: null }
     };
     persist(next);
@@ -343,11 +350,14 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   splitActivePane: (paneId, direction) => set((s) => {
-    const workspaces = s.workspaces.map((w) => {
-      if (w.id !== s.activeWorkspaceId || !w.layout) return w;
-      return { ...w, layout: splitPane(w.layout, paneId, direction, nextPaneId(), nextSplitId()) };
-    });
-    const next = { ...s, workspaces };
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws?.layout || !collectPaneIds(ws.layout).includes(paneId)) return s;
+    const newPaneId = nextPaneId();
+    const workspaces = s.workspaces.map((w) =>
+      w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
+    // The new pane takes over: store focus plus DOM focus once it has mounted.
+    requestAnimationFrame(() => focusTerminal(newPaneId));
+    const next = { ...s, workspaces, focusedPaneId: newPaneId };
     persist(next);
     return next;
   }),
@@ -356,9 +366,17 @@ export const useStore = create<StoreState>((set, get) => ({
     window.api.kill(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
+    let successor: string | null = null;
     const workspaces = s.workspaces.map((w) => {
       if (w.id !== s.activeWorkspaceId || !w.layout) return w;
-      const next: Workspace = { ...w, layout: closePane(w.layout, paneId) };
+      const oldIds = collectPaneIds(w.layout);
+      const layout = closePane(w.layout, paneId);
+      // The pane that slid into the closed pane's DFS slot — its former split
+      // sibling — inherits the focus.
+      const remaining = collectPaneIds(layout);
+      const idx = Math.max(0, oldIds.indexOf(paneId));
+      successor = remaining.length > 0 ? remaining[Math.min(idx, remaining.length - 1)] : null;
+      const next: Workspace = { ...w, layout };
       // Drop the closed pane's metadata so it can't orphan in persisted state
       // (mirrors the paneStatus/paneCwd cleanup above).
       const titles = stripKey(next.paneTitles, paneId);
@@ -367,13 +385,19 @@ export const useStore = create<StoreState>((set, get) => ({
       if (pending) next.pendingStartupCommands = pending; else delete next.pendingStartupCommands;
       return next;
     });
+    const focusedPaneId = s.focusedPaneId === paneId ? successor : s.focusedPaneId;
+    if (s.focusedPaneId === paneId && successor) {
+      const target = successor;
+      requestAnimationFrame(() => focusTerminal(target));
+    }
     const next = {
       ...s,
       workspaces,
       paneStatus,
       paneCwd,
-      focusedPaneId: s.focusedPaneId === paneId ? null : s.focusedPaneId,
-      maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId
+      focusedPaneId,
+      maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
+      searchOpenPaneId: s.searchOpenPaneId === paneId ? null : s.searchOpenPaneId
     };
     persist(next);
     return next;

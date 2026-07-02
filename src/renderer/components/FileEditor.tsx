@@ -10,6 +10,7 @@ type LoadState = 'loading' | 'ok' | 'binary' | 'too-large' | 'error';
 export function FileEditor({ path }: { path: string }): React.JSX.Element {
   const { t } = useTranslation();
   const setPanelTab = useStore((s) => s.setPanelTab);
+  const panelTab = useStore((s) => s.previewPanel.tab);
   const [content, setContent] = useState('');
   const [saved, setSaved] = useState('');
   const [state, setState] = useState<LoadState>('loading');
@@ -51,16 +52,22 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
 
   // Cmd/Ctrl+S saves from anywhere in the panel — including markdown preview
   // mode, where the textarea is unmounted and a div-level handler never fires.
+  // Window-level, so it must yield whenever the editor isn't the active surface:
+  // only the platform's primary chord counts (Ctrl+S on macOS belongs to the
+  // shell), only while the editor tab is visible, and never when the keystroke
+  // targets a terminal (Ctrl+S there is flow control/XOFF, not save).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 's') {
-        e.preventDefault();
-        save();
-      }
+      const primary = window.api.platform === 'darwin' ? e.metaKey : e.ctrlKey;
+      if (!primary || e.shiftKey || e.altKey || e.key.toLowerCase() !== 's') return;
+      if (panelTab !== 'preview') return;
+      if ((e.target as HTMLElement | null)?.closest?.('.xterm')) return;
+      e.preventDefault();
+      save();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [save]);
+  }, [save, panelTab]);
 
   // Guard the markdown render: bad input throwing here would crash the whole
   // renderer (no error boundary exists). Fall back to a notice instead.

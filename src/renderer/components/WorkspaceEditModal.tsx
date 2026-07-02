@@ -27,7 +27,13 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
   const setTasksEnabled = useStore((s) => s.setTasksEnabled);
 
+  // Every field is buffered locally and applied only on "Done" — Cancel,
+  // Escape and the backdrop discard ALL edits. (Colour/folder/tasks used to
+  // write through immediately, which made the Cancel button a lie.)
   const [name, setName] = useState(ws?.name ?? '');
+  const [color, setColor] = useState(ws?.color);
+  const [cwd, setCwd] = useState(ws?.cwd ?? '');
+  const [tasksEnabled, setTasks] = useState(ws?.tasksEnabled ?? false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,10 +41,16 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     inputRef.current?.select();
   }, []);
 
-  // Commit the (trimmed) name and close. Enter and the "Done" button share
-  // this; an empty name is discarded so a workspace never loses its label.
+  // Apply the buffered edits and close. Enter and the "Done" button share this;
+  // an empty name is discarded so a workspace never loses its label. The cwd
+  // goes last: it restarts the workspace's panes.
   const commit = (): void => {
-    if (ws && name.trim()) renameWorkspace(ws.id, name.trim());
+    if (ws) {
+      if (name.trim() && name.trim() !== ws.name) renameWorkspace(ws.id, name.trim());
+      if (color && color !== ws.color) setWorkspaceColor(ws.id, color);
+      if (tasksEnabled !== (ws.tasksEnabled ?? false)) setTasksEnabled(ws.id, tasksEnabled);
+      if (cwd && cwd !== ws.cwd) setWorkspaceCwd(ws.id, cwd);
+    }
     onClose();
   };
 
@@ -50,17 +62,17 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, ws]);
+  }, [name, color, cwd, tasksEnabled, ws]);
 
   const chooseFolder = async (): Promise<void> => {
     if (!ws) return;
     const dir = await window.api.pickDirectory();
-    if (!dir) return;
+    if (!dir || dir === ws.cwd) { if (dir) setCwd(dir); return; }
     // Changing the folder restarts the workspace's open terminals in the new
-    // directory, so confirm first when there are running panes to lose.
+    // directory (applied on "Done"), so confirm when there are panes to lose.
     const hasPanes = collectPaneIds(ws.layout ?? null).length > 0;
     if (hasPanes && !window.confirm(t('workspace.folderRestartConfirm'))) return;
-    setWorkspaceCwd(ws.id, dir);
+    setCwd(dir);
   };
 
   if (!ws) return null;
@@ -92,10 +104,10 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
               <button
                 key={c}
                 type="button"
-                className={`ws-edit-swatch ${ws.color === c ? 'active' : ''}`}
+                className={`ws-edit-swatch ${color === c ? 'active' : ''}`}
                 style={{ background: c }}
                 title={t('workspace.edit.setColor')}
-                onClick={() => setWorkspaceColor(ws.id, c)}
+                onClick={() => setColor(c)}
               />
             ))}
           </div>
@@ -104,7 +116,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         <div className="ws-edit-field">
           <div className="modal-section-label">{t('workspace.edit.baseFolder')}</div>
           <div className="ws-edit-folder">
-            <code className="ws-edit-folder-path" title={ws.cwd}>{ws.cwd}</code>
+            <code className="ws-edit-folder-path" title={cwd}>{cwd}</code>
             <button type="button" className="ws-edit-folder-btn" onClick={() => void chooseFolder()}>
               <Icon name="folder" size={15} />
               {t('common.change')}
@@ -115,8 +127,8 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         <label className="ws-edit-tasks">
           <input
             type="checkbox"
-            checked={ws.tasksEnabled ?? false}
-            onChange={(e) => setTasksEnabled(ws.id, e.target.checked)}
+            checked={tasksEnabled}
+            onChange={(e) => setTasks(e.target.checked)}
           />
           {t('workspace.edit.enableTasks')}
         </label>

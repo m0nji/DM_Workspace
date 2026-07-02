@@ -30,13 +30,14 @@ function formatSize(bytes: number): string {
 interface NodeProps {
   entry: DirEntry;
   depth: number;
+  refreshKey: number;
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onOpenFile: (path: string) => void;
   onContext: (e: React.MouseEvent, entry: DirEntry) => void;
 }
 
-function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
+function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<DirEntry[] | null>(null);
@@ -50,6 +51,17 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext 
       .then((list) => { inFlight.current = false; setChildren(list); setError(null); })
       .catch((err: unknown) => { inFlight.current = false; setError(String(err)); });
   }, [entry.path]);
+
+  // A refresh (delete/create/manual reload) must reach expanded subfolders too,
+  // not just the root listing — otherwise a file deleted inside an open folder
+  // stays visible until the folder is collapsed and re-expanded.
+  const lastRefresh = useRef(refreshKey);
+  useEffect(() => {
+    if (lastRefresh.current === refreshKey) return;
+    lastRefresh.current = refreshKey;
+    if (open) loadChildren();
+    else setChildren(null); // stale while collapsed: reload on next expand
+  }, [refreshKey, open, loadChildren]);
 
   const toggle = useCallback(() => {
     if (!entry.isDir) return;
@@ -100,7 +112,7 @@ function TreeNode({ entry, depth, selectedPath, onSelect, onOpenFile, onContext 
           : children === null
             ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>{t('files.loading')}</div>
             : children.map((c) => (
-                <TreeNode key={c.path} entry={c} depth={depth + 1} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
+                <TreeNode key={c.path} entry={c} depth={depth + 1} refreshKey={refreshKey} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
               ))
       )}
     </>
@@ -157,7 +169,7 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onReques
   return (
     <div className="ftree" role="tree">
       {entries.map((e) => (
-        <TreeNode key={e.path} entry={e} depth={0} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} onContext={onContext} />
+        <TreeNode key={e.path} entry={e} depth={0} refreshKey={refreshKey} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} onContext={onContext} />
       ))}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>

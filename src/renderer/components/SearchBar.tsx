@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { findNext, findPrevious, clearSearch } from '../search-registry';
+import { focusTerminal } from '../terminal-registry';
 
 interface Props { paneId: string; }
 
@@ -21,7 +22,9 @@ export function SearchBar({ paneId }: Props): React.JSX.Element | null {
 
   if (!open) return null;
 
-  const close = (): void => { clearSearch(paneId); setSearchOpen(null); };
+  // Hand focus back to the pane's terminal — otherwise it falls to <body> when
+  // the input unmounts and keystrokes go nowhere until the user clicks.
+  const close = (): void => { clearSearch(paneId); setSearchOpen(null); focusTerminal(paneId); };
 
   return (
     <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>

@@ -20,6 +20,12 @@ export function useKeyboardShortcuts(): void {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (!mod) return;
 
+      // An open modal (shared .modal-backdrop pattern: confirms, workspace
+      // editor, changelog, settings) owns the keyboard — app shortcuts must not
+      // act on the layout behind it (e.g. Mod+W closing a pane behind a delete
+      // confirmation).
+      if (document.querySelector('.modal-backdrop')) return;
+
       // Capture phase on window runs before xterm's textarea handler; we must
       // BOTH preventDefault and stopPropagation on a match so the keystroke never
       // reaches the terminal (preventDefault alone still lets it propagate down,
