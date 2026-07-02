@@ -15,6 +15,8 @@
 
 ---
 
+> **Just want to install it?** Grab the ready-made app package for your operating system from the [Releases page](https://github.com/m0nji/DM_Workspace/releases) — no build step required.
+
 ## What it is
 
 DM Workspace lets you open many terminals at once in a single, tidy window. Instead of
