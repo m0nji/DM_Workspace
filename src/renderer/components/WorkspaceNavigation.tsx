@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
@@ -20,9 +20,17 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const selectWorkspace = useStore((s) => s.selectWorkspace);
   const addWorkspace = useStore((s) => s.addWorkspace);
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
-  const paneStatus = useStore((s) => s.paneStatus);
   const showDoneBadge = useStore((s) => s.settings.showDoneBadge ?? false);
-  const activeId2 = useStore((s) => s.activeWorkspaceId);
+  // Subscribe to paneStatus only while the done badge is on — status flips on
+  // every terminal's running/idle/done transition and would re-render the whole
+  // navigation for nothing otherwise.
+  const paneStatus = useStore((s) => (s.settings.showDoneBadge ?? false) ? s.paneStatus : null);
+  // Pane-id lists per workspace, recomputed only when layouts change (NOT on
+  // every status flip — collectPaneIds walks every layout tree).
+  const paneIdsByWs = useMemo(
+    () => new Map(workspaces.map((w) => [w.id, collectPaneIds(w.layout)])),
+    [workspaces]
+  );
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -39,10 +47,10 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
     <div className={rootClass}>
       {!top && <div className="sidebar-header"><span>{t('workspace.sectionTitle')}</span></div>}
       {workspaces.map((w) => {
-        const paneIds = collectPaneIds(w.layout);
+        const paneIds = paneIdsByWs.get(w.id) ?? [];
         const count = paneIds.length;
         // Badge: number of "done" panes in INACTIVE workspaces (where you can't see them).
-        const doneCount = !showDoneBadge || w.id === activeId2
+        const doneCount = !showDoneBadge || !paneStatus || w.id === activeId
           ? 0
           : paneIds.filter((pid) => paneStatus[pid] === 'done').length;
         return (

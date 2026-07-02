@@ -74,13 +74,10 @@ export function splitPane(
       children: [node, makePane(newPaneId)]
     };
   }
-  return {
-    ...node,
-    children: [
-      splitPane(node.children[0], targetPaneId, direction, newPaneId, newSplitId, ratio),
-      splitPane(node.children[1], targetPaneId, direction, newPaneId, newSplitId, ratio)
-    ]
-  };
+  const a = splitPane(node.children[0], targetPaneId, direction, newPaneId, newSplitId, ratio);
+  const b = splitPane(node.children[1], targetPaneId, direction, newPaneId, newSplitId, ratio);
+  if (a === node.children[0] && b === node.children[1]) return node; // unchanged subtree
+  return { ...node, children: [a, b] };
 }
 
 export function closePane(node: LayoutNode, targetPaneId: string): LayoutNode | null {
@@ -101,10 +98,10 @@ export function setRatio(node: LayoutNode, splitId: string, ratio: number): Layo
   if (node.id === splitId) {
     return { ...node, ratio: clampRatio(ratio) };
   }
-  return {
-    ...node,
-    children: [setRatio(node.children[0], splitId, ratio), setRatio(node.children[1], splitId, ratio)]
-  };
+  const a = setRatio(node.children[0], splitId, ratio);
+  const b = setRatio(node.children[1], splitId, ratio);
+  if (a === node.children[0] && b === node.children[1]) return node; // unchanged subtree
+  return { ...node, children: [a, b] };
 }
 
 function split(id: string, direction: Direction, a: LayoutNode, b: LayoutNode): SplitNode {

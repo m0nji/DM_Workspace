@@ -437,7 +437,10 @@ export const useStore = create<StoreState>((set, get) => ({
       const ws = s.workspaces.find((w) => collectPaneIds(w.layout).includes(paneId));
       const visible = ws != null && ws.id === s.activeWorkspaceId;
       if (ws && (!visible || !s.windowFocused)) {
-        window.api.notifyAgentDone({ workspaceId: ws.id, workspaceName: ws.name, paneTitle: ws.cwd });
+        // Prefer the pane's custom title, then its live cwd; the workspace cwd
+        // is only the last resort (it names the workspace, not the pane).
+        const paneTitle = ws.paneTitles?.[paneId] ?? s.paneCwd[paneId] ?? ws.cwd;
+        window.api.notifyAgentDone({ workspaceId: ws.id, workspaceName: ws.name, paneTitle });
       }
     }
     return { ...s, paneStatus };

@@ -321,6 +321,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const onDragLeave = (e: DragEvent): void => {
       // Only clear when the pointer actually leaves the host (not on child enter).
       if (e.relatedTarget && host.contains(e.relatedTarget as Node)) return;
+      // relatedTarget is often null during OS file drags (Chromium withholds it),
+      // so also keep the highlight while the pointer is still inside the host.
+      const r = host.getBoundingClientRect();
+      if (e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom) return;
       host.classList.remove('drop-target');
     };
     const onDrop = (e: DragEvent): void => {
@@ -479,11 +483,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
 
     let spawned = false;
+    let spawnSent = false; // true once the spawn IPC has actually gone out
     const spawnOnce = () => {
       if (spawned) return;
       spawned = true;
       void restoreOnce().then(() => {
         window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+        spawnSent = true;
         // One-shot startup command for a pane created from a template. Consuming
         // clears it (and persists) so it never runs again after a restart. The
         // PTY buffers the input until the shell is ready to read it.
@@ -511,7 +517,9 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const resize = () => {
       if (safeFit()) {
         spawnOnce();
-        window.api.resize({ paneId, cols: term.cols, rows: term.rows });
+        // Don't let a resize IPC race ahead of the (async) spawn IPC — the
+        // spawn itself carries the freshly fitted cols/rows, so nothing is lost.
+        if (spawnSent) window.api.resize({ paneId, cols: term.cols, rows: term.rows });
       }
     };
     // Observe the wrapper, not the host: safeFit pins the host to a fixed pixel

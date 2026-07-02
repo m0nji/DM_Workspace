@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { breadcrumbSegments, isFsRoot, parentDir } from '../../shared/fs-path';
@@ -42,16 +42,22 @@ export function PreviewPanel(): React.JSX.Element | null {
   // so opening the panel (incl. via the keyboard shortcut) always has a folder.
   const root = panel.browseRoot ?? activeCwd;
 
+  // Cleanup lives in a ref so an unmount mid-drag (panel closed while resizing)
+  // also removes the window listeners, not just mouseup.
+  const dragCleanup = useRef<(() => void) | null>(null);
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const onMove = (ev: MouseEvent): void => setPreviewWidth(window.innerWidth - ev.clientX);
-    const onUp = (): void => {
+    const onUp = (): void => dragCleanup.current?.();
+    dragCleanup.current = () => {
+      dragCleanup.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [setPreviewWidth]);
+  useEffect(() => () => dragCleanup.current?.(), []);
 
   const pickRoot = useCallback(async () => {
     const dir = await window.api.pickDirectory();

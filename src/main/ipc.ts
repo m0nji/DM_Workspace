@@ -106,9 +106,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   const pty = new PtyManager();
   const scrollback = new ScrollbackStore(SCROLLBACK_FILE());
 
-  // Wipe the temp image dir on quit; pasted images only need to survive the session.
+  // Wipe the temp image dir on quit; pasted images only need to survive the
+  // session. Also release the task watcher and its pending debounce (declared
+  // below; the handler runs at quit time, long after they exist).
   app.on('will-quit', () => {
     scrollback.flush();
+    taskWatcher?.close();
+    if (watchDebounce) clearTimeout(watchDebounce);
     try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   });
 
@@ -158,6 +162,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     taskWatcher?.close();
     taskWatcher = null;
     watchedDir = dir;
+    // Only one dir is ever watched; drop echo-guard entries for other dirs so
+    // the map cannot grow without bound over a long session.
+    for (const key of [...lastWritten.keys()]) if (key !== dir) lastWritten.delete(key);
     const file = tasksFilePath(dir);
     try {
       // Watch the .dmworkspace dir (the file may not exist yet); filter on filename.

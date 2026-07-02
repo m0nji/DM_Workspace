@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
 import { makePane, collectPaneIds, collectSplitIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
+import type { SplitNode } from '../src/shared/types';
 
 describe('createIdGenerator', () => {
   it('produces unique sequential ids with a prefix', () => {
@@ -60,6 +61,16 @@ describe('splitPane', () => {
     const result = splitPane(makePane('a'), 'a', 'h', 'b', 's1', 0) as any;
     expect(result.ratio).toBe(0.1);
   });
+
+  it('shares untouched subtrees by reference (like closePane)', () => {
+    let tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1') as SplitNode;
+    tree = splitPane(tree, 'a', 'v', 'c', 's2') as SplitNode;
+    const untouchedRight = tree.children[1]; // pane 'b'
+    const result = splitPane(tree, 'c', 'h', 'd', 's3') as SplitNode;
+    expect(result.children[1]).toBe(untouchedRight);
+    // No target at all -> the whole tree comes back by reference.
+    expect(splitPane(tree, 'zzz', 'h', 'x', 'sx')).toBe(tree);
+  });
 });
 
 describe('closePane', () => {
@@ -97,6 +108,16 @@ describe('setRatio', () => {
     const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
     const result = setRatio(tree, 's1', 0.3);
     expect((result as any).ratio).toBe(0.3);
+  });
+
+  it('shares untouched subtrees by reference (like closePane)', () => {
+    let tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1') as SplitNode;
+    tree = splitPane(tree, 'a', 'v', 'c', 's2') as SplitNode;
+    const untouchedRight = tree.children[1]; // pane 'b'
+    const result = setRatio(tree, 's2', 0.7) as SplitNode;
+    expect(result.children[1]).toBe(untouchedRight);
+    // Unknown split id -> the whole tree comes back by reference.
+    expect(setRatio(tree, 'nope', 0.7)).toBe(tree);
   });
 
   it('clamps ratio into [0.1, 0.9]', () => {
