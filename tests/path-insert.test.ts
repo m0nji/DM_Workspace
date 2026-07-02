@@ -46,6 +46,16 @@ describe('formatPathsForInsert (Windows)', () => {
     expect(formatPathsForInsert(['C:\\Users\\me\\bad"name.png'], 'win32'))
       .toBe('"C:\\Users\\me\\bad`"name.png" ');
   });
+
+  it('quotes and backtick-escapes $ so PowerShell does not interpolate it', () => {
+    expect(formatPathsForInsert(['C:\\temp\\$env.txt'], 'win32'))
+      .toBe('"C:\\temp\\`$env.txt" ');
+  });
+
+  it('quotes and doubles a backtick (the PowerShell escape char)', () => {
+    expect(formatPathsForInsert(['C:\\temp\\a`b.txt'], 'win32'))
+      .toBe('"C:\\temp\\a``b.txt" ');
+  });
 });
 
 describe('formatPathsForInsert (edge cases)', () => {

@@ -78,6 +78,7 @@ const api: RendererApi = {
   // Resolve the real filesystem path of a dropped File (Electron 32+ removed
   // File.path; webUtils.getPathForFile is the supported replacement).
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
   platform: process.platform,
   disableWebgl: process.env.DMWS_DISABLE_WEBGL === '1',
   isE2E: process.env.DMWS_E2E === '1',

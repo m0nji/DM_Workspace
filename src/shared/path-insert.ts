@@ -15,9 +15,12 @@ function escapePosix(p: string): string {
   return p.replace(POSIX_SPECIAL, (ch) => '\\' + ch);
 }
 
+// The Windows shell is PowerShell (see pty-manager defaultShell). Inside its
+// double quotes, `$` (variable/subexpression) and the backtick (escape char)
+// still interpolate, so they both trigger quoting AND get backtick-escaped.
 function escapeWindows(p: string): string {
-  if (!/[\s&|;<>()^"%!]/.test(p)) return p;
-  return `"${p.replace(/"/g, '`"')}"`;
+  if (!/[\s&|;<>()^"%!$`]/.test(p)) return p;
+  return `"${p.replace(/[`"$]/g, (ch) => '`' + ch)}"`;
 }
 
 export function formatPathsForInsert(paths: string[], platform: NodeJS.Platform): string {

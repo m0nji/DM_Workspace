@@ -1,5 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { bashPromptCommand, zshIntegrationFiles, screenrcContent } from '../src/main/shell-integration';
+import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, PS_CWD_BOOTSTRAP } from '../src/main/shell-integration';
+
+describe('shellArgs', () => {
+  it('passes the OSC 9;9 cwd bootstrap to PowerShell (any spelling or path)', () => {
+    expect(shellArgs('powershell.exe')).toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
+    expect(shellArgs('pwsh')).toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
+    expect(shellArgs('C:\\Program Files\\PowerShell\\7\\pwsh.exe'))
+      .toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
+  });
+
+  it('launches POSIX shells as login shells', () => {
+    expect(shellArgs('/bin/zsh')).toEqual(['-l']);
+    expect(shellArgs('/usr/bin/bash')).toEqual(['-l']);
+    expect(shellArgs('fish')).toEqual(['-l']);
+  });
+
+  it('gives git-bash on Windows the login flag, not PowerShell args', () => {
+    expect(shellArgs('C:\\Program Files\\Git\\bin\\bash.exe')).toEqual(['-l']);
+  });
+
+  it('passes no flags to cmd.exe', () => {
+    expect(shellArgs('cmd.exe')).toEqual([]);
+    expect(shellArgs('C:\\Windows\\System32\\cmd.exe')).toEqual([]);
+  });
+});
 
 describe('bashPromptCommand', () => {
   it('emits an OSC 7 file:// sequence using $HOSTNAME and $PWD', () => {

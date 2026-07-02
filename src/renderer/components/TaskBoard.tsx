@@ -12,8 +12,11 @@ function moveTask(board: Board, from: { col: number; idx: number }, toCol: numbe
   const columns = board.columns.map((c) => ({ ...c, tasks: [...c.tasks] }));
   const [moved] = columns[from.col].tasks.splice(from.idx, 1);
   if (!moved) return board;
-  // "Done" column toggles the checkbox to match its name, mirroring the spec.
-  const done = /done/i.test(columns[toCol].name);
+  // The last column counts as "done" (boards read left-to-right: Todo → … →
+  // Done), so a renamed/localized final column ("Fertig", "Erledigt") still
+  // checks tasks off. The name match keeps a "Done" column working when it
+  // isn't last.
+  const done = toCol === columns.length - 1 || /done/i.test(columns[toCol].name);
   columns[toCol].tasks.push({ ...moved, done });
   return { columns };
 }

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
-import { renderMarkdown } from '../markdown';
+import { renderMarkdown, handleMarkdownLinkClick } from '../markdown';
 import { resolveSource, fileTarget } from '../../shared/link-detect';
 import { escapeHtml } from '../../shared/html';
 import { Icon } from './Icon';
@@ -119,7 +119,7 @@ export function PreviewBody(): React.JSX.Element {
             {t('files.notFound')}
           </div>
         ) : isMarkdown ? (
-          <div className="markdown-body" dangerouslySetInnerHTML={{ __html: mdHtml }} />
+          <div className="markdown-body" onClick={handleMarkdownLinkClick} dangerouslySetInnerHTML={{ __html: mdHtml }} />
         ) : (
           <webview ref={webviewRef as React.Ref<WebviewEl>} src={source.target} className="preview-webview" />
         )}

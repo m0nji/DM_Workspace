@@ -47,8 +47,13 @@ export function resolveLinkPath(
 ): string | null {
   const maxDepth = opts.maxDepth ?? MAX_DEPTH;
   const maxDirs = opts.maxDirs ?? MAX_DIRS;
-  const norm = (p: string) => p.replace(/\/+$/, '');
+  // expandTilde: a workspace cwd may still be the literal '~' (fresh workspace),
+  // which readdirSync can't resolve. Trailing-separator strip is [\\/] so the
+  // nested-start dedup below also works with Windows paths.
+  const norm = (p: string) => expandTilde(p).replace(/[\\/]+$/, '');
   const starts = [...new Set([norm(cwd), ...roots.map(norm)])];
+  // Separator-agnostic prefix test for the nested-start dedup.
+  const fwd = (p: string) => p.replace(/\\/g, '/');
   // Only skip a nested start if its ancestor completed its BFS WITHOUT hitting
   // the budget cap — if the ancestor was capped, the nested start may not have
   // been reached and must run its own BFS with a fresh budget.
@@ -57,7 +62,7 @@ export function resolveLinkPath(
   for (const start of starts) {
     // Skip starts that are nested under a start that was fully walked (not
     // capped), because the whole subtree was already visited exhaustively.
-    if (fullyWalked.some((s) => start === s || start.startsWith(s + '/'))) continue;
+    if (fullyWalked.some((s) => start === s || fwd(start).startsWith(fwd(s) + '/'))) continue;
 
     // Each start gets its own fresh budget so a large cwd subtree cannot
     // exhaust the quota before any workspace root is ever searched.
@@ -205,7 +210,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // panel never needs anything else, and this avoids slurping arbitrary files
   // (e.g. a malicious agent printing a clickable ~/.ssh/id_rsa path).
   ipcMain.handle('file:read', (_e, path: string): string => {
-    return readPreviewFile(path);
+    // expandTilde for consistency with every other fs-touching handler — a
+    // '~/notes.md' link from terminal output must resolve to the home dir.
+    return readPreviewFile(expandTilde(path));
   });
 
   // File browser. Unlike file:read (whose paths come from terminal output and are
@@ -244,6 +251,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // Move a file or folder (recursively) to the OS trash, so a delete is always
   // recoverable. Errors (missing path / permission) reject and surface inline.
   ipcMain.handle('fs:delete', (_e, path: string) => shell.trashItem(expandTilde(path)));
+
+  // Open a link from the markdown preview in the system browser. http(s) only —
+  // never file:/smb:/etc., which could be abused by untrusted markdown.
+  ipcMain.on('shell:openExternal', (_e, url: string) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+  });
 
   ipcMain.handle('dialog:pickDirectory', async () => {
     const win = getWindow();

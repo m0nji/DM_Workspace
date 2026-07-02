@@ -32,9 +32,12 @@ export function useKeyboardShortcuts(): void {
       // and xterm would emit a control byte on Ctrl+letter combos).
       const stop = (): void => { e.preventDefault(); e.stopPropagation(); };
 
-      // Fixed: jump to workspace 1..9.
-      if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
-        const ws = s.workspaces[Number(e.key) - 1];
+      // Fixed: jump to workspace 1..9. Match on e.code (physical digit row /
+      // numpad) like the rest of the shortcut system — on layouts where digits
+      // need Shift (e.g. AZERTY), e.key would never be "1".
+      const digit = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+      if (!e.shiftKey && !e.altKey && digit) {
+        const ws = s.workspaces[Number(digit[1]) - 1];
         if (ws) { stop(); s.selectWorkspace(ws.id); }
         return;
       }

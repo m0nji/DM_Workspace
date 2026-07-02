@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { resolveCwd } from './resolve-cwd';
 import { app } from 'electron';
 import { join } from 'path';
-import { bashPromptCommand, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
+import { bashPromptCommand, shellArgs, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
 
 export interface SpawnOptions {
   cwd: string;
@@ -16,25 +16,6 @@ export interface SpawnOptions {
 function defaultShell(): string {
   if (process.platform === 'win32') return 'powershell.exe';
   return process.env.SHELL || '/bin/zsh';
-}
-
-// PowerShell bootstrap that makes every prompt emit OSC 9;9 with the current
-// filesystem path, so the renderer can show the live cwd in the pane title. It
-// wraps (rather than replaces) the existing prompt, so a custom prompt is kept.
-// $([char]27) = ESC, $([char]7) = BEL (the OSC terminator). Passed as a single
-// argv element, so no extra shell-quoting is needed.
-const PS_CWD_BOOTSTRAP =
-  "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
-  "function global:prompt{$o=& $global:__dmwsPrompt;" +
-  "\"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$o\"}";
-
-// Launch as a login shell on macOS/Linux so /etc/zprofile (path_helper) and the
-// user's ~/.zprofile/.zlogin run — exactly like Terminal.app. Without this a
-// GUI-launched app inherits only a minimal PATH and tools installed under e.g.
-// /opt/homebrew/bin (Homebrew) aren't found, even though they work in Terminal.
-function shellArgs(): string[] {
-  if (process.platform === 'win32') return ['-NoExit', '-Command', PS_CWD_BOOTSTRAP];
-  return ['-l'];
 }
 
 // The zsh integration files are deterministic, so generate them once per process
@@ -113,7 +94,7 @@ export class PtyManager {
   spawn(paneId: string, opts: SpawnOptions): void {
     if (this.procs.has(paneId)) return;
     const shell = opts.shell || defaultShell();
-    const proc = pty.spawn(shell, shellArgs(), {
+    const proc = pty.spawn(shell, shellArgs(shell), {
       // xterm-256color + COLORTERM=truecolor so programs render full color (e.g.
       // Claude Code's logo shows orange instead of the 16-color red fallback).
       name: 'xterm-256color',

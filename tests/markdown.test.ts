@@ -29,4 +29,16 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('style=');
     expect(html).toContain('styled');
   });
+
+  it('strips remote image sources (tracking/IP leak) but keeps inline data: images', () => {
+    const html = renderMarkdown('![t](https://evil.example/pixel.png)\n\n![ok](data:image/png;base64,AAAA)');
+    expect(html).not.toContain('https://evil.example');
+    expect(html).toContain('data:image/png;base64,AAAA');
+  });
+
+  it('adds rel=noopener to links', () => {
+    const html = renderMarkdown('[site](https://example.com)');
+    expect(html).toContain('href="https://example.com"');
+    expect(html).toContain('noopener');
+  });
 });

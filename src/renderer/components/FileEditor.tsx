@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
-import { renderMarkdown, isMarkdownFile } from '../markdown';
+import { renderMarkdown, isMarkdownFile, handleMarkdownLinkClick } from '../markdown';
 import { basename } from '../../shared/fs-path';
 import { Icon } from './Icon';
 
@@ -101,7 +101,7 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
         {state === 'error' && <div className="feditor-notice">{t('files.editorLoadError')}</div>}
         {state === 'ok' && (
           mode === 'render'
-            ? <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+            ? <div className="markdown-body" onClick={handleMarkdownLinkClick} dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             : <textarea
                 className="feditor-textarea"
                 value={content}

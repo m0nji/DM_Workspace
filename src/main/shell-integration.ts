@@ -5,6 +5,34 @@ import { join } from 'path';
 const ESC = '\x1b';
 const BEL = '\x07';
 
+// PowerShell bootstrap that makes every prompt emit OSC 9;9 with the current
+// filesystem path, so the renderer can show the live cwd in the pane title. It
+// wraps (rather than replaces) the existing prompt, so a custom prompt is kept.
+// $([char]27) = ESC, $([char]7) = BEL (the OSC terminator). Passed as a single
+// argv element, so no extra shell-quoting is needed.
+export const PS_CWD_BOOTSTRAP =
+  "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
+  "function global:prompt{$o=& $global:__dmwsPrompt;" +
+  "\"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$o\"}";
+
+// Shells we know accept `-l` (login shell). POSIX shells get `-l` so
+// /etc/zprofile (path_helper) and the user's profile run — exactly like
+// Terminal.app; a GUI-launched app otherwise inherits a minimal PATH.
+const POSIX_SHELLS = new Set(['bash', 'zsh', 'fish', 'sh', 'dash', 'ksh']);
+
+// Spawn args for the shell we actually launch — NOT for the platform. A custom
+// shell (cmd.exe, git-bash) must never receive the PowerShell bootstrap flags.
+export function shellArgs(shell: string): string[] {
+  // Manual basename: node's posix basename would not split a Windows path.
+  const base = (shell.split(/[\\/]/).pop() ?? shell).toLowerCase().replace(/\.exe$/, '');
+  if (base === 'powershell' || base === 'pwsh') return ['-NoExit', '-Command', PS_CWD_BOOTSTRAP];
+  if (base === 'cmd') return []; // cmd.exe has no -l and would choke on PS flags
+  if (POSIX_SHELLS.has(base)) return ['-l'];
+  // Unknown shell: assume login-shell support on POSIX (the previous behaviour
+  // for every $SHELL); pass nothing on Windows (cmd.exe & friends have no -l).
+  return process.platform === 'win32' ? [] : ['-l'];
+}
+
 // bash: the cwd-reporting command goes into the PROMPT_COMMAND *environment
 // variable*, which bash runs before each prompt. Inheriting it via env avoids
 // echoing a typed command into the terminal (the old stdin-injection did).

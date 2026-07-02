@@ -177,6 +177,8 @@ export interface RendererApi {
   clipboardWrite(text: string): void;
   // resolve the real filesystem path of a dropped File
   getPathForFile(file: File): string;
+  // open an http(s) link in the system browser (markdown preview links)
+  openExternal(url: string): void;
   // the host platform (for path-escaping decisions in the renderer)
   platform: NodeJS.Platform;
   // e2e-only: keep xterm on the DOM renderer for tests that assert terminal text
