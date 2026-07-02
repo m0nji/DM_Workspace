@@ -2,6 +2,25 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.10 – 2026-07-02
+- fix: The file browser now works on Windows – breadcrumbs split `C:\…` paths into clickable segments, and the "up" button stops at the drive root instead of jumping to a broken `/` (Windows)
+- fix: Ctrl+V reaches the shell again on macOS (readline quoted-insert, vim's visual block) instead of being swallowed by the paste handler – pasting stays on Cmd+V (macOS)
+- fix: Ctrl+R reaches the shell's history search again in packaged builds – the hidden Reload/DevTools menu shortcuts are now dev-only, so an accidental Ctrl+R can no longer reset all terminals (Windows/Linux)
+- fix: App state, terminal scrollback and TASKS.md are now written atomically, so a crash or forced quit mid-write can no longer corrupt them and silently reset all workspaces
+- fix: Custom pane titles and pending startup commands now survive changing a workspace's base folder
+- fix: Keyboard focus now follows the action – to the split neighbor after closing a pane, to the new pane after a split, to the first pane after switching workspaces, and back to the terminal after closing search – instead of keystrokes going nowhere until a click
+- fix: App shortcuts are suspended while a dialog is open, so Cmd/Ctrl+W can no longer close a pane behind a delete confirmation
+- fix: Cmd/Ctrl+S only saves the file editor while it is visible and never intercepts the keystroke inside a terminal (where Ctrl+S is flow control)
+- fix: Deleting a file inside an expanded subfolder now updates the file tree immediately
+- fix: "Cancel" in the workspace editor now discards colour, folder and task changes instead of silently keeping them
+- fix: The update dialog shows an error instead of loading forever when the release notes can't be fetched
+- fix: Moving a task into a renamed last column (e.g. "Fertig") now checks it off, not just columns named "Done"
+- fix: Workspace shortcuts Cmd/Ctrl+1–9 now work on keyboard layouts where digits require Shift (e.g. AZERTY)
+- fix: Dropped or pasted paths containing `$` or a backtick are now escaped correctly for PowerShell (Windows)
+- fix: A custom shell now gets matching startup flags – cmd.exe no longer receives PowerShell arguments, git-bash starts as a login shell (Windows)
+- security: Markdown previews no longer load remote images (tracking protection for untrusted agent output), and external links open in the system browser instead of being dead clicks
+- perf: Terminal status changes no longer re-render the whole workspace navigation, and layout operations reuse unchanged subtrees
+
 ## 0.9.8 – 2026-06-30
 - change: Terminal panes now have a "Reset terminal" entry in the right-click menu that unsticks the input – e.g. after a tool exits and leaves mouse tracking on, hijacking the scroll wheel and text selection – without clearing the pane's contents (use "Clear window" for that)
 
