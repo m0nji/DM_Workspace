@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../src/renderer/store';
+import { collectPaneIds } from '../src/shared/layout-tree';
 
 describe('workspace store actions', () => {
   const saveState = vi.fn();
@@ -57,7 +58,7 @@ describe('workspace store actions', () => {
           id: 's1',
           direction: 'h',
           ratio: 0.5,
-          children: [{ type: 'pane', id: 'p1' }, { type: 'pane', id: 'p2' }]
+          children: [{ type: 'pane', id: 'old1' }, { type: 'pane', id: 'old2' }]
         }
       }],
       activeWorkspaceId: 'w1'
@@ -69,6 +70,38 @@ describe('workspace store actions', () => {
 
     useStore.getState().resizeSplit('s1', 0.7, true);
     expect(saveState).toHaveBeenCalledTimes(1);
+  });
+
+  it('remaps pane titles and pending startup commands when the cwd change restarts panes', () => {
+    useStore.setState({
+      workspaces: [{
+        id: 'w1',
+        name: 'One',
+        cwd: '/tmp',
+        layout: {
+          type: 'split',
+          id: 's1',
+          direction: 'h',
+          ratio: 0.5,
+          children: [{ type: 'pane', id: 'old1' }, { type: 'pane', id: 'old2' }]
+        },
+        paneTitles: { old1: 'API', old2: 'Web' },
+        pendingStartupCommands: { old1: 'npm run dev' }
+      }],
+      activeWorkspaceId: 'w1'
+    });
+
+    useStore.getState().setWorkspaceCwd('w1', '/elsewhere');
+
+    const ws = useStore.getState().workspaces[0];
+    expect(ws.cwd).toBe('/elsewhere');
+    const newIds = collectPaneIds(ws.layout);
+    expect(newIds).toHaveLength(2);
+    expect(newIds).not.toContain('old1');
+    expect(newIds).not.toContain('old2');
+    // Metadata follows the fresh pane ids — no orphaned old keys survive.
+    expect(ws.paneTitles).toEqual({ [newIds[0]]: 'API', [newIds[1]]: 'Web' });
+    expect(ws.pendingStartupCommands).toEqual({ [newIds[0]]: 'npm run dev' });
   });
 
   it('does not start a newer workspace save while an older save is still in flight', async () => {

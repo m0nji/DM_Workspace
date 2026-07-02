@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from 'fs';
-import { join, dirname, parse as parsePath } from 'path';
+import { readFileSync, existsSync, appendFileSync } from 'fs';
+import { join, dirname, resolve } from 'path';
 import { parseTasks, serializeTasks, type TaskBoard } from '../shared/tasks-markdown';
 import { expandTilde } from './resolve-cwd';
+import { writeFileAtomic } from './atomic-write';
 
 const DIR = '.dmworkspace';
 const GITIGNORE_ENTRY = '.dmworkspace/';
@@ -27,21 +28,22 @@ export function loadTasks(workingDir: string): TaskBoard {
 // gitignore entry. Returns the exact bytes written (used by the IPC echo-guard).
 export function saveTasks(workingDir: string, board: TaskBoard): string {
   const file = tasksFilePath(workingDir);
-  mkdirSync(dirname(file), { recursive: true });
   const content = serializeTasks(board);
-  writeFileSync(file, content, 'utf8');
+  writeFileAtomic(file, content);
   ensureGitignore(workingDir);
   return content;
 }
 
 // Find the nearest ancestor directory (inclusive) that contains a .git entry.
+// resolve() makes the walk safe for relative input, where dirname() would
+// otherwise settle on '.' and never reach a filesystem root (infinite loop).
 function findGitRoot(startDir: string): string | null {
-  let dir = startDir;
-  const root = parsePath(dir).root;
+  let dir = resolve(startDir);
   for (;;) {
     if (existsSync(join(dir, '.git'))) return dir;
-    if (dir === root) return null;
-    dir = dirname(dir);
+    const parent = dirname(dir);
+    if (parent === dir) return null; // reached the fs root
+    dir = parent;
   }
 }
 

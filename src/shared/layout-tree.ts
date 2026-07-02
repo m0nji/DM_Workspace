@@ -56,26 +56,6 @@ export function collectSplitIds(node: LayoutNode | null): string[] {
   return [node.id, ...collectSplitIds(node.children[0]), ...collectSplitIds(node.children[1])];
 }
 
-// Return a structurally identical layout with freshly generated pane and split
-// ids (direction and ratio preserved). Replacing the pane ids forces React to
-// remount each TerminalView, which respawns its PTY — used to restart a
-// workspace's terminals in a new working directory.
-export function reassignIds(
-  node: LayoutNode,
-  nextPaneId: () => string,
-  nextSplitId: () => string
-): LayoutNode {
-  if (node.type === 'pane') return makePane(nextPaneId());
-  return {
-    ...node,
-    id: nextSplitId(),
-    children: [
-      reassignIds(node.children[0], nextPaneId, nextSplitId),
-      reassignIds(node.children[1], nextPaneId, nextSplitId)
-    ]
-  };
-}
-
 export function splitPane(
   node: LayoutNode,
   targetPaneId: string,

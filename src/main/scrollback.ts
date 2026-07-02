@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { readFileSync } from 'fs';
+import { writeFileAtomic } from './atomic-write';
 
 // Per-pane terminal scrollback, keyed by the (restart-stable) pane id.
 export type ScrollbackMap = Record<string, string>;
@@ -46,8 +46,7 @@ export function loadScrollbackFromFile(file: string): ScrollbackMap {
 
 export function saveScrollbackToFile(file: string, map: ScrollbackMap): void {
   try {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify(map), 'utf8');
+    writeFileAtomic(file, JSON.stringify(map));
   } catch (err) {
     console.error(`Failed to save scrollback to ${file}:`, err);
   }

@@ -1,6 +1,6 @@
 import { homedir } from 'os';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { readFileSync } from 'fs';
+import { writeFileAtomic } from './atomic-write';
 import type {
   AppState, LayoutNode, Settings, WindowBounds, Workspace, WorkspaceTemplate, WorkspaceNavigationPlacement
 } from '../shared/types';
@@ -210,8 +210,7 @@ export function loadStateFromFile(file: string): AppState {
 
 export function saveStateToFile(file: string, state: AppState): void {
   try {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, serialize(state), 'utf8');
+    writeFileAtomic(file, serialize(state));
   } catch (err) {
     console.error(`Failed to save state to ${file}:`, err);
   }

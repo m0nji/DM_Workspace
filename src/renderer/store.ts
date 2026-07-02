@@ -3,7 +3,7 @@ import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection
 } from '../shared/types';
 import {
-  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, reassignIds
+  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
 } from '../shared/layout-tree';
 import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
 import { createIdGenerator } from '../shared/ids';
@@ -295,8 +295,19 @@ export const useStore = create<StoreState>((set, get) => ({
     collectPaneIds(ws.layout).forEach((pid) => {
       window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid];
     });
-    const layout = reassignIds(ws.layout, nextPaneId, nextSplitId);
-    const workspaces = s.workspaces.map((w) => w.id === id ? { ...w, cwd, layout } : w);
+    // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
+    // pane-keyed metadata has to follow the id change or titles/pending startup
+    // commands would be orphaned under the old keys and persist forever.
+    const { layout, paneIdMap } = cloneTemplateLayout(ws.layout, nextPaneId, nextSplitId);
+    const workspaces = s.workspaces.map((w) => {
+      if (w.id !== id) return w;
+      const nextWs: Workspace = { ...w, cwd, layout };
+      const paneTitles = remapStringMap(w.paneTitles, paneIdMap);
+      if (paneTitles) nextWs.paneTitles = paneTitles; else delete nextWs.paneTitles;
+      const pending = remapStringMap(w.pendingStartupCommands, paneIdMap);
+      if (pending) nextWs.pendingStartupCommands = pending; else delete nextWs.pendingStartupCommands;
+      return nextWs;
+    });
     const next = {
       ...s, workspaces, paneStatus, paneCwd,
       maximizedPaneId: null,

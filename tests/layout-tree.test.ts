@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, collectSplitIds, splitPane, closePane, setRatio, makePreset, reassignIds } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, collectSplitIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
 
 describe('createIdGenerator', () => {
   it('produces unique sequential ids with a prefix', () => {
@@ -157,38 +157,5 @@ describe('makePreset', () => {
     expect(tree.children[0].children[1].direction).toBe('h');
     expect(tree.children[1].children[0].direction).toBe('h');
     expect(tree.children[1].children[1].direction).toBe('h');
-  });
-});
-
-describe('reassignIds', () => {
-  it('gives a lone pane a fresh id', () => {
-    const next = createIdGenerator('p');
-    const result = reassignIds(makePane('old'), next, createIdGenerator('s'));
-    expect(result).toEqual({ type: 'pane', id: 'p1' });
-  });
-
-  it('preserves structure, direction and ratio while replacing all ids', () => {
-    const nextPane = createIdGenerator('np');
-    const nextSplit = createIdGenerator('ns');
-    const original = makePreset('4', createIdGenerator('p'), createIdGenerator('s')) as any;
-    original.ratio = 0.3; // a non-default ratio that must survive
-
-    const result = reassignIds(original, nextPane, nextSplit) as any;
-
-    // Same shape: 4 panes, outer vertical split with two horizontal children.
-    expect(collectPaneIds(result)).toHaveLength(4);
-    expect(result.type).toBe('split');
-    expect(result.direction).toBe('v');
-    expect(result.ratio).toBe(0.3);
-    expect(result.children[0].direction).toBe('h');
-
-    // Every id is freshly generated and unique.
-    expect(collectPaneIds(result)).toEqual(['np1', 'np2', 'np3', 'np4']);
-    const splitIds = collectSplitIds(result);
-    expect(new Set(splitIds).size).toBe(splitIds.length);
-    expect(splitIds.every((id) => id.startsWith('ns'))).toBe(true);
-
-    // Original tree is not mutated.
-    expect(collectPaneIds(original)).not.toEqual(collectPaneIds(result));
   });
 });

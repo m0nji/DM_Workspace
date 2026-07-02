@@ -68,6 +68,19 @@ describe('ensureGitignore', () => {
     ensureGitignore(dir);
     expect(existsSync(join(dir, '.gitignore'))).toBe(false);
   });
+  // Regression: findGitRoot compared against parse(dir).root, which is '' for
+  // relative input while dirname() settles on '.' — an infinite loop that froze
+  // the main process. The walk must terminate (vitest's timeout flags a hang).
+  it('terminates for a relative working dir outside any repo', () => {
+    const prev = process.cwd();
+    process.chdir(dir); // tmpdir has no .git anywhere up its ancestry
+    try {
+      expect(() => ensureGitignore('relative/subdir')).not.toThrow();
+      expect(existsSync(join(dir, '.gitignore'))).toBe(false);
+    } finally {
+      process.chdir(prev);
+    }
+  });
   it('appends on a new line when the existing .gitignore has no trailing newline', () => {
     mkdirSync(join(dir, '.git'));
     writeFileSync(join(dir, '.gitignore'), 'node_modules', 'utf8'); // no trailing \n
