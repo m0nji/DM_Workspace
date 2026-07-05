@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, watch, writeFileSync, mkdirSync, rmSync, typ
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
+import { createPtyDataBatcher } from './pty-data-batcher';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { loadTasks, saveTasks, tasksFilePath } from './task-store';
@@ -116,11 +117,18 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   });
 
-  pty.onData((paneId, data) => {
-    const payload: PtyDataEvent = { paneId, data };
-    getWindow()?.webContents.send('pty:data', payload);
+  // Coalesce PTY chunks into one IPC message per pane per ~5ms window — see
+  // pty-data-batcher.ts for why (IPC saturation under high-throughput output).
+  const dataBatcher = createPtyDataBatcher({
+    send: (paneId, data) => {
+      const payload: PtyDataEvent = { paneId, data };
+      getWindow()?.webContents.send('pty:data', payload);
+    }
   });
+  pty.onData((paneId, data) => dataBatcher.push(paneId, data));
   pty.onExit((paneId, exitCode) => {
+    // The exit event must never outrun still-buffered output for this pane.
+    dataBatcher.flushPane(paneId);
     const payload: PtyExitEvent = { paneId, exitCode };
     getWindow()?.webContents.send('pty:exit', payload);
   });

@@ -20,8 +20,15 @@ import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
+import { createResizeScheduler } from '../resize-scheduler';
+import { createSaveScheduler, type SaveScheduler } from '../save-scheduler';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
+
+// Scrollback kept in the live xterm buffer AND exported by the serializer (the
+// two must match: serializing more than the buffer holds is pointless, less
+// would silently drop restorable history). Also caps scrollback.json growth.
+const SCROLLBACK_LINES = 1000;
 
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
@@ -104,6 +111,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const webglRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webglLossRef = useRef({ count: 0, last: 0 });
   const activeRef = useRef(active);
+  // The mount effect owns the scheduler; the active effect steers its cadence.
+  const saveSchedulerRef = useRef<SaveScheduler | null>(null);
   const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
   const customBg = useStore((s) => s.settings.terminalBackground);
@@ -169,6 +178,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         useStore.getState().settings.terminalBackground
       ),
       cursorBlink: true,
+      scrollback: SCROLLBACK_LINES,
       // xterm's native alt-click only ever emits ←/→ and models the prompt as
       // one wrapped logical line, so it can't reach another line of a multi-line
       // editor. Disable it; the custom mouseup handler below handles ↑/↓ too.
@@ -423,9 +433,6 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // PTY byte stream. SerializeAddon emits only the normal buffer — no alt-screen
     // contents, color-query replies, or cursor-jump sequences — so a restart
     // replays clean, reflowable history instead of control-character garbage.
-    // Cap the exported scrollback so scrollback.json can't grow without bound.
-    const SCROLLBACK_LINES = 1000;
-    let saveTimer: ReturnType<typeof setTimeout> | null = null;
     const doSave = (): void => {
       const data = serializeAddon.serialize({ scrollback: SCROLLBACK_LINES });
       // Never persist the restore separator — serialize captures the rendered
@@ -434,14 +441,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       const cleaned = data.split('\n').filter((line) => !line.includes(RESTORE_MARKER_TEXT)).join('\n');
       window.api.saveScrollback(paneId, cleaned);
     };
-    const flushSave = (): void => {
-      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-      doSave();
-    };
-    const scheduleSave = (): void => {
-      if (saveTimer) return; // coalesce bursts of output into one write per second
-      saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 1000);
-    };
+    // Serialize walks the whole buffer on the renderer thread, so hidden panes
+    // save on a slow cadence (plus once when their workspace is switched away)
+    // instead of every second — see save-scheduler.ts.
+    const saveScheduler = createSaveScheduler({ save: doSave });
+    saveScheduler.setActive(activeRef.current);
+    saveSchedulerRef.current = saveScheduler;
+    const flushSave = (): void => saveScheduler.flush();
 
     // Wipe the buffer (scrollback + viewport), keeping the current prompt line as
     // the new first line, then persist immediately so a restart doesn't replay
@@ -456,7 +462,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
       term.write(data, updateAtBottom);
-      scheduleSave();
+      saveScheduler.schedule();
       activity.onOutput();
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
@@ -514,19 +520,24 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       });
     });
 
-    const resize = () => {
-      if (safeFit()) {
+    // Fit once per frame (the terminal keeps reflowing live while a splitter is
+    // dragged), but debounce the pty:resize IPC so the shell gets one SIGWINCH
+    // when the drag settles instead of a storm — see resize-scheduler.ts.
+    const resizeScheduler = createResizeScheduler({
+      fit: () => {
+        if (!safeFit()) return false;
         spawnOnce();
         // Don't let a resize IPC race ahead of the (async) spawn IPC — the
         // spawn itself carries the freshly fitted cols/rows, so nothing is lost.
-        if (spawnSent) window.api.resize({ paneId, cols: term.cols, rows: term.rows });
-      }
-    };
+        return spawnSent;
+      },
+      sendResize: () => window.api.resize({ paneId, cols: term.cols, rows: term.rows })
+    });
     // Observe the wrapper, not the host: safeFit pins the host to a fixed pixel
     // height, so a height-only pane resize (splitter drag, maximize) never
     // changes the host's size and would never fire the observer. The wrapper
     // always tracks the pane layout and is never pinned.
-    const ro = new ResizeObserver(resize);
+    const ro = new ResizeObserver(() => resizeScheduler.onResize());
     ro.observe(host.parentElement ?? host);
 
     // The very first fit can run before the WebGL renderer has measured the cell
@@ -548,9 +559,12 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
     return () => {
       flushSave();
+      saveSchedulerRef.current = null;
+      saveScheduler.dispose();
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       ro.disconnect();
+      resizeScheduler.dispose();
       cancelAnimationFrame(pinRaf);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
       host.removeEventListener('dragover', onDragOver);
@@ -595,6 +609,9 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const wasActive = activeRef.current;
     activeRef.current = active;
     syncWebgl(active);
+    // Hidden panes serialize their scrollback on a slow cadence; going hidden
+    // flushes a pending save so the last-seen state is what a crash restores.
+    saveSchedulerRef.current?.setActive(active);
     if (active && !wasActive) {
       const term = termRef.current;
       if (term) term.refresh(0, Math.max(0, term.rows - 1));
