@@ -2,6 +2,12 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.11 – 2026-07-05
+- perf: Terminal output is now batched into far fewer internal messages, so heavy output (build logs, streaming AI agents) no longer floods the app and stays smooth instead of stuttering
+- perf: Dragging a pane divider now sends the shell a single resize once the drag settles instead of a rapid-fire storm, so full-screen programs (vim, streaming agents) no longer re-render dozens of times per drag – the visible terminal still reflows live
+- perf: Terminals in hidden workspaces now save their scrollback on a much slower cadence (with one immediate save when you switch away), cutting constant background CPU usage while agents keep producing output
+- change: The terminal scrollback limit (1000 lines) is now set explicitly instead of relying on the built-in default
+
 ## 0.9.10 – 2026-07-02
 - fix: The file browser now works on Windows – breadcrumbs split `C:\…` paths into clickable segments, and the "up" button stops at the drive root instead of jumping to a broken `/` (Windows)
 - fix: Ctrl+V reaches the shell again on macOS (readline quoted-insert, vim's visual block) instead of being swallowed by the paste handler – pasting stays on Cmd+V (macOS)
