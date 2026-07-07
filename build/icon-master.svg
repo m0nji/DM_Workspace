@@ -1,46 +1,32 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" data-variant="color-modern">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" data-variant="graphite-sand">
   <defs>
-    <linearGradient id="workspace-color-modern-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#24242d"/>
-      <stop offset="1" stop-color="#08080d"/>
+    <linearGradient id="workspace-graphite-sand-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#181614"/>
+      <stop offset="1" stop-color="#090908"/>
     </linearGradient>
-    <clipPath id="workspace-color-modern-clip">
-      <rect x="100" y="100" width="824" height="824" rx="185"/>
-    </clipPath>
-    <linearGradient id="workspace-color-modern-rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
-      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.03"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    <linearGradient id="workspace-graphite-sand-rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E7D7BF" stop-opacity="0.10"/>
+      <stop offset="0.55" stop-color="#E7D7BF" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#E7D7BF" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="workspace-color-modern-accent" cx="0.45" cy="0.35" r="0.42">
-      <stop offset="0" stop-color="#ee9a5d" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#c97b4a" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="workspace-color-modern-mark-fill" x1="0.18" y1="0.1" x2="0.84" y2="0.92">
-      <stop offset="0" stop-color="#f7f5f2" stop-opacity="0.42"/>
-      <stop offset="0.5" stop-color="#d88a58" stop-opacity="0.28"/>
-      <stop offset="1" stop-color="#78c7ff" stop-opacity="0.2"/>
+    <linearGradient id="workspace-graphite-sand-metal" x1="140" y1="140" x2="884" y2="884" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F3E6D4"/>
+      <stop offset="0.26" stop-color="#E7D7BF"/>
+      <stop offset="0.50" stop-color="#C7B299"/>
+      <stop offset="0.72" stop-color="#A57B58"/>
+      <stop offset="1" stop-color="#D7B98F"/>
     </linearGradient>
-    <linearGradient id="workspace-color-modern-mark-stroke" x1="0.16" y1="0.08" x2="0.86" y2="0.94">
-      <stop offset="0" stop-color="#fff8ee"/>
-      <stop offset="0.46" stop-color="#e59661"/>
-      <stop offset="1" stop-color="#8ed8ff"/>
-    </linearGradient>
-    <filter id="workspace-color-modern-depth" x="-28%" y="-24%" width="156%" height="164%">
-      <feDropShadow dx="0" dy="26" stdDeviation="10" flood-color="#000000" flood-opacity="0.62"/>
-      <feDropShadow dx="0" dy="8" stdDeviation="4" flood-color="#c97b4a" flood-opacity="0.2"/>
-      <feDropShadow dx="0" dy="-4" stdDeviation="2" flood-color="#ffffff" flood-opacity="0.18"/>
+    <filter id="workspace-graphite-sand-depth" x="-28%" y="-24%" width="156%" height="164%">
+      <feDropShadow dx="0" dy="26" stdDeviation="10" flood-color="#000000" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="4" flood-color="#9B7659" flood-opacity="0.18"/>
     </filter>
   </defs>
-  <g id="workspace-color-modern-surface" clip-path="url(#workspace-color-modern-clip)">
-    <rect x="100" y="100" width="824" height="824" fill="url(#workspace-color-modern-bg)"/>
-    <rect x="100" y="100" width="824" height="412" fill="url(#workspace-color-modern-rim)"/>
-    <circle cx="452" cy="364" r="226" fill="url(#workspace-color-modern-accent)" data-layer="accent-glint"/>
-  </g>
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="3"/>
-  <g id="workspace-color-modern-mark" fill="url(#workspace-color-modern-mark-fill)" stroke="url(#workspace-color-modern-mark-stroke)" stroke-opacity="0.92" stroke-width="26" stroke-linejoin="round" filter="url(#workspace-color-modern-depth)">
-    <rect data-panel="nav" x="260" y="318" width="150" height="388" rx="38"/>
-    <rect data-panel="top" x="448" y="318" width="316" height="164" rx="38"/>
-    <rect data-panel="bottom" x="448" y="540" width="316" height="166" rx="38"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#workspace-graphite-sand-bg)"/>
+  <rect x="100" y="100" width="824" height="412" rx="185" fill="url(#workspace-graphite-sand-rim)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#E7D7BF" stroke-opacity="0.12" stroke-width="3"/>
+  <g id="workspace-graphite-sand-mark" fill="url(#workspace-graphite-sand-metal)" filter="url(#workspace-graphite-sand-depth)">
+    <rect data-panel="nav" x="216" y="216" width="180" height="592" rx="20"/>
+    <rect data-panel="top" x="444" y="216" width="364" height="272" rx="20"/>
+    <rect data-panel="bottom" x="444" y="536" width="364" height="272" rx="20"/>
   </g>
 </svg>
