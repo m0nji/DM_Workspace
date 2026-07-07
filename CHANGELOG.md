@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.12 – 2026-07-07
+- change: New app icon in the DM "Graphite Sand" brand design — the familiar tile layout with squarer corners in the warm base-metal gradient (all platforms)
+
 ## 0.9.11 – 2026-07-05
 - perf: Terminal output is now batched into far fewer internal messages, so heavy output (build logs, streaming AI agents) no longer floods the app and stays smooth instead of stuttering
 - perf: Dragging a pane divider now sends the shell a single resize once the drag settles instead of a rapid-fire storm, so full-screen programs (vim, streaming agents) no longer re-render dozens of times per drag – the visible terminal still reflows live
