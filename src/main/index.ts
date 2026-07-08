@@ -147,6 +147,16 @@ function createWindow(): void {
   mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));
   mainWindow.on('blur', () => mainWindow?.webContents.send('window:focus', false));
 
+  // Ctrl+mousewheel zoom: Electron only emits zoom-changed for the gesture, it
+  // doesn't change the zoom itself. Step and clamp mirror the menu's zoomIn/
+  // zoomOut roles (±0.5 zoom level, 0.5..3x factor ≈ levels -3.8..6).
+  mainWindow.webContents.on('zoom-changed', (_event, direction) => {
+    const wc = mainWindow?.webContents;
+    if (!wc) return;
+    const next = wc.getZoomLevel() + (direction === 'in' ? 0.5 : -0.5);
+    wc.setZoomLevel(Math.max(-3.8, Math.min(6, next)));
+  });
+
   // Persist size/position shortly after the user stops dragging/resizing, and
   // immediately on (un)maximize. Debounced so a resize drag writes once, not per frame.
   const scheduleBoundsSave = (): void => {

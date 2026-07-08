@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
+import { beginDragGuard } from '../drag-guard';
 import { breadcrumbSegments, isFsRoot, parentDir } from '../../shared/fs-path';
 import type { DirEntry } from '../../shared/types';
 import { Icon } from './Icon';
@@ -47,12 +48,14 @@ export function PreviewPanel(): React.JSX.Element | null {
   const dragCleanup = useRef<(() => void) | null>(null);
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    const endGuard = beginDragGuard();
     const onMove = (ev: MouseEvent): void => setPreviewWidth(window.innerWidth - ev.clientX);
     const onUp = (): void => dragCleanup.current?.();
     dragCleanup.current = () => {
       dragCleanup.current = null;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      endGuard();
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);

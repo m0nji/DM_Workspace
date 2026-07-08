@@ -685,6 +685,10 @@ input[type="checkbox"]:checked::after {
 }
 .preview-body { flex: 1; min-height: 0; overflow: auto; }
 .preview-webview { width: 100%; height: 100%; border: none; }
+/* While a splitter/panel drag is running (body class set by drag-guard.ts), the
+   out-of-process webview guest must not receive mouse events — it would swallow
+   the mouseup and the drag could never finish. */
+body.drag-active webview { pointer-events: none; }
 .preview-empty, .preview-error, .preview-notfound { padding: 16px; opacity: 0.7; }
 
 /* themed markdown */

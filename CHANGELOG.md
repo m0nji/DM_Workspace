@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.15 – 2026-07-08
+- fix: Ctrl+Plus / Ctrl+Minus now zoom without needing Shift – Electron's default zoom shortcut only registered as Ctrl+Shift+Plus, so plain Ctrl+Plus did nothing (Windows/Linux)
+- feat: Ctrl+mouse wheel and Ctrl+Numpad +/− now zoom the UI, matching browser behavior
+- fix: Dragging a pane divider or the panel edge no longer sticks to the mouse while the preview/file editor panel is open – the preview view swallowed the mouse release, so the drag could never finish
+
 ## 0.9.14 – 2026-07-08
 - change: App icon mark reduced further (~60% tile fill) — macOS 26 and the Windows taskbar render the tile edge-to-edge, so the previous size still crowded the edge (per DM BrandDesign v1.0.2)
 

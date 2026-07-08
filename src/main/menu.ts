@@ -15,9 +15,8 @@ import { app, Menu, type MenuItemConstructorOptions } from 'electron';
  * shell's Ctrl+R (reverse-i-search) on Windows/Linux in packaged builds, and an
  * accidental reload tears down every terminal in the window.
  */
-export function installAppMenu(): void {
-  const isMac = process.platform === 'darwin';
-  const devItems: MenuItemConstructorOptions[] = app.isPackaged
+export function buildMenuTemplate(isMac: boolean, isPackaged: boolean): MenuItemConstructorOptions[] {
+  const devItems: MenuItemConstructorOptions[] = isPackaged
     ? []
     : [
         { role: 'reload' },
@@ -36,11 +35,24 @@ export function installAppMenu(): void {
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },
+        // The zoomIn role's default accelerator is CommandOrControl+Plus, which
+        // Electron registers as Shift + the =/+ key — so plain Ctrl+Plus does
+        // nothing on Windows/Linux (macOS gets a hidden Cmd+= item from Electron
+        // itself). These hidden duplicates add the shift-less binding plus the
+        // numpad +/- everywhere, matching browser zoom behavior.
+        { role: 'zoomIn', accelerator: 'CommandOrControl+=', visible: false },
+        { role: 'zoomIn', accelerator: 'CommandOrControl+numadd', visible: false },
+        { role: 'zoomOut', accelerator: 'CommandOrControl+numsub', visible: false },
         { type: 'separator' },
         { role: 'togglefullscreen' }
       ]
     },
     { role: 'windowMenu' }
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  return template;
+}
+
+export function installAppMenu(): void {
+  const isMac = process.platform === 'darwin';
+  Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate(isMac, app.isPackaged)));
 }

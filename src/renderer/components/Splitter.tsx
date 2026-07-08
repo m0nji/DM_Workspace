@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { useStore } from '../store';
+import { beginDragGuard } from '../drag-guard';
 import type { Direction } from '../../shared/types';
 
 interface Props { splitId: string; direction: Direction; containerRef: React.RefObject<HTMLDivElement | null>; }
@@ -12,6 +13,7 @@ export function Splitter({ splitId, direction, containerRef }: Props): React.JSX
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
+    const endGuard = beginDragGuard();
     let lastRatio = 0.5;
 
     const onMove = (ev: MouseEvent) => {
@@ -23,6 +25,7 @@ export function Splitter({ splitId, direction, containerRef }: Props): React.JSX
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      endGuard();
       resizeSplit(splitId, lastRatio, true);
     };
     window.addEventListener('mousemove', onMove);
