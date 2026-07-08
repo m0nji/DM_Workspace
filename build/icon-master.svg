@@ -24,7 +24,7 @@
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#workspace-graphite-sand-bg)"/>
   <rect x="100" y="100" width="824" height="412" rx="185" fill="url(#workspace-graphite-sand-rim)"/>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#E7D7BF" stroke-opacity="0.12" stroke-width="3"/>
-  <g id="workspace-graphite-sand-mark" fill="url(#workspace-graphite-sand-metal)" filter="url(#workspace-graphite-sand-depth)" transform="translate(512 512) scale(0.93) translate(-512 -512)">
+  <g id="workspace-graphite-sand-mark" fill="url(#workspace-graphite-sand-metal)" filter="url(#workspace-graphite-sand-depth)" transform="translate(512 512) scale(0.84) translate(-512 -512)">
     <rect data-panel="nav" x="216" y="216" width="180" height="592" rx="20"/>
     <rect data-panel="top" x="444" y="216" width="364" height="272" rx="20"/>
     <rect data-panel="bottom" x="444" y="536" width="364" height="272" rx="20"/>

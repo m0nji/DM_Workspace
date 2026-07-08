@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.14 – 2026-07-08
+- change: App icon mark reduced further (~60% tile fill) — macOS 26 and the Windows taskbar render the tile edge-to-edge, so the previous size still crowded the edge (per DM BrandDesign v1.0.2)
+
 ## 0.9.13 – 2026-07-07
 - change: App icon refined — the tile mark is slightly smaller so it no longer crowds the squircle edge (all platforms, per DM BrandDesign v1.0.1)
 
