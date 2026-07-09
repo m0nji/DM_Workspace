@@ -2,7 +2,7 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
-## Unreleased
+## 0.9.17 – 2026-07-09
 - fix: Resizing a pane sideways no longer shreds the output of running TUIs (Claude Code, Codex) – the terminal used to reflow at every intermediate width while the program still painted at the old width, leaving torn, duplicated rows that only a maximize/restore cleaned up. Width changes now reflow once, when the drag settles, together with the program's resize signal; height-only resizes still track the drag live
 
 ## 0.9.16 – 2026-07-09
