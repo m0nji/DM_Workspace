@@ -18,6 +18,11 @@ import { writeFileSync, mkdirSync, rmSync } from 'fs';
 //
 // A neutral ZDOTDIR prompt + a seeded neutral cwd keep the real user/host out of
 // frame; commands avoid anything that prints the username (no pwd/whoami/ls -l).
+//
+// Storyline: an existing "Web-App" workspace sits in the sidebar; the demo
+// creates a NEW workspace via "+ Workspace", names it in the edit modal, picks
+// the 2×2 layout and runs a command in every pane. The sidebar (with the
+// current version in the footer) stays in frame the whole time.
 
 const REC = '/tmp/dmws-gif';
 const FRAMES = join(REC, 'frames');
@@ -46,18 +51,18 @@ function seedEnv(): void {
   writeFileSync(join(REC, 'zdotdir', '.zprofile'),
     '[ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"\n');
 
-  // One workspace, empty layout (so the welcome screen shows first), neutral cwd.
+  // One existing workspace on the welcome screen; the demo adds a second one.
   writeFileSync(join(REC, 'userdata', 'state.json'), JSON.stringify({
     version: 1,
     activeWorkspaceId: 'w1',
-    workspaces: [{ id: 'w1', name: 'Demo', cwd: DEMO_CWD, layout: null }],
+    workspaces: [{ id: 'w1', name: 'Web-App', cwd: DEMO_CWD, layout: null }],
     settings: { themeId: 'default', terminalOpacity: 0.95 }
   }, null, 2));
 }
 
 test('record demo frames', async () => {
   test.skip(!process.env.RECORD_GIF, 'recording helper — run with RECORD_GIF=1');
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   let n = 0;
 
   seedEnv();
@@ -90,13 +95,36 @@ test('record demo frames', async () => {
     }
   };
 
-  // 1) Welcome screen — choosing how many terminals to open.
+  // 1) Opening view: sidebar with the existing "Web-App" workspace, welcome
+  // screen asking for the layout, version in the sidebar footer.
   await win.getByText('How many terminals do you want to open?').waitFor();
   await win.waitForTimeout(400);
+  await shot(10);
+
+  // 2) Create a NEW workspace via the sidebar.
+  await win.locator('.add-ws').click();
+  await win.locator('.ws-item', { hasText: 'Workspace 2' }).waitFor();
+  await win.waitForTimeout(300);
   await shot(8);
 
-  // 2) Pick the 4 (2×2) layout, then let all four shells reach their prompt.
-  await win.getByText('4 (2×2)').click();
+  // 3) Open the edit modal (double-click the sidebar entry) and name it.
+  await win.locator('.ws-item', { hasText: 'Workspace 2' }).dblclick();
+  await win.locator('.ws-edit-name').waitFor();
+  await win.waitForTimeout(300);
+  await shot(6);
+  // The name input is focused with the text selected — typing replaces it.
+  await typeAnim('API Server');
+  await shot(4);
+  // Give it a colour, then confirm.
+  await win.locator('.ws-edit-swatch').nth(2).click();
+  await shot(5);
+  await win.locator('.ws-edit-modal .btn-primary').click();
+  await win.waitForTimeout(300);
+  await shot(8);
+
+  // 4) Pick the 4 (2×2) layout, then let all four shells reach their prompt.
+  // Both workspaces mount a welcome screen — click the visible one.
+  await win.locator('.label:visible', { hasText: '4 (2×2)' }).click();
   await win.locator('.pane .xterm-screen').first().waitFor();
   await win.waitForTimeout(2200);
 
@@ -114,7 +142,7 @@ test('record demo frames', async () => {
   await win.waitForTimeout(400);
   await shot(8);
 
-  // 3) Run a command (or two) in each pane. No quotes in the echo: per-keystroke
+  // 5) Run a command (or two) in each pane. No quotes in the echo: per-keystroke
   // typing can drop a closing quote and trap the shell in a dquote> prompt.
   const runs: string[][] = [
     ['echo Hello from DM Workspace', 'date'],
@@ -139,9 +167,9 @@ test('record demo frames', async () => {
     }
   }
 
-  // 4) Final dwell on the finished 2×2 grid.
+  // 6) Final dwell on the finished 2×2 grid next to the sidebar.
   await win.waitForTimeout(400);
-  await shot(12);
+  await shot(14);
 
   await app.close();
 });
