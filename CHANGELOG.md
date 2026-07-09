@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.16 – 2026-07-09
+- feat: New "Graphite Sand" app design — the DM Apps corporate look with graphite surfaces, warm sand accents, the brand gradient in Settings and on the welcome screen, and the DM wordmark. It is now the default; Black Utility and Standard stay available under Settings → Appearance
+- fix: The chosen app design, language and terminal-click setting now survive restarts and updates — previously they silently reset to Black Utility / system language on every launch
+
 ## 0.9.15 – 2026-07-08
 - fix: Ctrl+Plus / Ctrl+Minus now zoom without needing Shift – Electron's default zoom shortcut only registered as Ctrl+Shift+Plus, so plain Ctrl+Plus did nothing (Windows/Linux)
 - feat: Ctrl+mouse wheel and Ctrl+Numpad +/− now zoom the UI, matching browser behavior
