@@ -16,6 +16,7 @@ import { registerSearch, unregisterSearch } from '../search-registry';
 import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, registerTerminalFocus, unregisterTerminalFocus } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { formatPathsForInsert } from '../../shared/path-insert';
+import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { ContextMenu, type MenuItem } from './ContextMenu';
@@ -277,6 +278,21 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
     });
+    // Cmd+C copy (macOS): route the native copy through the same cleanup as the
+    // context menu, so trailing padding spaces (TUI box backgrounds are real
+    // space cells) never reach the clipboard. Only the platform copy chord —
+    // Ctrl+C is SIGINT everywhere and must reach the shell untouched, so this
+    // handler exists on macOS only (other platforms copy via the context menu).
+    const handleTerminalCopyShortcut = (e: KeyboardEvent): void => {
+      if (window.api.platform !== 'darwin') return;
+      const isCopyKey = e.key.toLowerCase() === 'c' && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+      if (!isCopyKey || !term.hasSelection()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.api.clipboardWrite(stripTrailingWhitespace(term.getSelection()));
+    };
+    host.addEventListener('keydown', handleTerminalCopyShortcut, true);
+
     const handleTerminalPasteShortcut = (e: KeyboardEvent): void => {
       // Only the platform's paste chord counts: Cmd+V on macOS, Ctrl+V elsewhere.
       // On macOS Ctrl+V must reach the shell untouched (readline quoted-insert,
@@ -569,6 +585,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       ro.disconnect();
       resizeScheduler.dispose();
       cancelAnimationFrame(pinRaf);
+      host.removeEventListener('keydown', handleTerminalCopyShortcut, true);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
       host.removeEventListener('dragover', onDragOver);
       host.removeEventListener('dragleave', onDragLeave);
@@ -634,7 +651,21 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // button, and on close it falls to <body>, not back to xterm's hidden
         // textarea — so keystrokes (e.g. Enter after Paste) are dropped until
         // the user clicks into the terminal. term.focus() restores it.
-        onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(sel); term?.focus(); }
+        // Trailing padding is layout (TUIs paint boxes with real space cells),
+        // so the default copy strips it; leading indentation stays (code).
+        onClick: () => { const sel = term?.getSelection(); if (sel) window.api.clipboardWrite(stripTrailingWhitespace(sel)); term?.focus(); }
+      },
+      {
+        // Multi-line command displayed by a TUI → one pasteable line: fully
+        // trimmed, blank lines dropped, fragments joined with single spaces.
+        label: t('menu.copyAsCommand'),
+        disabled: !hasSelection,
+        onClick: () => {
+          const sel = term?.getSelection();
+          const cmd = sel ? selectionAsCommand(sel) : '';
+          if (cmd) window.api.clipboardWrite(cmd);
+          term?.focus();
+        }
       },
       {
         label: t('menu.paste'),

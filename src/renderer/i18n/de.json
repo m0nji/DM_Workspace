@@ -318,6 +318,7 @@
   },
   "menu": {
     "copy": "Kopieren",
+    "copyAsCommand": "Als Befehl kopieren",
     "paste": "Einfügen",
     "selectAll": "Alles auswählen",
     "clearWindow": "Fenster leeren",

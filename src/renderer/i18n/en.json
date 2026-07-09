@@ -318,6 +318,7 @@
   },
   "menu": {
     "copy": "Copy",
+    "copyAsCommand": "Copy as command",
     "paste": "Paste",
     "selectAll": "Select all",
     "clearWindow": "Clear window",
