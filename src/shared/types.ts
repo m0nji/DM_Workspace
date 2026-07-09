@@ -61,7 +61,7 @@ export interface Settings {
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
   shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts
   locale?: 'en' | 'de';        // UI language; unset => detect from OS, fallback 'en'
-  brandDesign?: 'standard' | 'black'; // DM BrandDesign family for the app chrome (default black); terminal themes stay independent
+  brandDesign?: 'graphite' | 'standard' | 'black'; // DM BrandDesign family for the app chrome (default graphite = corporate Graphite Sand); terminal themes stay independent
 }
 
 export interface WindowBounds {

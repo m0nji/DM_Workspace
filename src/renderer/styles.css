@@ -1,8 +1,9 @@
 :root {
-  /* DM BrandDesign tokens (DM_BrandDesign/packages/tokens). Two selectable
-     families: Standard Utility (dark gray, calm borders) and Black Utility
-     (pure black, hairline "layered chrome" controls). :root carries Standard;
-     [data-brand-design="black"] on .root overrides the family values. */
+  /* DM BrandDesign tokens (DM_BrandDesign/packages/tokens). Three selectable
+     families: Graphite Sand (the DM Apps corporate design, default), Standard
+     Utility (dark gray, calm borders) and Black Utility (pure black, hairline
+     "layered chrome" controls). :root carries Standard; [data-brand-design]
+     on .root overrides the family values. */
   --dm-surface-app: #1f1f1f;
   --dm-surface-panel: #212121;
   --dm-surface-panel-elevated: #2f2f32;
@@ -109,10 +110,73 @@
   --disabled: var(--dm-text-disabled);
   --accent-soft: var(--dm-accent-orange-soft);
 }
+
+/* DM Graphite Sand: the DM Apps corporate design (DM_CICD brand tokens) —
+   deep graphite surfaces with warm sand accents. Default family. The accent
+   moves from utility orange to the brand's sand (#C7B299), so the accent
+   aliases are re-declared here too (see the alias note on the black family). */
+.root[data-brand-design="graphite"] {
+  --dm-surface-app: #090908;
+  --dm-surface-panel: #14120f;
+  --dm-surface-panel-elevated: #23201d;
+  --dm-surface-input: #100e0c;
+  --dm-surface-overlay: rgba(9, 9, 8, 0.6);
+  --dm-text-primary: #e9e4db;
+  --dm-text-strong: #f5f1ea;
+  --dm-text-muted: #a9a39a;
+  --dm-text-disabled: #6e675f;
+  --dm-border-subtle: #262320;
+  --dm-border-default: #342f2a;
+  --dm-border-strong: #47403a;
+  --dm-border-hover: #59514a;
+  --dm-border-focus: #c7b299;
+  --dm-control-highlight: rgba(245, 241, 234, 0.10);
+  --dm-control-shadow: rgba(0, 0, 0, 0.38);
+  --dm-pane-bg: #0c0b0a;
+  --dm-pane-header: #181614;
+  --dm-accent-orange: #c7b299;
+  --dm-accent-orange-hover: #e7d7bf;
+  --dm-accent-orange-active: #ad9679;
+  --dm-accent-orange-soft: rgba(199, 178, 153, 0.14);
+  --dm-on-accent: #171512;
+  --shadow-focus: 0 0 0 1px rgba(199, 178, 153, 0.28), 0 10px 28px rgba(0, 0, 0, 0.30);
+  --chrome-action-hover-bg: rgba(245, 241, 234, 0.06);
+  --chrome-action-active-bg: rgba(245, 241, 234, 0.10);
+  /* Brand backdrop (dm-apps-brand-tokens.css): only on elements that own their
+     full box (settings modal, welcome screen) — see the gradient rules below. */
+  --dm-gradient-bg: radial-gradient(circle at 22% 8%, rgba(199, 178, 153, 0.15), transparent 34%), radial-gradient(circle at 86% 20%, rgba(155, 118, 89, 0.12), transparent 32%), linear-gradient(180deg, #090908 0%, #000 100%);
+
+  --bg: var(--dm-surface-app);
+  --panel: var(--dm-surface-panel);
+  --panel-elevated: var(--dm-surface-panel-elevated);
+  --input: var(--dm-surface-input);
+  --border: var(--dm-border-default);
+  --border-subtle: var(--dm-border-subtle);
+  --border-strong: var(--dm-border-strong);
+  --border-hover: var(--dm-border-hover);
+  --text: var(--dm-text-primary);
+  --text-strong: var(--dm-text-strong);
+  --muted: var(--dm-text-muted);
+  --disabled: var(--dm-text-disabled);
+  --accent: var(--dm-accent-orange);
+  --accent-hover: var(--dm-accent-orange-hover);
+  --accent-active: var(--dm-accent-orange-active);
+  --accent-soft: var(--dm-accent-orange-soft);
+  --on-accent: var(--dm-on-accent);
+}
+
+/* Graphite Sand backdrop: the settings modal and the welcome screen carry the
+   brand gradient (matches the DM-Voice settings window). Both elements span
+   their full box (fixed-height modal / absolutely-filled view), so the gradient
+   never tiles. */
+.root[data-brand-design="graphite"] .modal.settings-modal { background: var(--dm-gradient-bg); }
+.root[data-brand-design="graphite"] .welcome { background: var(--dm-gradient-bg); }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {
-  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  /* Brand typography (dm-apps-brand-tokens.css --dm-font-sans): Inter when
+     installed, otherwise the system UI font — no bundled font files. */
+  font-family: Inter, Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   /* Transparent so the macOS window vibrancy shows through where terminals are
      translucent. The sidebar/titlebar stay solid; the welcome screen is solid. */
   background: transparent;
@@ -185,7 +249,7 @@ body {
 .ws-end { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
 .ws-actions { position: absolute; right: 100%; top: 0; bottom: 0; display: flex;
   align-items: center; gap: 6px; padding: 0 8px 0 18px; visibility: hidden;
-  background: linear-gradient(to right, rgba(201, 123, 74, 0), rgba(201, 123, 74, 0.14) 18px); }
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--accent) 14%, transparent) 18px); }
 .ws-item:hover, .workspace-tab:hover { background: var(--chrome-action-hover-bg); }
 .ws-item.active:hover { background: var(--accent-soft); color: var(--text-strong); }
 .ws-item:hover .ws-actions, .workspace-tab:hover .ws-actions { visibility: visible; }
@@ -372,7 +436,10 @@ input[type="checkbox"]:checked::after {
 }
 .segmented-control {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Column per item, all equal width — holds for the 2-option controls
+     (language, navigation) and the 3-option app-design picker alike. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   min-width: 260px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -421,7 +488,7 @@ input[type="checkbox"]:checked::after {
 }
 .update-badge:hover { filter: brightness(1.08); }
 .update-badge.downloading {
-  background: rgba(201, 123, 74, 0.16); color: var(--accent); cursor: default;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); cursor: default;
 }
 .update-badge.ready { animation: update-badge-pulse 1.6s ease-in-out infinite; }
 @keyframes update-badge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
@@ -435,6 +502,9 @@ input[type="checkbox"]:checked::after {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 20px; }
 .welcome h2 { font-weight: 500; opacity: .85; }
+/* The SVG carries its own drop shadows; keep it modest so it reads as a brand
+   mark, not a hero graphic. */
+.welcome-logo { width: 92px; height: auto; margin-bottom: -4px; }
 .welcome-cwd { display: flex; align-items: center; gap: 10px;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 12px; max-width: 80%; }
@@ -914,7 +984,7 @@ body.drag-active webview { pointer-events: none; }
 .ftree-error { color: var(--danger); }
 .ftree-row { display: flex; align-items: center; gap: 7px; padding: 2px 8px; line-height: 1.55; font-size: 12.5px; color: var(--text); cursor: default; white-space: nowrap; }
 .ftree-row:hover { background: var(--chrome-action-hover-bg); }
-.ftree-row.sel { background: rgba(201, 123, 74, 0.22); }
+.ftree-row.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .ftree-row:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 .ftree-chev { width: 12px; display: inline-flex; color: var(--muted); }
 .ftree-ic { display: inline-flex; }

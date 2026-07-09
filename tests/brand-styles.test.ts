@@ -53,6 +53,52 @@ describe('DM brand styles', () => {
     }
   });
 
+  it('declares the Graphite Sand corporate family with re-declared aliases', () => {
+    const graphiteRules = ruleBodies('.root[data-brand-design="graphite"]');
+    expect(graphiteRules).toHaveLength(1);
+    const rule = graphiteRules[0];
+
+    // Core Graphite Sand tokens (DM_CICD dm-apps-brand-tokens.css).
+    expect(rule).toContain('--dm-surface-app: #090908;');
+    expect(rule).toContain('--dm-surface-panel-elevated: #23201d;');
+    expect(rule).toContain('--dm-border-default: #342f2a;');
+    expect(rule).toContain('--dm-text-strong: #f5f1ea;');
+    expect(rule).toContain('--dm-text-muted: #a9a39a;');
+    expect(rule).toContain('--dm-accent-orange: #c7b299;');
+    expect(rule).toContain('--dm-accent-orange-hover: #e7d7bf;');
+    expect(rule).toContain('--dm-on-accent: #171512;');
+    expect(rule).toContain('--dm-gradient-bg:');
+
+    // Alias re-declarations, INCLUDING the accent aliases (the family swaps the
+    // accent from utility orange to brand sand — see the note on the black family).
+    for (const alias of [
+      '--bg: var(--dm-surface-app);',
+      '--panel: var(--dm-surface-panel);',
+      '--border: var(--dm-border-default);',
+      '--text: var(--dm-text-primary);',
+      '--muted: var(--dm-text-muted);',
+      '--accent: var(--dm-accent-orange);',
+      '--accent-hover: var(--dm-accent-orange-hover);',
+      '--accent-active: var(--dm-accent-orange-active);',
+      '--accent-soft: var(--dm-accent-orange-soft);',
+      '--on-accent: var(--dm-on-accent);'
+    ]) {
+      expect(rule).toContain(alias);
+    }
+  });
+
+  it('applies the brand gradient backdrop to the settings modal and welcome screen in graphite', () => {
+    expect(styles).toContain('.root[data-brand-design="graphite"] .modal.settings-modal { background: var(--dm-gradient-bg); }');
+    expect(styles).toContain('.root[data-brand-design="graphite"] .welcome { background: var(--dm-gradient-bg); }');
+  });
+
+  it('keeps accent-derived fills family-aware instead of hardcoding utility orange', () => {
+    // These once hardcoded rgba(201, 123, 74, …) and would have stayed orange
+    // under the Graphite Sand family.
+    expect(ruleBodies('.update-badge.downloading')[0]).toContain('color-mix(in srgb, var(--accent) 16%, transparent)');
+    expect(ruleBodies('.ftree-row.sel')[0]).toContain('color-mix(in srgb, var(--accent) 22%, transparent)');
+  });
+
   it('uses ink text on filled accent controls instead of white', () => {
     for (const selector of ['.btn-primary', '.confirm-btn.primary', '.update-badge', '.segmented-control-item.active']) {
       const rules = ruleBodies(selector);

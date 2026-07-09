@@ -69,4 +69,33 @@ describe('migrateSettings', () => {
       workspaceNavigationPlacement: 'floating'
     })).toEqual(defaultSettings());
   });
+
+  // Regression: these fields used to be dropped on load, so the user's choice
+  // reverted (to Black Utility / OS language) on every launch and the next save
+  // then persisted the stripped settings — losing the choice permanently.
+  it('preserves the persisted brand design across a load/save round-trip', () => {
+    for (const design of ['graphite', 'standard', 'black'] as const) {
+      expect(migrateSettings({
+        themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, brandDesign: design
+      }).brandDesign).toBe(design);
+    }
+  });
+
+  it('omits an invalid brand design so the renderer default (graphite) applies', () => {
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, brandDesign: 'neon'
+    }).brandDesign).toBeUndefined();
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95 }).brandDesign).toBeUndefined();
+  });
+
+  it('preserves the persisted locale and drops invalid values', () => {
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, locale: 'de' }).locale).toBe('de');
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, locale: 'en' }).locale).toBe('en');
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, locale: 'fr' }).locale).toBeUndefined();
+  });
+
+  it('preserves clickMovesCursor', () => {
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, clickMovesCursor: true }).clickMovesCursor).toBe(true);
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, clickMovesCursor: 'yes' }).clickMovesCursor).toBeUndefined();
+  });
 });

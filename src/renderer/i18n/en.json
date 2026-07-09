@@ -50,9 +50,10 @@
     },
     "appearance": {
       "brandDesign": "App design",
+      "brandDesignGraphite": "Graphite Sand",
       "brandDesignBlack": "Black Utility",
       "brandDesignStandard": "Standard",
-      "brandDesignHint": "Black Utility uses pure black with fine hairline controls, Standard a calm dark gray. Terminal themes stay independent.",
+      "brandDesignHint": "Graphite Sand is the DM Apps corporate design — warm sand accents on deep graphite. Black Utility uses pure black with fine hairline controls, Standard a calm dark gray. Terminal themes stay independent.",
       "theme": "Terminal theme",
       "backgroundColor": "Background color",
       "customColor": "Custom color",

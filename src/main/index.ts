@@ -107,7 +107,7 @@ function createWindow(): void {
     // macOS keeps the vibrancy frosted backdrop. Windows uses a solid dark base:
     // the acrylic backdrop was too strong, and a transparent backgroundColor also
     // greys out the maximize button, so Windows stays fully opaque and maximizable.
-    backgroundColor: isMac ? '#00000000' : '#0d0d0d',
+    backgroundColor: isMac ? '#00000000' : '#090908',
     vibrancy: isMac ? 'under-window' : undefined,
     visualEffectState: isMac ? 'active' : undefined,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',

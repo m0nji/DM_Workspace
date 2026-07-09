@@ -29,7 +29,7 @@ export function App(): React.JSX.Element {
   const showBoard = taskView && tasksEnabled;
 
   const locale = useStore((s) => s.settings.locale);
-  const brandDesign = useStore((s) => s.settings.brandDesign ?? 'black');
+  const brandDesign = useStore((s) => s.settings.brandDesign ?? 'graphite');
 
   useKeyboardShortcuts();
 

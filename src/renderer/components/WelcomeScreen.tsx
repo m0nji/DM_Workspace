@@ -2,6 +2,9 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import type { PresetKind } from '../../shared/types';
+// Colored DM wordmark for dark surfaces — copied verbatim from the brand repo
+// (DM_CICD 02_logo); never redrawn or recolored per the logo rules.
+import logoUrl from '../assets/dm-apps-logo-final-dark-colored.svg';
 
 const PRESETS = [
   { kind: '1',  labelKey: 'welcome.preset.single',     cols: 1, rows: 1, cells: 1 },
@@ -29,6 +32,7 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
 
   return (
     <div className="welcome">
+      <img className="welcome-logo" src={logoUrl} alt="DM Apps" />
       <h2>{t('welcome.heading')}</h2>
       <div className="welcome-cwd">
         <span className="label">{t('welcome.workingDirectory')}</span>

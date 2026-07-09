@@ -32,6 +32,14 @@ function migrateWorkspaceNavigationPlacement(raw: unknown): WorkspaceNavigationP
   return raw === 'left' || raw === 'top' ? raw : undefined;
 }
 
+function migrateBrandDesign(raw: unknown): Settings['brandDesign'] {
+  return raw === 'graphite' || raw === 'standard' || raw === 'black' ? raw : undefined;
+}
+
+function migrateLocale(raw: unknown): Settings['locale'] {
+  return raw === 'en' || raw === 'de' ? raw : undefined;
+}
+
 export function defaultSettings(): Settings {
   return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, workspaceNavigationPlacement: 'left' };
 }
@@ -52,8 +60,16 @@ export function migrateSettings(raw: unknown): Settings {
     : d.terminalOpacity;
   const out: Settings = { themeId, terminalOpacity, workspaceNavigationPlacement: d.workspaceNavigationPlacement };
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
+  if (typeof r.clickMovesCursor === 'boolean') out.clickMovesCursor = r.clickMovesCursor;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
+  // brandDesign/locale MUST survive the round-trip: dropping them here is what
+  // made the app fall back to Black Utility (and OS language) on every launch —
+  // the next save then persisted the stripped settings, losing the choice for good.
+  const brandDesign = migrateBrandDesign(r.brandDesign);
+  if (brandDesign) out.brandDesign = brandDesign;
+  const locale = migrateLocale(r.locale);
+  if (locale) out.locale = locale;
   const shortcutBindings = migrateShortcutBindings(r.shortcutBindings);
   if (shortcutBindings) out.shortcutBindings = shortcutBindings;
   const workspaceNavigationPlacement = migrateWorkspaceNavigationPlacement(r.workspaceNavigationPlacement);

@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS: Settings = {
   showDoneBadge: false,
   notificationsEnabled: false,
   workspaceNavigationPlacement: 'left',
-  brandDesign: 'black'
+  brandDesign: 'graphite'
 };
 
 export type UpdateStatus =

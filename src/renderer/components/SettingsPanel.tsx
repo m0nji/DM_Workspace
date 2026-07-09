@@ -133,6 +133,14 @@ function TemplatesSection(): React.JSX.Element {
   );
 }
 
+// Graphite Sand is the DM Apps corporate design and the default; the two
+// Utility families remain as alternatives.
+const BRAND_DESIGNS: { value: 'graphite' | 'black' | 'standard'; labelKey: ParseKeys }[] = [
+  { value: 'graphite', labelKey: 'settings.appearance.brandDesignGraphite' },
+  { value: 'black', labelKey: 'settings.appearance.brandDesignBlack' },
+  { value: 'standard', labelKey: 'settings.appearance.brandDesignStandard' }
+];
+
 const COLOR_PRESETS: { labelKey: ParseKeys; value: string }[] = [
   { labelKey: 'settings.appearance.preset.black', value: '#000000' },
   { labelKey: 'settings.appearance.preset.darkGray', value: '#1e1e1e' },
@@ -268,15 +276,15 @@ export function SettingsPanel(): React.JSX.Element | null {
                 <div className="settings-group">
                   <div className="modal-section-label">{t('settings.appearance.brandDesign')}</div>
                   <div className="segmented-control" role="group" aria-label={t('settings.appearance.brandDesign')}>
-                    {(['black', 'standard'] as const).map((design) => (
+                    {BRAND_DESIGNS.map(({ value, labelKey }) => (
                       <button
-                        key={design}
+                        key={value}
                         type="button"
-                        className={`segmented-control-item ${(settings.brandDesign ?? 'black') === design ? 'active' : ''}`}
-                        aria-pressed={(settings.brandDesign ?? 'black') === design}
-                        onClick={() => updateSettings({ brandDesign: design })}
+                        className={`segmented-control-item ${(settings.brandDesign ?? 'graphite') === value ? 'active' : ''}`}
+                        aria-pressed={(settings.brandDesign ?? 'graphite') === value}
+                        onClick={() => updateSettings({ brandDesign: value })}
                       >
-                        {t(`settings.appearance.brandDesign${design === 'black' ? 'Black' : 'Standard'}`)}
+                        {t(labelKey)}
                       </button>
                     ))}
                   </div>
