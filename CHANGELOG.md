@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## Unreleased
+- fix: Resizing a pane sideways no longer shreds the output of running TUIs (Claude Code, Codex) – the terminal used to reflow at every intermediate width while the program still painted at the old width, leaving torn, duplicated rows that only a maximize/restore cleaned up. Width changes now reflow once, when the drag settles, together with the program's resize signal; height-only resizes still track the drag live
+
 ## 0.9.16 – 2026-07-09
 - feat: New "Graphite Sand" app design — the DM Apps corporate look with graphite surfaces, warm sand accents, the brand gradient in Settings and on the welcome screen, and the DM wordmark. It is now the default; Black Utility and Standard stay available under Settings → Appearance
 - fix: The chosen app design, language and terminal-click setting now survive restarts and updates — previously they silently reset to Black Utility / system language on every launch

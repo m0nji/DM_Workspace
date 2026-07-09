@@ -531,7 +531,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // spawn itself carries the freshly fitted cols/rows, so nothing is lost.
         return spawnSent;
       },
-      sendResize: () => window.api.resize({ paneId, cols: term.cols, rows: term.rows })
+      sendResize: () => window.api.resize({ paneId, cols: term.cols, rows: term.rows }),
+      // The wrapper's width: unlike the host it is never pinned, so it always
+      // tracks the pane layout. Width changes defer the fit (see scheduler).
+      getWidth: () => (host.parentElement ?? host).clientWidth
     });
     // Observe the wrapper, not the host: safeFit pins the host to a fixed pixel
     // height, so a height-only pane resize (splitter drag, maximize) never
