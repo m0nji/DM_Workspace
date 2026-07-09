@@ -2,7 +2,7 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
-## Unreleased
+## 0.9.18 – 2026-07-09
 - fix: Copying from the terminal no longer picks up the padding spaces TUIs (Claude Code, Codex) paint around their boxes — trailing whitespace is stripped from every copied line (context menu and Cmd+C), while leading indentation is kept for code
 - feat: New context-menu action "Copy as command" — collapses a command a TUI displayed across several padded lines into one clean, pasteable line
 
