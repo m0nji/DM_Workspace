@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.19 – 2026-07-10
+- fix: "Reset terminal" now also recovers a pane stuck in the alternate screen — a TUI (Claude Code, Codex) that exits uncleanly could leave the pane where the mouse wheel paged through shell history instead of scrolling the buffer, and the reset didn't help; it now leaves the alternate screen and re-shows a hidden cursor in addition to clearing mouse-tracking modes
+
 ## 0.9.18 – 2026-07-09
 - fix: Copying from the terminal no longer picks up the padding spaces TUIs (Claude Code, Codex) paint around their boxes — trailing whitespace is stripped from every copied line (context menu and Cmd+C), while leading indentation is kept for code
 - feat: New context-menu action "Copy as command" — collapses a command a TUI displayed across several padded lines into one clean, pasteable line
