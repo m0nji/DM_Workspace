@@ -24,3 +24,4 @@ build/.notarize.env
 
 # Apple App Store Connect API key (never commit)
 build/*.p8
+.secrets

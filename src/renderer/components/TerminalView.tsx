@@ -19,6 +19,7 @@ import { formatPathsForInsert } from '../../shared/path-insert';
 import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
+import { STUCK_MODE_RESET } from '../../shared/terminal-reset';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { createResizeScheduler } from '../resize-scheduler';
@@ -33,14 +34,6 @@ const SCROLLBACK_LINES = 1000;
 
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
-// A TUI (e.g. Codex) that exits uncleanly can leave xterm stuck in mouse tracking
-// mode, which hijacks the wheel and text selection so the pane can no longer be
-// scrolled or copied. Writing these DECRST resets clears that. Covers X10 (?9),
-// VT200/normal (?1000), highlight (?1001), button-event/drag (?1002) and any-event
-// (?1003) tracking plus the SGR extended encoding (?1006). Driven by the
-// "Reset terminal" context-menu action — an explicit, content-preserving recovery
-// (it does not clear the buffer; that is "Clear window").
-const MOUSE_TRACKING_RESET = '\x1b[?9l\x1b[?1000l\x1b[?1001l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
 
 // The translucent terminal background as an rgba() string (opacity baked into the
 // alpha so a translucent terminal reveals the window vibrancy). This is painted as
@@ -186,6 +179,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       altClickMovesCursor: false
     });
     termRef.current = term;
+    // e2e hook (see main.tsx): expose the active buffer type per pane so tests
+    // can assert alt-screen recovery without probing xterm's DOM, whose scroll
+    // metrics don't reflect the buffer switch deterministically.
+    if (window.api?.isE2E) {
+      const g = window as unknown as { __bufferTypes?: Map<string, () => string> };
+      (g.__bufferTypes ??= new Map()).set(paneId, () => term.buffer.active.type);
+    }
     const fit = new FitAddon();
     term.loadAddon(fit);
     const search = new SearchAddon();
@@ -600,6 +600,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
       unregisterTerminalFocus(paneId);
+      (window as unknown as { __bufferTypes?: Map<string, unknown> }).__bufferTypes?.delete(paneId);
       if (webglRetryRef.current) { clearTimeout(webglRetryRef.current); webglRetryRef.current = null; }
       webglRef.current?.dispose();
       webglRef.current = null;
@@ -681,7 +682,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: t('menu.clearAllWindows'), onClick: () => setConfirmClearAll(true) },
       // Unstick the terminal's input/mouse modes without wiping its contents — e.g.
       // after a TUI crashed and left mouse tracking on, hijacking the wheel.
-      { label: t('menu.resetTerminal'), onClick: () => { term?.write(MOUSE_TRACKING_RESET); term?.focus(); } },
+      { label: t('menu.resetTerminal'), onClick: () => { term?.write(STUCK_MODE_RESET); term?.focus(); } },
       { label: '-' },
       { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
       { label: t('menu.closeTerminal'), onClick: () => closeActivePane(paneId) }
