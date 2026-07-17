@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.20 – 2026-07-17
+- fix: Creating or closing a pane now forces one final terminal fit, PTY resize and full repaint after the new layout is committed, so the existing pane no longer keeps torn or incorrectly wrapped text until it is maximized and restored
+- fix: Closing a pane now asks for confirmation from every entry point (pane button, context menu, command palette and keyboard shortcut); workspace and pane close confirmations now use the Graphite Sand brand dialog with sand accents
+
 ## 0.9.19 – 2026-07-10
 - fix: "Reset terminal" now also recovers a pane stuck in the alternate screen — a TUI (Claude Code, Codex) that exits uncleanly could leave the pane where the mouse wheel paged through shell history instead of scrolling the buffer, and the reset didn't help; it now leaves the alternate screen and re-shows a hidden cursor in addition to clearing mouse-tracking modes
 
