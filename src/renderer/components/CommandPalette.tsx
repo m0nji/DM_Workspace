@@ -70,7 +70,7 @@ export function CommandPalette(): React.JSX.Element | null {
         { id: 'split-v', title: t('palette.cmd.splitVertical'), category: catActions, hint: hint('splitVertical'), run: act(() => s.splitActivePane(focusedPaneId, 'v')) },
         { id: 'maximize', title: t('palette.cmd.toggleMaximize'), category: catActions, hint: hint('toggleMaximize'), run: act(() => s.toggleMaximize(focusedPaneId)) },
         { id: 'search', title: t('palette.cmd.searchPane'), category: catActions, hint: hint('searchPane'), run: act(() => s.setSearchOpen(focusedPaneId)) },
-        { id: 'close-pane', title: t('palette.cmd.closePane'), category: catActions, hint: hint('closePane'), run: act(() => s.closeActivePane(focusedPaneId)) }
+        { id: 'close-pane', title: t('palette.cmd.closePane'), category: catActions, hint: hint('closePane'), run: act(() => s.requestClosePane(focusedPaneId)) }
       );
     }
 

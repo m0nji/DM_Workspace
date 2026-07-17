@@ -10,6 +10,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { TemplateWizard } from './components/TemplateWizard';
 import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
 import { TaskBoard } from './components/TaskBoard';
+import { ClosePaneConfirmDialog } from './components/ClosePaneConfirmDialog';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): React.JSX.Element {
@@ -121,6 +122,7 @@ export function App(): React.JSX.Element {
       <CommandPalette />
       <TemplateWizard />
       <StartupCommandConfirmDialog />
+      <ClosePaneConfirmDialog />
     </div>
   );
 }

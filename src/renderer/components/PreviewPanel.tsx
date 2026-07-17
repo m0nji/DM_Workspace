@@ -178,6 +178,7 @@ export function PreviewPanel(): React.JSX.Element | null {
             ? t('files.deleteMessageFolder', { name: pendingDelete.name })
             : t('files.deleteMessage', { name: pendingDelete.name })}
           confirmLabel={t('common.delete')}
+          tone="danger"
           onConfirm={() => { void confirmDelete(); }}
           onCancel={() => setPendingDelete(null)}
         />

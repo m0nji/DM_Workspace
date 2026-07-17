@@ -37,6 +37,8 @@ export interface ResizeSchedulerOptions {
 
 export interface ResizeScheduler {
   onResize(): void;
+  /** Immediately settle a programmatic layout change at the current size. */
+  flush(): void;
   dispose(): void;
 }
 
@@ -52,6 +54,12 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
   let settle: unknown = null; // deferred fit while the width is changing
   let lastWidth: number | null = null;
   let disposed = false;
+
+  const cancelPending = (): void => {
+    if (frame !== null) { caf(frame); frame = null; }
+    if (timer !== null) { clearTimer(timer); timer = null; }
+    if (settle !== null) { clearTimer(settle); settle = null; }
+  };
 
   return {
     onResize() {
@@ -83,11 +91,15 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
         }, debounceMs);
       });
     },
+    flush() {
+      if (disposed) return;
+      cancelPending();
+      lastWidth = opts.getWidth?.() ?? null;
+      if (opts.fit()) opts.sendResize();
+    },
     dispose() {
       disposed = true;
-      if (frame !== null) { caf(frame); frame = null; }
-      if (timer !== null) { clearTimer(timer); timer = null; }
-      if (settle !== null) { clearTimer(settle); settle = null; }
+      cancelPending();
     }
   };
 }

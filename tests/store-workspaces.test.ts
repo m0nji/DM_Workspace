@@ -28,7 +28,8 @@ describe('workspace store actions', () => {
       ],
       activeWorkspaceId: 'w1',
       settings: { themeId: 'default', terminalOpacity: 0.75 },
-      maximizedPaneId: 'p1'
+      maximizedPaneId: 'p1',
+      pendingClosePaneId: null
     });
   });
 
@@ -143,6 +144,21 @@ describe('workspace store actions', () => {
     expect(collectPaneIds(state.workspaces[0].layout)).toEqual(['old2']);
     expect(state.focusedPaneId).toBe('old2');
     expect(state.searchOpenPaneId).toBeNull();
+  });
+
+  it('stages pane closing for confirmation before changing the layout', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: { type: 'pane', id: 'old1' } }],
+      activeWorkspaceId: 'w1'
+    });
+
+    useStore.getState().requestClosePane('old1');
+    expect(useStore.getState().pendingClosePaneId).toBe('old1');
+    expect(collectPaneIds(useStore.getState().workspaces[0].layout)).toEqual(['old1']);
+
+    useStore.getState().cancelClosePane();
+    expect(useStore.getState().pendingClosePaneId).toBeNull();
+    expect(window.api.kill).not.toHaveBeenCalled();
   });
 
   it('remaps pane titles and pending startup commands when the cwd change restarts panes', () => {

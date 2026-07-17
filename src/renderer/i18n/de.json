@@ -25,11 +25,12 @@
     },
     "folderRestartConfirm": "Diesen Workspace im neuen Ordner neu starten? Die laufenden Terminals werden beendet.",
     "deleteTitle": "Workspace schließen?",
-    "deleteMessage": "„{{name}}“ wird geschlossen. Laufende Terminals werden beendet."
+    "deleteMessage": "„{{name}}“ wird geschlossen. Laufende Terminals werden beendet.",
+    "closeConfirm": "Workspace schließen"
   },
   "tooltip": {
     "editWorkspace": "Workspace bearbeiten",
-    "deleteWorkspace": "Workspace löschen",
+    "deleteWorkspace": "Workspace schließen",
     "terminalsReady": "Terminals bereit",
     "addWorkspace": "Workspace hinzufügen",
     "whatsNewChangelog": "Was ist neu – Changelog anzeigen"
@@ -277,6 +278,9 @@
     "splitVertical": "Oben und unten teilen",
     "maximize": "Maximieren",
     "restore": "Wiederherstellen",
+    "closeTitle": "Fenster schließen?",
+    "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
+    "closeConfirm": "Fenster schließen",
     "status": {
       "idle": "untätig",
       "busy": "beschäftigt",

@@ -89,6 +89,7 @@ describe('DM brand styles', () => {
 
   it('applies the brand gradient backdrop to the settings modal and welcome screen in graphite', () => {
     expect(styles).toContain('.root[data-brand-design="graphite"] .modal.settings-modal { background: var(--dm-gradient-bg); }');
+    expect(styles).toContain('.root[data-brand-design="graphite"] .modal.confirm-modal { background: var(--dm-gradient-bg); }');
     expect(styles).toContain('.root[data-brand-design="graphite"] .welcome { background: var(--dm-gradient-bg); }');
   });
 

@@ -10,7 +10,7 @@ import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
-import { focusTerminal } from './terminal-registry';
+import { focusTerminal, refreshTerminalLayoutAfterCommit } from './terminal-registry';
 
 const DEFAULT_SETTINGS: Settings = {
   themeId: DEFAULT_THEME_ID,
@@ -63,6 +63,7 @@ interface StoreState extends AppState {
   paneStatus: Record<string, PaneStatus>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   focusedPaneId: string | null;
+  pendingClosePaneId: string | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
   taskView: boolean;                 // true => board visible instead of terminals
@@ -107,6 +108,8 @@ interface StoreState extends AppState {
   // layout
   applyPreset: (kind: PresetKind) => void;
   splitActivePane: (paneId: string, direction: Direction) => void;
+  requestClosePane: (paneId: string) => void;
+  cancelClosePane: () => void;
   closeActivePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number, persistNow?: boolean) => void;
   toggleMaximize: (paneId: string) => void;
@@ -211,6 +214,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneStatus: {},
   paneCwd: {},
   focusedPaneId: null,
+  pendingClosePaneId: null,
   windowFocused: true,
   searchOpenPaneId: null,
   taskView: false,
@@ -355,12 +359,25 @@ export const useStore = create<StoreState>((set, get) => ({
     const newPaneId = nextPaneId();
     const workspaces = s.workspaces.map((w) =>
       w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
+    // The old terminal changes width. Force one final atomic fit/PTY resize and
+    // repaint after React has committed the split instead of relying solely on
+    // ResizeObserver timing.
+    refreshTerminalLayoutAfterCommit(paneId);
     // The new pane takes over: store focus plus DOM focus once it has mounted.
     requestAnimationFrame(() => focusTerminal(newPaneId));
     const next = { ...s, workspaces, focusedPaneId: newPaneId };
     persist(next);
     return next;
   }),
+
+  requestClosePane: (paneId) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    return ws?.layout && collectPaneIds(ws.layout).includes(paneId)
+      ? { pendingClosePaneId: paneId }
+      : s;
+  }),
+
+  cancelClosePane: () => set({ pendingClosePaneId: null }),
 
   closeActivePane: (paneId) => set((s) => {
     window.api.kill(paneId);
@@ -390,6 +407,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const target = successor;
       requestAnimationFrame(() => focusTerminal(target));
     }
+    if (successor) refreshTerminalLayoutAfterCommit(successor);
     const next = {
       ...s,
       workspaces,
@@ -397,7 +415,8 @@ export const useStore = create<StoreState>((set, get) => ({
       paneCwd,
       focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
-      searchOpenPaneId: s.searchOpenPaneId === paneId ? null : s.searchOpenPaneId
+      searchOpenPaneId: s.searchOpenPaneId === paneId ? null : s.searchOpenPaneId,
+      pendingClosePaneId: s.pendingClosePaneId === paneId ? null : s.pendingClosePaneId
     };
     persist(next);
     return next;

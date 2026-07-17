@@ -24,3 +24,27 @@ const focusRegistry = new Map<string, () => void>();
 export function registerTerminalFocus(paneId: string, focus: () => void): void { focusRegistry.set(paneId, focus); }
 export function unregisterTerminalFocus(paneId: string): void { focusRegistry.delete(paneId); }
 export function focusTerminal(paneId: string): void { focusRegistry.get(paneId)?.(); }
+
+// A programmatic split/close can resize a terminal before ResizeObserver has
+// delivered a trustworthy final measurement. TerminalView registers an atomic
+// fit + PTY resize + repaint callback so layout actions can explicitly settle it.
+const layoutRefreshRegistry = new Map<string, () => void>();
+export function registerTerminalLayoutRefresh(paneId: string, refresh: () => void): void {
+  layoutRefreshRegistry.set(paneId, refresh);
+}
+export function unregisterTerminalLayoutRefresh(paneId: string): void {
+  layoutRefreshRegistry.delete(paneId);
+}
+export function refreshTerminalLayout(paneId: string): void {
+  layoutRefreshRegistry.get(paneId)?.();
+}
+export function refreshTerminalLayoutAfterCommit(paneId: string): void {
+  if (typeof requestAnimationFrame !== 'function') {
+    // Store unit tests run without a browser frame scheduler. There is no
+    // mounted terminal there, so a direct (normally empty) registry lookup is
+    // the faithful fallback.
+    refreshTerminalLayout(paneId);
+    return;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => refreshTerminalLayout(paneId)));
+}

@@ -13,7 +13,11 @@ import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
-import { registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, registerTerminalFocus, unregisterTerminalFocus } from '../terminal-registry';
+import {
+  registerTerminal, unregisterTerminal, clearTerminal, clearTerminals,
+  registerTerminalFocus, unregisterTerminalFocus,
+  registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh
+} from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { formatPathsForInsert } from '../../shared/path-insert';
 import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
@@ -112,7 +116,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const customBg = useStore((s) => s.settings.terminalBackground);
   const setPaneStatus = useStore((s) => s.setPaneStatus);
   const setSearchOpen = useStore((s) => s.setSearchOpen);
-  const closeActivePane = useStore((s) => s.closeActivePane);
+  const requestClosePane = useStore((s) => s.requestClosePane);
   const [atBottom, setAtBottom] = useState(true);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -559,6 +563,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const ro = new ResizeObserver(() => resizeScheduler.onResize());
     ro.observe(host.parentElement ?? host);
 
+    registerTerminalLayoutRefresh(paneId, () => {
+      resizeScheduler.flush();
+      // fit() updates the geometry synchronously. Invalidate the viewport too,
+      // so an idle normal-buffer app cannot retain torn rows from the old width.
+      if (term.rows > 0) term.refresh(0, term.rows - 1);
+    });
+
     // The very first fit can run before the WebGL renderer has measured the cell
     // size, so .xterm-screen still has no height and the host can't be pinned —
     // which leaves the black bottom bar on idle panes (no output → no resize/render
@@ -584,6 +595,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       cancelAnimationFrame(raf2);
       ro.disconnect();
       resizeScheduler.dispose();
+      unregisterTerminalLayoutRefresh(paneId);
       cancelAnimationFrame(pinRaf);
       host.removeEventListener('keydown', handleTerminalCopyShortcut, true);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
@@ -685,7 +697,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: t('menu.resetTerminal'), onClick: () => { term?.write(STUCK_MODE_RESET); term?.focus(); } },
       { label: '-' },
       { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
-      { label: t('menu.closeTerminal'), onClick: () => closeActivePane(paneId) }
+      { label: t('menu.closeTerminal'), onClick: () => requestClosePane(paneId) }
     ];
   };
 
@@ -718,6 +730,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           title={t('terminal.clearAllTitle')}
           message={t('terminal.clearAllMessage')}
           confirmLabel={t('terminal.clearAllConfirm')}
+          tone="danger"
           onConfirm={() => {
             const ws = useStore.getState().activeWorkspace();
             clearTerminals(collectPaneIds(ws?.layout ?? null));

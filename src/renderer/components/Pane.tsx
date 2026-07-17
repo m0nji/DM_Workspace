@@ -68,7 +68,7 @@ function Close(): React.JSX.Element {
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
   const splitActivePane = useStore((s) => s.splitActivePane);
-  const closeActivePane = useStore((s) => s.closeActivePane);
+  const requestClosePane = useStore((s) => s.requestClosePane);
   const toggleMaximize = useStore((s) => s.toggleMaximize);
   const maximized = useStore((s) => s.maximizedPaneId === paneId);
   const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
@@ -94,7 +94,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         <button className="pane-btn" title={maximized ? t('pane.restore') : t('pane.maximize')}
                 onClick={() => toggleMaximize(paneId)}>{maximized ? <Restore /> : <Maximize />}</button>
         <button className="pane-btn" title={t('common.close')}
-                onClick={() => closeActivePane(paneId)}><Close /></button>
+                onClick={() => requestClosePane(paneId)}><Close /></button>
       </div>
       <div className="pane-body">
         <SearchBar paneId={paneId} />

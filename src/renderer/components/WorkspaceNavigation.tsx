@@ -116,6 +116,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
         <ConfirmDialog
           title={t('workspace.deleteTitle')}
           message={t('workspace.deleteMessage', { name: pendingWs.name })}
+          confirmLabel={t('workspace.closeConfirm')}
           onConfirm={() => { deleteWorkspace(pendingWs.id); setPendingDeleteId(null); }}
           onCancel={() => setPendingDeleteId(null)}
         />

@@ -165,11 +165,10 @@
   --on-accent: var(--dm-on-accent);
 }
 
-/* Graphite Sand backdrop: the settings modal and the welcome screen carry the
-   brand gradient (matches the DM-Voice settings window). Both elements span
-   their full box (fixed-height modal / absolutely-filled view), so the gradient
-   never tiles. */
+/* Graphite Sand backdrop: settings, confirmations and the welcome screen carry
+   the brand gradient (matches the DM-Voice settings window). */
 .root[data-brand-design="graphite"] .modal.settings-modal { background: var(--dm-gradient-bg); }
+.root[data-brand-design="graphite"] .modal.confirm-modal { background: var(--dm-gradient-bg); }
 .root[data-brand-design="graphite"] .welcome { background: var(--dm-gradient-bg); }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -463,8 +462,10 @@ input[type="checkbox"]:checked::after {
 .swatch.active { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 .modal-hint { color: var(--muted); font-size: 11px; margin: 6px 0 0; line-height: 1.4; }
 
-.confirm-modal { width: 360px; }
-.confirm-message { margin: 0 0 18px; line-height: 1.5; color: var(--text); }
+.confirm-modal { width: 390px; padding: 22px; border-color: var(--border-strong); position: relative; overflow: hidden; }
+.confirm-modal-brand::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: var(--accent); }
+.confirm-title { color: var(--text-strong); font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.confirm-message { margin: 0 0 22px; line-height: 1.55; color: var(--muted); }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .confirm-btn { padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border-strong);
   background: var(--panel-elevated); color: var(--text); cursor: pointer; font-size: 13px;

@@ -99,6 +99,26 @@ describe('resize-scheduler', () => {
     h.fireTimer();
     expect(h.resizes()).toBe(0);
   });
+
+  it('flush cancels queued work and immediately fits and resizes once', () => {
+    const h = harness();
+    h.sched.onResize();
+    h.sched.flush();
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(1);
+    expect(h.timerPending()).toBe(false);
+    h.fireRaf();
+    h.fireAllTimers();
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(1);
+  });
+
+  it('flush skips the PTY resize when the immediate fit fails', () => {
+    const h = harness(() => false);
+    h.sched.flush();
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(0);
+  });
 });
 
 // Width changes reflow wrapped lines. A TUI on the normal buffer (Claude Code,
