@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.21 – 2026-07-17
+- fix: Edit and close icons in the top workspace navigation no longer overlap the workspace name on hover — the actions now occupy their own stable space while long names ellipsize cleanly, consistently on macOS and Windows
+
 ## 0.9.20 – 2026-07-17
 - fix: Creating or closing a pane now forces one final terminal fit, PTY resize and full repaint after the new layout is committed, so the existing pane no longer keeps torn or incorrectly wrapped text until it is maximized and restored
 - fix: Closing a pane now asks for confirmation from every entry point (pane button, context menu, command palette and keyboard shortcut); workspace and pane close confirmations now use the Graphite Sand brand dialog with sand accents
