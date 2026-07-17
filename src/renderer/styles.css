@@ -242,9 +242,9 @@ body {
 .ws-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .ws-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-item .badge { color: var(--muted); font-size: 11px; }
-/* Pane count (+ optional done badge) pinned to the far right. The edit/close
-   actions take no layout space — they overlay the tail of the name on hover,
-   immediately left of the count, so the name gets the full width otherwise. */
+/* Pane count (+ optional done badge) pinned to the far right. In the sidebar,
+   actions overlay the tail of the name on hover; top tabs override this below
+   and reserve real layout space so icons can never collide with the label. */
 .ws-end { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
 .ws-actions { position: absolute; right: 100%; top: 0; bottom: 0; display: flex;
   align-items: center; gap: 6px; padding: 0 8px 0 18px; visibility: hidden;
@@ -288,7 +288,14 @@ body {
 }
 .workspace-tab.active { background: var(--accent-soft); color: var(--text-strong); }
 .workspace-tab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-.workspace-tab .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-tab .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-tab .ws-actions {
+  position: static;
+  flex: none;
+  padding: 0;
+  gap: 4px;
+  background: none;
+}
 .workspace-tab .badge { color: var(--muted); font-size: 11px; }
 .add-workspace-tab {
   flex: 0 0 auto;
