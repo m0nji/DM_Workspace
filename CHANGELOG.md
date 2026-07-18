@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.22 – 2026-07-18
+- feat: Workspaces can now be reordered with drag and drop in both navigation layouts — vertically in the left sidebar and horizontally in the optional top tab bar; insertion markers show the destination and the new order persists across restarts
+
 ## 0.9.21 – 2026-07-17
 - fix: Edit and close icons in the top workspace navigation no longer overlap the workspace name on hover — the actions now occupy their own stable space while long names ellipsize cleanly, consistently on macOS and Windows
 
