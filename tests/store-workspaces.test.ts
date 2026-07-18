@@ -44,6 +44,34 @@ describe('workspace store actions', () => {
     }));
   });
 
+  it('reorders workspaces and persists the new order', () => {
+    useStore.setState({
+      workspaces: [
+        { id: 'w1', name: 'One', cwd: '/tmp', layout: null },
+        { id: 'w2', name: 'Two', cwd: '/tmp', layout: null },
+        { id: 'w3', name: 'Three', cwd: '/tmp', layout: null }
+      ]
+    });
+
+    useStore.getState().reorderWorkspace('w3', 'w1', 'before');
+
+    expect(useStore.getState().workspaces.map((w) => w.id)).toEqual(['w3', 'w1', 'w2']);
+    expect(saveState).toHaveBeenCalledWith(expect.objectContaining({
+      workspaces: [
+        expect.objectContaining({ id: 'w3' }),
+        expect.objectContaining({ id: 'w1' }),
+        expect.objectContaining({ id: 'w2' })
+      ]
+    }));
+  });
+
+  it('does not persist a workspace reorder that leaves the order unchanged', () => {
+    useStore.getState().reorderWorkspace('w1', 'w2', 'before');
+
+    expect(useStore.getState().workspaces.map((w) => w.id)).toEqual(['w1', 'w2']);
+    expect(saveState).not.toHaveBeenCalled();
+  });
+
   it('ignores selection of an unknown workspace', () => {
     useStore.getState().selectWorkspace('missing');
 

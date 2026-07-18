@@ -102,6 +102,7 @@ interface StoreState extends AppState {
   activeWorkspace: () => Workspace | undefined;
   selectWorkspace: (id: string) => void;
   addWorkspace: () => void;
+  reorderWorkspace: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
   renameWorkspace: (id: string, name: string) => void;
   setWorkspaceCwd: (id: string, cwd: string) => void;
   deleteWorkspace: (id: string) => void;
@@ -283,6 +284,26 @@ export const useStore = create<StoreState>((set, get) => ({
       return next;
     });
   },
+
+  reorderWorkspace: (draggedId, targetId, position) => set((s) => {
+    if (draggedId === targetId) return s;
+    const dragged = s.workspaces.find((w) => w.id === draggedId);
+    const targetIndex = s.workspaces.findIndex((w) => w.id === targetId);
+    if (!dragged || targetIndex < 0) return s;
+
+    const workspaces = s.workspaces.filter((w) => w.id !== draggedId);
+    const adjustedTargetIndex = workspaces.findIndex((w) => w.id === targetId);
+    const insertIndex = adjustedTargetIndex + (position === 'after' ? 1 : 0);
+    workspaces.splice(insertIndex, 0, dragged);
+
+    // Dropping an item immediately beside itself can describe the order that is
+    // already present. Avoid an unnecessary state update and disk write then.
+    if (workspaces.every((w, index) => w.id === s.workspaces[index]?.id)) return s;
+
+    const next = { ...s, workspaces };
+    persist(next);
+    return next;
+  }),
 
   renameWorkspace: (id, name) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, name } : w) };

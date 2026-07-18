@@ -19,6 +19,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const activeId = useStore((s) => s.activeWorkspaceId);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
   const addWorkspace = useStore((s) => s.addWorkspace);
+  const reorderWorkspace = useStore((s) => s.reorderWorkspace);
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
   const showDoneBadge = useStore((s) => s.settings.showDoneBadge ?? false);
   // Subscribe to paneStatus only while the done badge is on — status flips on
@@ -35,6 +36,11 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    position: 'before' | 'after';
+  } | null>(null);
 
   const pendingWs = pendingDeleteId
     ? workspaces.find((w) => w.id === pendingDeleteId)
@@ -56,9 +62,53 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
         return (
           <div
             key={w.id}
-            className={`${itemClass} ${w.id === activeId ? 'active' : ''}`}
+            className={[
+              itemClass,
+              w.id === activeId ? 'active' : '',
+              w.id === draggedId ? 'dragging' : '',
+              dropTarget?.id === w.id ? `drop-${dropTarget.position}` : ''
+            ].filter(Boolean).join(' ')}
+            draggable
             onClick={() => selectWorkspace(w.id)}
             onDoubleClick={(e) => { e.preventDefault(); setEditingId(w.id); }}
+            onDragStart={(e) => {
+              setDraggedId(w.id);
+              setDropTarget(null);
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', w.id);
+            }}
+            onDragOver={(e) => {
+              if (!draggedId) return;
+              if (draggedId === w.id) {
+                setDropTarget(null);
+                return;
+              }
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pointer = top ? e.clientX : e.clientY;
+              const midpoint = top ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+              const position = pointer < midpoint ? 'before' : 'after';
+              setDropTarget((current) => current?.id === w.id && current.position === position
+                ? current
+                : { id: w.id, position });
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const sourceId = draggedId || e.dataTransfer.getData('text/plain');
+              if (sourceId && sourceId !== w.id) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pointer = top ? e.clientX : e.clientY;
+                const midpoint = top ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+                reorderWorkspace(sourceId, w.id, pointer < midpoint ? 'before' : 'after');
+              }
+              setDraggedId(null);
+              setDropTarget(null);
+            }}
+            onDragEnd={() => {
+              setDraggedId(null);
+              setDropTarget(null);
+            }}
           >
             <span className="dot" style={w.color ? { background: w.color } : undefined} />
             <span className="name">{w.name}</span>
