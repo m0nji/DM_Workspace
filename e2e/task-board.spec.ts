@@ -54,7 +54,7 @@ test('task board: opt-in, create persists to TASKS.md (+gitignore), external edi
   // ── 5. Add a task in the first column ────────────────────────────────────
   await win.locator('.task-column').first().locator('.task-add').click();
 
-  // A card appears with the default title "Neue Task".
+  // A card appears with the default title.
   const card = win.locator('.task-card').first();
   await expect(card).toBeVisible();
 
@@ -65,7 +65,9 @@ test('task board: opt-in, create persists to TASKS.md (+gitignore), external edi
   const titleInput = win.locator('.task-edit-title');
   await expect(titleInput).toBeVisible();
   await titleInput.fill('e2e task');
-  await win.getByRole('button', { name: 'Speichern' }).click();
+  // Select by class, not by label: the app follows the system locale, so a
+  // hardcoded caption ties the test to whichever language this machine runs.
+  await win.locator('.task-edit-save').click();
 
   // The card should now show our title.
   await expect(win.locator('.task-card', { hasText: 'e2e task' })).toBeVisible();

@@ -92,8 +92,8 @@ export function TaskCard({ task, onEdit, onDelete, onDragStart }: Props): React.
                onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
                placeholder={t('tasks.commandPlaceholder')} />
         <div className="task-edit-actions">
-          <button type="button" onClick={commitEdit}>{t('common.save')}</button>
-          <button type="button" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
+          <button type="button" className="task-edit-save" onClick={commitEdit}>{t('common.save')}</button>
+          <button type="button" className="task-edit-cancel" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
         </div>
       </div>
     );

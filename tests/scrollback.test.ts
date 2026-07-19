@@ -11,9 +11,24 @@ import {
   ScrollbackStore
 } from '../src/main/scrollback';
 
-function tmpFile(): string {
-  return join(mkdtempSync(join(tmpdir(), 'dmws-sb-')), 'scrollback.json');
+// Every temp dir handed out here is removed after the test. Callers used to
+// rmSync only the file inside, which left the containing dir in the system temp
+// folder on every run — hundreds accumulated over time.
+const tmpDirs: string[] = [];
+
+function tmpDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'dmws-sb-'));
+  tmpDirs.push(dir);
+  return dir;
 }
+
+function tmpFile(): string {
+  return join(tmpDir(), 'scrollback.json');
+}
+
+afterEach(() => {
+  while (tmpDirs.length) rmSync(tmpDirs.pop()!, { recursive: true, force: true });
+});
 
 describe('scrollback file IO', () => {
   it('returns empty map when file is missing', () => {
@@ -39,9 +54,7 @@ describe('scrollback file IO', () => {
   });
 
   it('returns empty map when read fails (path is a directory)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'dmws-sb-'));
-    expect(loadScrollbackFromFile(dir)).toEqual({});
-    rmSync(dir, { recursive: true, force: true });
+    expect(loadScrollbackFromFile(tmpDir())).toEqual({});
   });
 });
 

@@ -3,12 +3,12 @@ import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-// Simulate a GUI launch: a minimal PATH WITHOUT /opt/homebrew/bin, like macOS
-// gives a Finder/Spotlight-launched .app. The login shell (-l) must re-add the
-// Homebrew path via path_helper so `codex` is found again.
+// Simulate a GUI launch: a minimal four-entry PATH, like macOS gives a
+// Finder/Spotlight-launched .app. The login shell (-l) must re-run the user's
+// profile and path_helper so tools outside /usr/bin are reachable again.
 const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-env-'));
 
-test('login shell restores PATH (codex found) and reports 256-color TERM', async () => {
+test('login shell restores the full PATH and reports 256-color TERM', async () => {
   const app = await electron.launch({
     args: ['out/main/index.js'],
     env: {
@@ -24,17 +24,24 @@ test('login shell restores PATH (codex found) and reports 256-color TERM', async
   await win.waitForTimeout(1500);
 
   await win.locator('.pane .xterm-screen').first().click();
-  await win.keyboard.type('echo "TERM=$TERM COLORTERM=$COLORTERM"; which codex');
+  // PATHN counts the entries the shell ended up with. We injected exactly four
+  // (/usr/bin:/bin:/usr/sbin:/sbin), so anything above that proves the login
+  // shell re-ran the user's profile and restored the fuller PATH. Asserting the
+  // count rather than a specific install location keeps this independent of
+  // where any given tool happens to live on the machine — the previous version
+  // hardcoded /opt/homebrew/bin/codex and broke when codex moved to ~/.local/bin.
+  await win.keyboard.type('echo "TERM=$TERM COLORTERM=$COLORTERM"; echo "PATHN=$(printf %s \\"$PATH\\" | tr : \'\\n\' | grep -c .)"');
   await win.keyboard.press('Enter');
   await win.waitForTimeout(1500);
 
   const text = await win.locator('.xterm-rows').first().innerText();
   console.log('--- terminal ---\n' + text + '\n--- end ---');
 
-  // The resolved codex path proves the login shell re-added /opt/homebrew/bin.
   expect(text).toContain('TERM=xterm-256color');
   expect(text).toContain('COLORTERM=truecolor');
-  expect(text).toContain('/opt/homebrew/bin/codex');
+  const pathn = text.match(/PATHN=(\d+)/);
+  expect(pathn, `no PATHN in terminal output:\n${text}`).not.toBeNull();
+  expect(Number(pathn![1])).toBeGreaterThan(4);
 
   await app.close();
 });
