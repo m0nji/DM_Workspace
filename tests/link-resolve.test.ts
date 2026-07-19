@@ -155,6 +155,75 @@ describe('resolveLinkPath', () => {
     }
   });
 
+  // --- git worktrees -------------------------------------------------------
+  // Linked worktrees live outside the repo (or under dot-dirs the BFS skips),
+  // so resolution must derive them from git's own metadata. The fixtures
+  // fabricate that metadata by hand — no real git needed.
+
+  /** Wire up a main checkout and one linked worktree via .git metadata. */
+  function makeWorktreePair(repo: string, wt: string, name = 'wt1'): void {
+    mkdirSync(join(repo, '.git', 'worktrees', name), { recursive: true });
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(repo, '.git', 'worktrees', name, 'gitdir'), join(wt, '.git') + '\n');
+    writeFileSync(join(wt, '.git'), `gitdir: ${join(repo, '.git', 'worktrees', name)}\n`);
+  }
+
+  it('finds a file in a linked worktree outside the repo', () => {
+    const repo = join(root, 'repo');
+    const wt = join(root, 'repo-worktrees', 'feature');
+    makeWorktreePair(repo, wt);
+    mkdirSync(join(wt, 'docs'), { recursive: true });
+    const target = join(wt, 'docs', 'concept.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('docs/concept.md', repo, [])).toBe(target);
+  });
+
+  it('finds a file in a worktree under a dot-dir inside the repo', () => {
+    const repo = join(root, 'repo');
+    const wt = join(root, 'repo', '.worktrees', 'feature');
+    makeWorktreePair(repo, wt);
+    const target = join(wt, 'hidden.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('hidden.md', repo, [])).toBe(target);
+  });
+
+  it('finds a file in the main checkout when cwd is a linked worktree', () => {
+    const repo = join(root, 'repo');
+    const wt = join(root, 'repo-worktrees', 'feature');
+    makeWorktreePair(repo, wt);
+    const target = join(repo, 'main-only.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('main-only.md', wt, [])).toBe(target);
+  });
+
+  it('finds a worktree file when cwd is a subdir of the repo', () => {
+    const repo = join(root, 'repo');
+    const wt = join(root, 'repo-worktrees', 'feature');
+    makeWorktreePair(repo, wt);
+    const sub = join(repo, 'src');
+    mkdirSync(sub, { recursive: true });
+    const target = join(wt, 'notes.md');
+    writeFileSync(target, '# hi');
+    expect(resolveLinkPath('notes.md', sub, [])).toBe(target);
+  });
+
+  it('prefers a match under cwd over the same rel in a worktree', () => {
+    const repo = join(root, 'repo');
+    const wt = join(root, 'repo-worktrees', 'feature');
+    makeWorktreePair(repo, wt);
+    const near = join(repo, 'dup.md');
+    writeFileSync(near, 'near');
+    writeFileSync(join(wt, 'dup.md'), 'far');
+    expect(resolveLinkPath('dup.md', repo, [])).toBe(near);
+  });
+
+  it('ignores stale worktree metadata pointing at a deleted dir', () => {
+    const repo = join(root, 'repo');
+    mkdirSync(join(repo, '.git', 'worktrees', 'gone'), { recursive: true });
+    writeFileSync(join(repo, '.git', 'worktrees', 'gone', 'gitdir'), join(root, 'nope', '.git') + '\n');
+    expect(resolveLinkPath('missing.md', repo, [])).toBeNull();
+  });
+
   it('returns null when nothing matches', () => {
     expect(resolveLinkPath('nope.md', root, [])).toBeNull();
   });

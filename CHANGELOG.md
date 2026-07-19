@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.26 – 2026-07-19
+- fix: Clicking a file link in the terminal now finds files that live in a linked git worktree — the preview only searched below the pane's folder and the workspace roots, so a path printed from a worktree checkout (e.g. `../repo-worktrees/feature/docs/x.md`) always ended in "File not found". Worktree locations are now read from git's own metadata and searched too, in both directions (main checkout ↔ worktree), including worktrees hidden under dot-folders like `.worktrees/`
+
 ## 0.9.25 – 2026-07-19
 - feat: HTML files in the file browser now offer "Preview" just like markdown does, rendering the page with its CSS and scripts in the sandboxed preview webview — the same view terminal links already opened. `.markdown` and `.mdx` files preview correctly too, where the menu entry previously did nothing
 - feat: Opening the file browser now jumps to the folder of the focused pane, following the shell as you cd instead of staying wherever it was last left; a folder you navigate to stays put for as long as the panel remains open

@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, shell } from 'electron';
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
@@ -29,6 +29,46 @@ const MAX_DEPTH = 5;   // levels below the start base
 const MAX_DIRS = 2000; // total dirs visited before giving up
 const SKIP = new Set(['node_modules', '.git']);
 
+// Linked git worktrees live outside the repo (or under dot-dirs the BFS skips),
+// so they can never be reached from the pane cwd or a workspace root alone.
+// Derive their paths from git's own metadata (.git/worktrees/*/gitdir) instead
+// of spawning git: walk up from `start` to the enclosing repo, resolve a
+// worktree ".git" file back to the main checkout, then enumerate all linked
+// worktrees. Stale entries point at deleted dirs; the BFS skips those anyway.
+export function gitWorktreeStarts(start: string): string[] {
+  let dir = expandTilde(start);
+  let gitPath: string | null = null;
+  for (;;) {
+    const cand = join(dir, '.git');
+    try { statSync(cand); gitPath = cand; break; } catch { /* keep ascending */ }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  if (!gitPath) return [];
+
+  const out: string[] = [];
+  let gitDir = gitPath;
+  try {
+    if (statSync(gitPath).isFile()) {
+      // Worktree checkout: ".git" is a file "gitdir: <main>/.git/worktrees/<name>"
+      const m = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(gitPath, 'utf8'));
+      if (!m) return [];
+      gitDir = dirname(dirname(m[1])); // <main>/.git
+      out.push(dirname(gitDir));       // main checkout root
+    }
+  } catch { return []; }
+  try {
+    for (const name of readdirSync(join(gitDir, 'worktrees'))) {
+      try {
+        const wtGit = readFileSync(join(gitDir, 'worktrees', name, 'gitdir'), 'utf8').trim();
+        if (wtGit) out.push(dirname(wtGit)); // strip trailing "/.git"
+      } catch { /* partial metadata -> skip this worktree */ }
+    }
+  } catch { /* no linked worktrees */ }
+  return out;
+}
+
 interface ResolveLinkPathOptions {
   maxDepth?: number;
   maxDirs?: number;
@@ -53,7 +93,10 @@ export function resolveLinkPath(
   // which readdirSync can't resolve. Trailing-separator strip is [\\/] so the
   // nested-start dedup below also works with Windows paths.
   const norm = (p: string) => expandTilde(p).replace(/[\\/]+$/, '');
-  const starts = [...new Set([norm(cwd), ...roots.map(norm)])];
+  // Worktree-derived starts go last: the primary locations (cwd, workspace
+  // roots) keep priority when the same rel exists in both.
+  const primary = [norm(cwd), ...roots.map(norm)];
+  const starts = [...new Set([...primary, ...primary.flatMap(gitWorktreeStarts).map(norm)])];
   // Separator-agnostic prefix test for the nested-start dedup.
   const fwd = (p: string) => p.replace(/\\/g, '/');
   // Only skip a nested start if its ancestor completed its BFS WITHOUT hitting
@@ -63,8 +106,13 @@ export function resolveLinkPath(
 
   for (const start of starts) {
     // Skip starts that are nested under a start that was fully walked (not
-    // capped), because the whole subtree was already visited exhaustively.
-    if (fullyWalked.some((s) => start === s || fwd(start).startsWith(fwd(s) + '/'))) continue;
+    // capped), because the whole subtree was already visited exhaustively —
+    // unless the path down to the nested start passes through a segment the
+    // BFS skips (dot dir, node_modules): that subtree was never visited, e.g.
+    // a git worktree under repo/.worktrees/.
+    const throughSkipped = (anc: string, s: string) =>
+      fwd(s).slice(fwd(anc).length + 1).split('/').some((seg) => seg.startsWith('.') || SKIP.has(seg));
+    if (fullyWalked.some((s) => start === s || (fwd(start).startsWith(fwd(s) + '/') && !throughSkipped(s, start)))) continue;
 
     // Each start gets its own fresh budget so a large cwd subtree cannot
     // exhaust the quota before any workspace root is ever searched.
