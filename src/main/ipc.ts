@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, shell } from 'electron';
-import { readFileSync, readdirSync, watch, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
@@ -7,6 +7,7 @@ import { createPtyDataBatcher } from './pty-data-batcher';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
 import { loadTasks, saveTasks, tasksFilePath } from './task-store';
+import { armTaskWatcher } from './task-watcher';
 import type { TaskBoard } from '../shared/types';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
@@ -174,10 +175,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     // the map cannot grow without bound over a long session.
     for (const key of [...lastWritten.keys()]) if (key !== dir) lastWritten.delete(key);
     const file = tasksFilePath(dir);
-    try {
-      // Watch the .dmworkspace dir (the file may not exist yet); filter on filename.
-      taskWatcher = watch(dirname(file), (_evt, name) => {
-        if (name && name.toString() !== 'TASKS.md') return;
+    // Watch the .dmworkspace dir (the file may not exist yet); filter on filename.
+    // armTaskWatcher owns the error path: a watcher that dies at runtime (EMFILE,
+    // folder removed) must not take the main process down — we just lose live
+    // reloads until the next tasks:load/save re-arms it.
+    taskWatcher = armTaskWatcher(
+      dirname(file),
+      (name) => {
+        if (name && name !== 'TASKS.md') return;
         if (watchDebounce) clearTimeout(watchDebounce);
         watchDebounce = setTimeout(() => {
           let content = '';
@@ -185,8 +190,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
           if (content === lastWritten.get(dir)) return; // our own write
           getWindow()?.webContents.send('tasks:changed', { dir, board: loadTasks(dir) });
         }, 150);
-      });
-    } catch { /* .dmworkspace may not exist yet; re-armed by the next tasks:save (which creates it) or tasks:load */ }
+      },
+      () => { taskWatcher = null; watchedDir = null; }
+    );
+    if (!taskWatcher) watchedDir = null; // re-try arming on the next load/save
   };
 
   ipcMain.handle('tasks:load', (_e, dir: string): TaskBoard => {

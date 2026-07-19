@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon, IconName } from './Icon';
 import { ContextMenu, MenuItem } from './ContextMenu';
-import { isMarkdownFile } from '../markdown';
+import { isPreviewableFile } from '../../shared/link-detect';
 import type { DirEntry } from '../../shared/types';
 
 // Map a filename to a flat icon + a tint class. Config patterns win over the
@@ -156,7 +156,7 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onReques
 
   const menuItems: MenuItem[] = menu
     ? [
-        ...(!menu.entry.isDir && onPreviewFile && isMarkdownFile(menu.entry.name)
+        ...(!menu.entry.isDir && onPreviewFile && isPreviewableFile(menu.entry.name)
           ? [{ label: t('files.preview'), onClick: () => onPreviewFile(menu.entry.path) }]
           : []),
         ...(!menu.entry.isDir

@@ -8,7 +8,9 @@ describe('file browser store', () => {
     useStore.setState({
       previewPanel: { ...blankPanel },
       workspaces: [{ id: 'w1', name: 'WS', cwd: '/tmp/proj', layout: null }],
-      activeWorkspaceId: 'w1'
+      activeWorkspaceId: 'w1',
+      focusedPaneId: null,
+      paneCwd: {}
     });
   });
 
@@ -20,10 +22,64 @@ describe('file browser store', () => {
     expect(p.browseRoot).toBe('/tmp/proj');
   });
 
-  it('openFiles keeps an existing browseRoot', () => {
-    useStore.setState({ previewPanel: { ...blankPanel, browseRoot: '/other' } });
+  // Opening the browser should land where the user is actually working, so it
+  // re-syncs to the focused pane's live cwd on every open rather than sticking
+  // to whatever folder was browsed last time.
+  it('openFiles jumps to the focused pane live cwd', () => {
+    useStore.setState({ focusedPaneId: 'p1', paneCwd: { p1: '/tmp/proj/src' } });
     useStore.getState().openFiles();
-    expect(useStore.getState().previewPanel.browseRoot).toBe('/other');
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/tmp/proj/src');
+  });
+
+  it('openFiles falls back to the workspace cwd when the pane reported no cwd yet', () => {
+    useStore.setState({ focusedPaneId: 'p1', paneCwd: {} });
+    useStore.getState().openFiles();
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/tmp/proj');
+  });
+
+  it('openFiles re-syncs a stale browseRoot from a previous session', () => {
+    useStore.setState({
+      previewPanel: { ...blankPanel, browseRoot: '/somewhere/else' },
+      focusedPaneId: 'p1',
+      paneCwd: { p1: '/tmp/proj/src' }
+    });
+    useStore.getState().openFiles();
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/tmp/proj/src');
+  });
+
+  it('togglePreview syncs browseRoot when it opens the panel', () => {
+    useStore.setState({
+      previewPanel: { ...blankPanel, open: false, browseRoot: '/somewhere/else' },
+      focusedPaneId: 'p1',
+      paneCwd: { p1: '/tmp/proj/src' }
+    });
+    useStore.getState().togglePreview();
+    const p = useStore.getState().previewPanel;
+    expect(p.open).toBe(true);
+    expect(p.browseRoot).toBe('/tmp/proj/src');
+  });
+
+  it('togglePreview leaves browseRoot alone when it closes the panel', () => {
+    useStore.setState({
+      previewPanel: { ...blankPanel, open: true, browseRoot: '/tmp/proj/docs' },
+      focusedPaneId: 'p1',
+      paneCwd: { p1: '/tmp/proj/src' }
+    });
+    useStore.getState().togglePreview();
+    const p = useStore.getState().previewPanel;
+    expect(p.open).toBe(false);
+    expect(p.browseRoot).toBe('/tmp/proj/docs');
+  });
+
+  // While the panel stays open the user owns the position: navigating into a
+  // subfolder and switching tabs must not yank the tree back to the pane cwd.
+  it('keeps a browsed folder while the panel stays open', () => {
+    useStore.setState({ focusedPaneId: 'p1', paneCwd: { p1: '/tmp/proj/src' } });
+    useStore.getState().openFiles();
+    useStore.getState().setBrowseRoot('/tmp/proj/docs');
+    useStore.getState().setPanelTab('preview');
+    useStore.getState().setPanelTab('files');
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/tmp/proj/docs');
   });
 
   it('setBrowseRoot updates the root and clears the editor', () => {

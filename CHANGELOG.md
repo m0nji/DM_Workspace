@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.24 – 2026-07-19
+- feat: HTML files in the file browser now offer "Preview" just like markdown does, rendering the page with its CSS and scripts in the sandboxed preview webview — the same view terminal links already opened. `.markdown` and `.mdx` files preview correctly too, where the menu entry previously did nothing
+- feat: Opening the file browser now jumps to the folder of the focused pane, following the shell as you cd instead of staying wherever it was last left; a folder you navigate to stays put for as long as the panel remains open
+- fix: A failing file watcher no longer crashes the app — when the task board's watcher hit a runtime error (the system running out of file handles, or its folder being removed) the unhandled error took down the whole main process with an error dialog; it now quietly gives up live board reloads instead
+
 ## 0.9.23 – 2026-07-19
 - fix: Updated all dependencies flagged by `npm audit` — seven advisories, three of them high severity. The only one reaching the shipped app was a DOMPurify flaw where `setConfig()` could permanently pollute the allowed-attribute list; the remaining six (vite, esbuild, undici, form-data, js-yaml, tar) affect the build toolchain only
 

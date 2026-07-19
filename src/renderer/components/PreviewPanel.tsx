@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { beginDragGuard } from '../drag-guard';
 import { breadcrumbSegments, isFsRoot, parentDir } from '../../shared/fs-path';
+import { resolveSource } from '../../shared/link-detect';
 import type { DirEntry } from '../../shared/types';
 import { Icon } from './Icon';
 import { FileTree } from './FileTree';
@@ -68,8 +69,12 @@ export function PreviewPanel(): React.JSX.Element | null {
   }, [setBrowseRoot]);
 
   // "Preview" from a file's context menu: render it read-only in the preview tab.
+  // resolveSource picks the renderer from the extension (markdown vs. the
+  // sandboxed webview for html), the same mapping terminal links go through.
+  // The path is absolute, so the cwd argument is never used.
   const onPreviewFile = useCallback((path: string) => {
-    openPreview({ kind: 'markdown', target: path, resolved: true });
+    const source = resolveSource(path, '/');
+    if (source) openPreview(source);
   }, [openPreview]);
 
   const submitNewFile = useCallback(async () => {

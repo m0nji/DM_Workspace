@@ -33,6 +33,13 @@ export function findLinks(line: string): LinkMatch[] {
   return out;
 }
 
+// True for files the preview panel can render: markdown goes through the
+// markdown renderer, html/htm through the sandboxed <webview>. Kept next to
+// resolveSource so the extension→kind mapping lives in exactly one place.
+export function isPreviewableFile(name: string): boolean {
+  return /\.(md|markdown|mdx|html?)$/i.test(name);
+}
+
 function isAbsolute(p: string): boolean {
   return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p);
 }
@@ -84,7 +91,7 @@ export function resolveSource(raw: string, cwd: string): PreviewSource | null {
 
   const rel = isAbsolute(raw) ? undefined : raw;
   const abs = isAbsolute(raw) ? raw : joinPath(cwd, raw);
-  if (/\.md$/i.test(raw)) return { kind: 'markdown', target: abs, ...(rel ? { rel } : {}), resolved: true };
+  if (/\.(md|markdown|mdx)$/i.test(raw)) return { kind: 'markdown', target: abs, ...(rel ? { rel } : {}), resolved: true };
   if (/\.html?$/i.test(raw)) return { kind: 'web', target: fileTarget('web', abs), ...(rel ? { rel } : {}), resolved: true };
   return null;
 }

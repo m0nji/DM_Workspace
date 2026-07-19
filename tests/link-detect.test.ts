@@ -1,6 +1,6 @@
 // tests/link-detect.test.ts
 import { describe, it, expect } from 'vitest';
-import { findLinks, resolveSource, fileTarget, pathEndsWith } from '../src/shared/link-detect';
+import { findLinks, resolveSource, fileTarget, pathEndsWith, isPreviewableFile } from '../src/shared/link-detect';
 
 describe('findLinks', () => {
   it('finds an http(s) URL in a line', () => {
@@ -55,6 +55,44 @@ describe('resolveSource', () => {
 
   it('returns null for an unsupported target', () => {
     expect(resolveSource('notes.txt', '/home/me')).toBeNull();
+  });
+
+  // The file browser routes its Preview action through resolveSource, so every
+  // markdown flavour isPreviewableFile offers must resolve here too — otherwise
+  // the menu entry appears and does nothing.
+  it('resolves .markdown and .mdx as markdown', () => {
+    expect(resolveSource('/tmp/notes.markdown', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/notes.markdown', resolved: true });
+    expect(resolveSource('/tmp/page.mdx', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/page.mdx', resolved: true });
+  });
+});
+
+describe('isPreviewableFile', () => {
+  it('accepts every markdown flavour the preview renders', () => {
+    expect(isPreviewableFile('README.md')).toBe(true);
+    expect(isPreviewableFile('notes.markdown')).toBe(true);
+    expect(isPreviewableFile('page.mdx')).toBe(true);
+  });
+
+  it('accepts .html and .htm so the file browser can offer a preview', () => {
+    expect(isPreviewableFile('index.html')).toBe(true);
+    expect(isPreviewableFile('legacy.htm')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isPreviewableFile('REPORT.HTML')).toBe(true);
+    expect(isPreviewableFile('README.MD')).toBe(true);
+  });
+
+  it('rejects files the preview has no renderer for', () => {
+    expect(isPreviewableFile('notes.txt')).toBe(false);
+    expect(isPreviewableFile('package.json')).toBe(false);
+    expect(isPreviewableFile('script.ts')).toBe(false);
+    expect(isPreviewableFile('archive.html.gz')).toBe(false);
+  });
+
+  it('rejects a name that merely contains an extension mid-string', () => {
+    expect(isPreviewableFile('mdfile')).toBe(false);
+    expect(isPreviewableFile('index.html.bak')).toBe(false);
   });
 });
 

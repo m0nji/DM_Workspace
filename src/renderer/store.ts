@@ -202,6 +202,15 @@ function persist(state: AppState): void {
   flushPersist(snapshot);
 }
 
+// Folder the file browser should land on when it opens: the focused pane's live
+// cwd (reported over OSC as the user cds around), falling back to the workspace
+// folder while a fresh pane has not reported one yet.
+function activePaneCwd(s: StoreState): string {
+  const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+  const paneCwd = s.focusedPaneId ? s.paneCwd[s.focusedPaneId] : undefined;
+  return paneCwd ?? ws?.cwd ?? '~';
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
@@ -557,15 +566,19 @@ export const useStore = create<StoreState>((set, get) => ({
     previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: null, source }
   })),
   closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),
-  togglePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: !s.previewPanel.open } })),
+  // Opening (closed → open) re-syncs the browse root to where the user is
+  // working; closing leaves it untouched so nothing shifts on the way out.
+  togglePreview: () => set((s) => {
+    const open = !s.previewPanel.open;
+    if (!open) return { previewPanel: { ...s.previewPanel, open } };
+    return { previewPanel: { ...s.previewPanel, open, browseRoot: activePaneCwd(s) } };
+  }),
   setPreviewWidth: (px) => set((s) => ({
     previewPanel: { ...s.previewPanel, widthPx: Math.min(1200, Math.max(240, px)) }
   })),
-  openFiles: () => set((s) => {
-    const cwd = s.workspaces.find((w) => w.id === s.activeWorkspaceId)?.cwd ?? '~';
-    const browseRoot = s.previewPanel.browseRoot ?? cwd;
-    return { previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot, editPath: null } };
-  }),
+  openFiles: () => set((s) => ({
+    previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot: activePaneCwd(s), editPath: null }
+  })),
   setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
   setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null } })),
   openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, source: null } })),
