@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.23 – 2026-07-19
+- fix: Updated all dependencies flagged by `npm audit` — seven advisories, three of them high severity. The only one reaching the shipped app was a DOMPurify flaw where `setConfig()` could permanently pollute the allowed-attribute list; the remaining six (vite, esbuild, undici, form-data, js-yaml, tar) affect the build toolchain only
+
 ## 0.9.22 – 2026-07-18
 - feat: Workspaces can now be reordered with drag and drop in both navigation layouts — vertically in the left sidebar and horizontally in the optional top tab bar; insertion markers show the destination and the new order persists across restarts
 
