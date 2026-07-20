@@ -21,6 +21,10 @@ interface TrackerOptions {
 class InputLine {
   private chars: string[] = [];
   private cursor = 0;
+  // False once the terminal sends an editing operation whose result we cannot
+  // reconstruct from input bytes alone (shell history, completion, Ctrl+R,
+  // custom key bindings, ...). Such a line must never become a title.
+  private reliable = true;
   private bracketedPaste = false;
   private escapePending = false;
   private csi = '';
@@ -30,6 +34,7 @@ class InputLine {
   reset(): void {
     this.chars = [];
     this.cursor = 0;
+    this.reliable = true;
     this.bracketedPaste = false;
     this.escapePending = false;
     this.csi = '';
@@ -53,8 +58,8 @@ class InputLine {
     while (this.cursor > 0 && !/\s/.test(this.chars[this.cursor - 1])) this.eraseBack();
   }
 
-  private submit(onSubmit: (line: string) => void): void {
-    const line = this.chars.join('');
+  private submit(onSubmit: (line: string | null) => void): void {
+    const line = this.reliable ? this.chars.join('') : null;
     this.reset();
     onSubmit(line);
   }
@@ -67,9 +72,10 @@ class InputLine {
     else if (/\[(?:1~|H)$/.test(seq)) this.cursor = 0;
     else if (/\[(?:4~|F)$/.test(seq)) this.cursor = this.chars.length;
     else if (/\[3~$/.test(seq) && this.cursor < this.chars.length) this.chars.splice(this.cursor, 1);
+    else this.reliable = false;
   }
 
-  feed(data: string, onSubmit: (line: string) => void): void {
+  feed(data: string, onSubmit: (line: string | null) => void): void {
     for (let i = 0; i < data.length;) {
       const code = data.codePointAt(i)!;
       const char = String.fromCodePoint(code);
@@ -106,7 +112,9 @@ class InputLine {
         if (char === '[') this.csi = '[';
         else if (char === ']') this.stringControl = 'osc';
         else if (char === 'P' || char === '_' || char === '^' || char === 'X') this.stringControl = 'st';
-        // Other ESC-prefixed keys are editing commands; discard both bytes.
+        // Other ESC-prefixed keys are editing commands. The shell may have
+        // changed its line buffer even though we cannot observe the result.
+        else this.reliable = false;
         i += char.length;
         continue;
       }
@@ -132,6 +140,7 @@ class InputLine {
       } else if (char === '\x0b') this.chars.splice(this.cursor); // Ctrl+K
       else if (char === '\x17') this.eraseWordBack(); // Ctrl+W
       else if (char === '\x03') this.reset(); // Ctrl+C
+      else if (code < 0x20) this.reliable = false;
       else if (code >= 0x20 && code !== 0x7f) this.insert(char);
       i += char.length;
     }
@@ -272,8 +281,8 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
   let prePromptInput = '';
   let disposed = false;
 
-  const submitAgentPrompt = (raw: string): void => {
-    if (!agent) return;
+  const submitAgentPrompt = (raw: string | null): void => {
+    if (!agent || raw === null) return;
     if (isAgentSessionReset(agent, raw)) {
       agentPromptCaptured = false;
       opts.onTitle(agent === 'claude' ? 'Claude' : 'Codex');
@@ -289,14 +298,21 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
     agentPromptCaptured = true;
   };
 
-  const submitShellCommand = (raw: string): void => {
+  const submitShellCommand = (raw: string | null): void => {
+    // Enter transfers control away from the local shell prompt regardless of
+    // whether we managed to reconstruct the submitted line. Disarm first and
+    // wait for the next trusted local prompt marker before inspecting input
+    // again. This is the security boundary that keeps SSH/sudo passwords and
+    // interactive-program input out of pane titles after history/completion.
+    shellReady = false;
+    agent = null;
+    agentPromptCaptured = false;
+    agentLine.reset();
+    if (raw === null) return;
     const title = commandTitle(raw, commandMaxLength);
     if (!title) return;
     opts.onTitle(title);
-    shellReady = false;
     agent = detectAgentCommand(raw);
-    agentPromptCaptured = false;
-    agentLine.reset();
   };
 
   const onInput = (data: string): void => {

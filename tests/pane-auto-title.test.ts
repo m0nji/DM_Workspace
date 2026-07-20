@@ -33,6 +33,31 @@ describe('pane automatic title tracker', () => {
     expect(h.current()).toBe('ssh root@server');
   });
 
+  it('never captures an SSH password after rerunning the command from shell history', () => {
+    const h = harness();
+    h.tracker.onShellPrompt();
+    h.tracker.onInput('ssh root@server\r');
+    h.tracker.onShellPrompt(); // disconnect: the trusted local prompt returns
+    expect(h.current()).toBe('');
+
+    // Up recalls the SSH command inside the shell's own line editor. The
+    // tracker cannot know that text, but Enter must still disarm it while SSH
+    // owns the terminal.
+    h.tracker.onInput('\x1b[A\r');
+    h.tracker.onInput('super-secret-password\r');
+
+    expect(h.current()).toBe('');
+    expect(h.titles).not.toContain('super-secret-password');
+  });
+
+  it('disarms on every submitted shell line, including an empty one', () => {
+    const h = harness();
+    h.tracker.onShellPrompt();
+    h.tracker.onInput('\r');
+    h.tracker.onInput('must-not-be-a-title\r');
+    expect(h.current()).toBe('');
+  });
+
   it('queues a startup command sent before the first shell prompt', () => {
     const h = harness();
     h.tracker.onInput('npm run dev\r');

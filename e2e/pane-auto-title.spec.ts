@@ -28,6 +28,18 @@ test('shows the active shell command and clears it when the prompt returns', asy
   await win.keyboard.press('Control+C');
   await expect(automatic).toHaveCount(0);
 
+  // Recall the same long-running command through the shell's own history and
+  // submit it again. The tracker cannot reconstruct history-expanded text, so
+  // it must fail closed: once Enter starts the command, subsequent interactive
+  // input must never be mistaken for a new shell command/title.
+  await win.keyboard.press('ArrowUp');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('must-not-be-pane-title');
+  await win.keyboard.press('Enter');
+  await expect(automatic).toHaveCount(0);
+
+  await win.keyboard.press('Control+C');
+
   await app.close();
 });
 

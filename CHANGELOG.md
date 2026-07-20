@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.29 – 2026-07-20
+- fix: Commands recalled through shell history now fail closed in the automatic pane-title tracker, preventing SSH passwords or other interactive input from ever being mistaken for a new title when the recalled command cannot be reconstructed safely
+
 ## 0.9.28 – 2026-07-20
 - feat: Pane headers now follow the active terminal context automatically — shell commands such as SSH connections appear while they run, and Codex or Claude sessions use a concise local summary of their first substantive prompt without sending it to another service
 - feat: Automatic agent titles refresh after `/new` or `/clear`, redact common secret values and pasted code, compact long paths, and yield to an optional manual pane description; on narrow panes the folder path collapses to its final directory so the active context keeps enough room
