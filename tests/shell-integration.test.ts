@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, PS_CWD_BOOTSTRAP } from '../src/main/shell-integration';
+import { DMWS_PROMPT_OSC, DMWS_PROMPT_PAYLOAD } from '../src/shared/pane-auto-title';
 
 describe('shellArgs', () => {
   it('passes the OSC 9;9 cwd bootstrap to PowerShell (any spelling or path)', () => {
@@ -31,6 +32,7 @@ describe('bashPromptCommand', () => {
     expect(pc).toContain(']7;file://');
     expect(pc).toContain('$HOSTNAME');
     expect(pc).toContain('$PWD');
+    expect(pc).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
     // raw ESC + BEL, not the escaped \e/\a literals (env vars are not shell-parsed)
     expect(pc).toContain('\x1b');
     expect(pc).toContain('\x07');
@@ -49,6 +51,11 @@ describe('zshIntegrationFiles', () => {
     expect(files['.zshrc']).toContain('_DMWS_USER_ZDOTDIR');
     expect(files['.zshrc']).toContain('precmd_functions+=(__dmws_cwd)');
     expect(files['.zshrc']).toContain(']7;file://');
+    expect(files['.zshrc']).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
+  });
+
+  it('PowerShell emits the private local-prompt marker alongside its cwd', () => {
+    expect(PS_CWD_BOOTSTRAP).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
   });
 
   it('.zshenv re-pins ZDOTDIR to the integration dir after sourcing the user file', () => {

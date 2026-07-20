@@ -23,7 +23,7 @@ test('adds, edits, and removes a workspace-local pane description', async () => 
 
   const pane = win.locator('.pane');
   await expect(pane).toBeVisible();
-  await expect(pane.locator('.pane-title')).not.toHaveText('');
+  await expect(pane.locator('.pane-title:visible')).not.toHaveText('');
 
   await pane.locator('.pane-label-btn').click();
   const input = pane.locator('.pane-label-input');
@@ -34,7 +34,7 @@ test('adds, edits, and removes a workspace-local pane description', async () => 
   await expect(pane.locator('.pane-label')).toBeVisible();
   await expect(pane.locator('.pane-label')).toHaveText('API monitoring');
   await expect(pane.locator('.pane-label-btn')).toHaveClass(/active/);
-  await expect(pane.locator('.pane-title')).not.toHaveText('');
+  await expect(pane.locator('.pane-title:visible')).not.toHaveText('');
 
   await pane.locator('.pane-label-btn').click();
   await input.fill('   ');

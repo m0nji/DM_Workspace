@@ -29,6 +29,7 @@ describe('workspace store actions', () => {
       activeWorkspaceId: 'w1',
       settings: { themeId: 'default', terminalOpacity: 0.75 },
       maximizedPaneId: 'p1',
+      paneAutoTitles: {},
       pendingClosePaneId: null
     });
   });
@@ -164,6 +165,23 @@ describe('workspace store actions', () => {
 
     useStore.getState().setPaneTitle('old2', '   ');
     expect(useStore.getState().workspaces[1].paneTitles).toBeUndefined();
+  });
+
+  it('uses an ephemeral automatic title unless a manual label overrides it', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: { type: 'pane', id: 'old1' } }],
+      activeWorkspaceId: 'w1'
+    });
+
+    useStore.getState().setPaneAutoTitle('old1', 'ssh root@server');
+    expect(useStore.getState().paneTitle('old1', '/tmp')).toBe('ssh root@server');
+    expect(saveState).not.toHaveBeenCalled();
+
+    useStore.getState().setPaneTitle('old1', 'Production server');
+    expect(useStore.getState().paneTitle('old1', '/tmp')).toBe('Production server');
+
+    useStore.getState().setPaneTitle('old1', '');
+    expect(useStore.getState().paneTitle('old1', '/tmp')).toBe('ssh root@server');
   });
 
   it('ignores a pane label for an unknown pane', () => {

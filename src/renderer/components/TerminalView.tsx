@@ -16,7 +16,8 @@ import { registerSearch, unregisterSearch } from '../search-registry';
 import {
   registerTerminal, unregisterTerminal, clearTerminal, clearTerminals,
   registerTerminalFocus, unregisterTerminalFocus,
-  registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh
+  registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh,
+  registerTerminalInputTracking, unregisterTerminalInputTracking
 } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { formatPathsForInsert } from '../../shared/path-insert';
@@ -28,6 +29,9 @@ import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { createResizeScheduler } from '../resize-scheduler';
 import { createSaveScheduler, type SaveScheduler } from '../save-scheduler';
+import {
+  createPaneAutoTitleTracker, DMWS_PROMPT_OSC, DMWS_PROMPT_PAYLOAD
+} from '../../shared/pane-auto-title';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -199,6 +203,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     term.loadAddon(serializeAddon);
     term.open(host);
 
+    const autoTitleTracker = createPaneAutoTitleTracker({
+      onTitle: (title) => useStore.getState().setPaneAutoTitle(paneId, title)
+    });
+    registerTerminalInputTracking(paneId, (data) => autoTitleTracker.onInput(data));
+
     // GPU renderer. xterm's default DOM renderer chokes on high-throughput
     // streaming output (e.g. an active Claude Code session) and on scrolling
     // through a large buffer, which shows up as visible lag. WebGL fixes that.
@@ -275,6 +284,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
     term.parser.registerOscHandler(9, (data) => reportCwd(parseOsc9(data)));
     term.parser.registerOscHandler(7, (data) => reportCwd(parseOsc7(data)));
+    // A private marker emitted only by DM Workspace's LOCAL shell hook. Unlike
+    // OSC 7, it is not forwarded by a remote SSH shell, so it safely tells the
+    // title tracker when a command ended and the local prompt is ready again.
+    term.parser.registerOscHandler(DMWS_PROMPT_OSC, (data) => {
+      if (data === DMWS_PROMPT_PAYLOAD) autoTitleTracker.onShellPrompt();
+      return true;
+    });
 
     // Per-pane activity machine: drive status from the raw output/input streams.
     const activity = createPaneActivity({
@@ -486,9 +502,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       activity.onOutput();
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
+      useStore.getState().setPaneAutoTitle(paneId, '');
       term.write(`\r\n[${t('terminal.processExited', { code: exitCode })}]\r\n`);
     });
     const inputDisp = term.onData((data) => {
+      autoTitleTracker.onInput(data);
       window.api.input({ paneId, data });
       activity.onInput();
     });
@@ -521,7 +539,9 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // PTY buffers the input until the shell is ready to read it.
         const command = useStore.getState().consumeStartupCommand(paneId);
         if (command) {
-          window.api.input({ paneId, data: `${command}\r` });
+          const data = `${command}\r`;
+          autoTitleTracker.onInput(data);
+          window.api.input({ paneId, data });
           activity.onInput();
         }
       });
@@ -596,6 +616,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       ro.disconnect();
       resizeScheduler.dispose();
       unregisterTerminalLayoutRefresh(paneId);
+      unregisterTerminalInputTracking(paneId);
+      autoTitleTracker.dispose();
       cancelAnimationFrame(pinRaf);
       host.removeEventListener('keydown', handleTerminalCopyShortcut, true);
       host.removeEventListener('keydown', handleTerminalPasteShortcut, true);

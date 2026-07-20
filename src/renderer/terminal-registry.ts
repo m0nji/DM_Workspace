@@ -48,3 +48,17 @@ export function refreshTerminalLayoutAfterCommit(paneId: string): void {
   }
   requestAnimationFrame(() => requestAnimationFrame(() => refreshTerminalLayout(paneId)));
 }
+
+// Programmatic commands (task board, startup commands) bypass xterm's onData
+// callback. Route a copy through the pane's automatic-title tracker before the
+// bytes go to the PTY so they behave like commands typed by the user.
+const inputTrackingRegistry = new Map<string, (data: string) => void>();
+export function registerTerminalInputTracking(paneId: string, track: (data: string) => void): void {
+  inputTrackingRegistry.set(paneId, track);
+}
+export function unregisterTerminalInputTracking(paneId: string): void {
+  inputTrackingRegistry.delete(paneId);
+}
+export function trackTerminalInput(paneId: string, data: string): void {
+  inputTrackingRegistry.get(paneId)?.(data);
+}

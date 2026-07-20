@@ -10,7 +10,7 @@ import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
-import { focusTerminal, refreshTerminalLayoutAfterCommit } from './terminal-registry';
+import { focusTerminal, refreshTerminalLayoutAfterCommit, trackTerminalInput } from './terminal-registry';
 
 const DEFAULT_SETTINGS: Settings = {
   themeId: DEFAULT_THEME_ID,
@@ -62,6 +62,7 @@ interface StoreState extends AppState {
   settingsOpen: boolean;
   paneStatus: Record<string, PaneStatus>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
+  paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
   focusedPaneId: string | null;
   pendingClosePaneId: string | null;
   windowFocused: boolean;
@@ -121,6 +122,7 @@ interface StoreState extends AppState {
   clearSettingsFocusSection: () => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
   setPaneCwd: (paneId: string, cwd: string) => void;
+  setPaneAutoTitle: (paneId: string, title: string) => void;
   setFocusedPane: (paneId: string) => void;
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
@@ -224,6 +226,7 @@ export const useStore = create<StoreState>((set, get) => ({
   settingsFocusSection: null,
   paneStatus: {},
   paneCwd: {},
+  paneAutoTitles: {},
   focusedPaneId: null,
   pendingClosePaneId: null,
   windowFocused: true,
@@ -334,8 +337,9 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     const paneStatus = { ...s.paneStatus };
     const paneCwd = { ...s.paneCwd };
+    const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws.layout).forEach((pid) => {
-      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid];
+      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
     // pane-keyed metadata has to follow the id change or titles/pending startup
@@ -351,7 +355,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return nextWs;
     });
     const next = {
-      ...s, workspaces, paneStatus, paneCwd,
+      ...s, workspaces, paneStatus, paneCwd, paneAutoTitles,
       maximizedPaneId: null,
       focusedPaneId: null
     };
@@ -363,14 +367,15 @@ export const useStore = create<StoreState>((set, get) => ({
     const ws = s.workspaces.find((w) => w.id === id);
     const paneStatus = { ...s.paneStatus };
     const paneCwd = { ...s.paneCwd };
+    const paneAutoTitles = { ...s.paneAutoTitles };
     if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
-      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid];
+      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     const workspaces = s.workspaces.filter((w) => w.id !== id);
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, paneCwd, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -414,6 +419,7 @@ export const useStore = create<StoreState>((set, get) => ({
     window.api.kill(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
+    const paneAutoTitles = { ...s.paneAutoTitles }; delete paneAutoTitles[paneId];
     let successor: string | null = null;
     const workspaces = s.workspaces.map((w) => {
       if (w.id !== s.activeWorkspaceId || !w.layout) return w;
@@ -444,6 +450,7 @@ export const useStore = create<StoreState>((set, get) => ({
       workspaces,
       paneStatus,
       paneCwd,
+      paneAutoTitles,
       focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
       searchOpenPaneId: s.searchOpenPaneId === paneId ? null : s.searchOpenPaneId,
@@ -487,9 +494,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const ws = s.workspaces.find((w) => collectPaneIds(w.layout).includes(paneId));
       const visible = ws != null && ws.id === s.activeWorkspaceId;
       if (ws && (!visible || !s.windowFocused)) {
-        // Prefer the pane's custom title, then its live cwd; the workspace cwd
-        // is only the last resort (it names the workspace, not the pane).
-        const paneTitle = ws.paneTitles?.[paneId] ?? s.paneCwd[paneId] ?? ws.cwd;
+        // Prefer the pane's custom title, then its current automatic title and
+        // live cwd; the workspace cwd is only the last resort.
+        const paneTitle = ws.paneTitles?.[paneId] ?? s.paneAutoTitles[paneId] ?? s.paneCwd[paneId] ?? ws.cwd;
         window.api.notifyAgentDone({ workspaceId: ws.id, workspaceName: ws.name, paneTitle });
       }
     }
@@ -499,6 +506,15 @@ export const useStore = create<StoreState>((set, get) => ({
   setPaneCwd: (paneId, cwd) => set((s) => {
     if (s.paneCwd[paneId] === cwd) return s;
     return { ...s, paneCwd: { ...s.paneCwd, [paneId]: cwd } };
+  }),
+
+  setPaneAutoTitle: (paneId, title) => set((s) => {
+    const value = title.trim();
+    if ((s.paneAutoTitles[paneId] ?? '') === value) return s;
+    const paneAutoTitles = { ...s.paneAutoTitles };
+    if (value) paneAutoTitles[paneId] = value;
+    else delete paneAutoTitles[paneId];
+    return { ...s, paneAutoTitles };
   }),
 
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
@@ -535,7 +551,9 @@ export const useStore = create<StoreState>((set, get) => ({
   // Send a task's command/title into a running pane, then reveal terminals and
   // focus that pane. Uses the same input path as startup commands.
   runTaskInPane: (paneId, text) => {
-    window.api.input({ paneId, data: `${text}\r` });
+    const data = `${text}\r`;
+    trackTerminalInput(paneId, data);
+    window.api.input({ paneId, data });
     set({ taskView: false, focusedPaneId: paneId });
     // rAF so the pane is un-hidden (display:none -> block) before we focus it.
     requestAnimationFrame(() => focusTerminal(paneId));
@@ -790,7 +808,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   paneTitle: (paneId, fallback) => {
     const ws = get().workspaces.find((w) => w.paneTitles?.[paneId]);
-    return ws?.paneTitles?.[paneId] ?? fallback;
+    return ws?.paneTitles?.[paneId] ?? get().paneAutoTitles[paneId] ?? fallback;
   },
 
   updateShortcutBinding: (action, binding) => set((s) => {

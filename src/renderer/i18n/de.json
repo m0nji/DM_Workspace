@@ -277,6 +277,8 @@
     "label": "Bereichsbeschriftung",
     "addLabel": "Beschreibung hinzufügen",
     "editLabel": "Beschreibung bearbeiten",
+    "overrideLabel": "Automatische Beschriftung überschreiben",
+    "automaticLabel": "Automatisch aus Befehl oder erstem Prompt",
     "labelPlaceholder": "Wofür wird dieser Bereich genutzt?",
     "splitHorizontal": "Links und rechts teilen",
     "splitVertical": "Oben und unten teilen",

@@ -572,13 +572,17 @@ input[type="checkbox"]:checked::after {
   border-radius: var(--radius-control); overflow: hidden; min-width: 0; min-height: 0; height: 100%;
   background: var(--dm-pane-bg); }
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-  background: var(--dm-pane-header); border-bottom: 1px solid var(--border); }
+  background: var(--dm-pane-header); border-bottom: 1px solid var(--border);
+  container: pane-header / inline-size; }
 .pane-heading { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .pane-title { min-width: 36px; color: var(--muted); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
+.pane-title-short { display: none; }
+.pane-heading.has-label .pane-title { flex: 0 1 auto; max-width: 42%; }
 .pane-label-divider { flex: 0 0 auto; color: var(--muted); opacity: .55; }
-.pane-label { min-width: 0; color: var(--text); overflow: hidden;
+.pane-label { flex: 1 1 auto; min-width: 0; color: var(--text); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.pane-label.automatic { color: var(--muted); font-style: italic; }
 .pane-label-input { flex: 1; min-width: 72px; height: 22px; box-sizing: border-box;
   background: var(--input); color: var(--text); border: 1px solid var(--accent);
   border-radius: 4px; padding: 1px 6px; font: inherit; font-size: 12px; outline: none; }
@@ -588,6 +592,11 @@ input[type="checkbox"]:checked::after {
   border-radius: 4px; }
 .pane-btn:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 .pane-label-btn.active { color: var(--accent); }
+@container pane-header (max-width: 760px) {
+  .pane-title-full { display: none; }
+  .pane-title-short { display: inline; }
+  .pane-heading.has-label .pane-title { max-width: 30%; }
+}
 .pane-body { flex: 1; min-height: 0; }
 .pane-body .xterm { height: 100%; padding: 0 4px; }
 /* height:100% lets the wrapper hold a sub-cell themed strip below the pinned

@@ -277,6 +277,8 @@
     "label": "Pane label",
     "addLabel": "Add description",
     "editLabel": "Edit description",
+    "overrideLabel": "Override automatic label",
+    "automaticLabel": "Automatic from command or first prompt",
     "labelPlaceholder": "What is this pane used for?",
     "splitHorizontal": "Split into left & right",
     "splitVertical": "Split into top & bottom",

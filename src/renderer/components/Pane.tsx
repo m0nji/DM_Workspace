@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
+import { basename } from '../../shared/fs-path';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -88,18 +89,22 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   // Keep the live folder visible and show the optional workspace-local pane
   // label beside it. Previously a template title replaced the folder entirely.
   const folder = useStore((s) => s.paneCwd[paneId] ?? cwd);
-  const label = useStore((s) =>
+  const folderName = basename(folder) || folder;
+  const manualLabel = useStore((s) =>
     s.workspaces.find((w) => w.paneTitles?.[paneId])?.paneTitles?.[paneId] ?? '');
+  const autoLabel = useStore((s) => s.paneAutoTitles[paneId] ?? '');
+  const label = manualLabel || autoLabel;
+  const automatic = !manualLabel && !!autoLabel;
   const [editingLabel, setEditingLabel] = React.useState(false);
-  const [labelDraft, setLabelDraft] = React.useState(label);
+  const [labelDraft, setLabelDraft] = React.useState(manualLabel);
   const labelInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (!editingLabel) return;
-    setLabelDraft(label);
+    setLabelDraft(manualLabel);
     labelInputRef.current?.focus();
     labelInputRef.current?.select();
-  }, [editingLabel, label]);
+  }, [editingLabel, manualLabel]);
 
   const saveLabel = (): void => {
     setPaneTitle(paneId, labelDraft);
@@ -113,8 +118,9 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
     >
       <div className="pane-header">
         <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
-        <div className="pane-heading">
-          <span className="pane-title" title={folder}>{folder}</span>
+        <div className={`pane-heading ${label ? 'has-label' : ''}`}>
+          <span className="pane-title pane-title-full" title={folder}>{folder}</span>
+          <span className="pane-title pane-title-short" title={folder}>{folderName}</span>
           {editingLabel ? (
             <input
               ref={labelInputRef}
@@ -122,7 +128,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
               value={labelDraft}
               maxLength={120}
               aria-label={t('pane.label')}
-              placeholder={t('pane.labelPlaceholder')}
+              placeholder={automatic ? autoLabel : t('pane.labelPlaceholder')}
               onChange={(event) => setLabelDraft(event.target.value)}
               onBlur={saveLabel}
               onKeyDown={(event) => {
@@ -131,7 +137,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
                   event.currentTarget.blur();
                 } else if (event.key === 'Escape') {
                   event.preventDefault();
-                  setLabelDraft(label);
+                  setLabelDraft(manualLabel);
                   setEditingLabel(false);
                 }
               }}
@@ -139,14 +145,17 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
           ) : label ? (
             <>
               <span className="pane-label-divider" aria-hidden="true">·</span>
-              <span className="pane-label" title={label}>{label}</span>
+              <span
+                className={`pane-label ${automatic ? 'automatic' : ''}`}
+                title={automatic ? `${t('pane.automaticLabel')}: ${label}` : label}
+              >{label}</span>
             </>
           ) : null}
         </div>
         <button
-          className={`pane-btn pane-label-btn ${label ? 'active' : ''}`}
-          title={t(label ? 'pane.editLabel' : 'pane.addLabel')}
-          aria-label={t(label ? 'pane.editLabel' : 'pane.addLabel')}
+          className={`pane-btn pane-label-btn ${manualLabel ? 'active' : ''}`}
+          title={t(manualLabel ? 'pane.editLabel' : automatic ? 'pane.overrideLabel' : 'pane.addLabel')}
+          aria-label={t(manualLabel ? 'pane.editLabel' : automatic ? 'pane.overrideLabel' : 'pane.addLabel')}
           onClick={() => setEditingLabel(true)}
         ><Label /></button>
         <button className="pane-btn" title={t('pane.splitHorizontal')}
