@@ -65,6 +65,16 @@ function Close(): React.JSX.Element {
   );
 }
 
+function Label(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
+      <path d="M3 3.5h8.5A1.5 1.5 0 0 1 13 5v5a1.5 1.5 0 0 1-1.5 1.5H7L4 14v-2.5H3A1.5 1.5 0 0 1 1.5 10V5A1.5 1.5 0 0 1 3 3.5Z" />
+      <line x1="4.5" y1="6.5" x2="10" y2="6.5" />
+      <line x1="4.5" y1="8.8" x2="8.5" y2="8.8" />
+    </svg>
+  );
+}
+
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
   const splitActivePane = useStore((s) => s.splitActivePane);
@@ -74,10 +84,27 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
   const focused = useStore((s) => s.focusedPaneId === paneId);
   const setFocusedPane = useStore((s) => s.setFocusedPane);
-  // A custom pane title (from a template) wins when set; otherwise show the live
-  // working directory reported by the shell, falling back to the workspace cwd
-  // until the shell emits its first prompt.
-  const title = useStore((s) => s.paneTitle(paneId, s.paneCwd[paneId] ?? cwd));
+  const setPaneTitle = useStore((s) => s.setPaneTitle);
+  // Keep the live folder visible and show the optional workspace-local pane
+  // label beside it. Previously a template title replaced the folder entirely.
+  const folder = useStore((s) => s.paneCwd[paneId] ?? cwd);
+  const label = useStore((s) =>
+    s.workspaces.find((w) => w.paneTitles?.[paneId])?.paneTitles?.[paneId] ?? '');
+  const [editingLabel, setEditingLabel] = React.useState(false);
+  const [labelDraft, setLabelDraft] = React.useState(label);
+  const labelInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!editingLabel) return;
+    setLabelDraft(label);
+    labelInputRef.current?.focus();
+    labelInputRef.current?.select();
+  }, [editingLabel, label]);
+
+  const saveLabel = (): void => {
+    setPaneTitle(paneId, labelDraft);
+    setEditingLabel(false);
+  };
 
   return (
     <div
@@ -86,7 +113,42 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
     >
       <div className="pane-header">
         <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
-        <span className="pane-title" title={title}>{title}</span>
+        <div className="pane-heading">
+          <span className="pane-title" title={folder}>{folder}</span>
+          {editingLabel ? (
+            <input
+              ref={labelInputRef}
+              className="pane-label-input"
+              value={labelDraft}
+              maxLength={120}
+              aria-label={t('pane.label')}
+              placeholder={t('pane.labelPlaceholder')}
+              onChange={(event) => setLabelDraft(event.target.value)}
+              onBlur={saveLabel}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setLabelDraft(label);
+                  setEditingLabel(false);
+                }
+              }}
+            />
+          ) : label ? (
+            <>
+              <span className="pane-label-divider" aria-hidden="true">·</span>
+              <span className="pane-label" title={label}>{label}</span>
+            </>
+          ) : null}
+        </div>
+        <button
+          className={`pane-btn pane-label-btn ${label ? 'active' : ''}`}
+          title={t(label ? 'pane.editLabel' : 'pane.addLabel')}
+          aria-label={t(label ? 'pane.editLabel' : 'pane.addLabel')}
+          onClick={() => setEditingLabel(true)}
+        ><Label /></button>
         <button className="pane-btn" title={t('pane.splitHorizontal')}
                 onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
         <button className="pane-btn" title={t('pane.splitVertical')}

@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.27 – 2026-07-20
+- feat: Terminal panes can now carry an editable workspace-local description beside their live folder path — use the new label button in each pane header to add, change, or remove a short note describing that pane's purpose
+
 ## 0.9.26 – 2026-07-19
 - fix: Clicking a file link in the terminal now finds files that live in a linked git worktree — the preview only searched below the pane's folder and the workspace roots, so a path printed from a worktree checkout (e.g. `../repo-worktrees/feature/docs/x.md`) always ended in "File not found". Worktree locations are now read from git's own metadata and searched too, in both directions (main checkout ↔ worktree), including worktrees hidden under dot-folders like `.worktrees/`
 

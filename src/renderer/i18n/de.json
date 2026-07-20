@@ -274,6 +274,10 @@
     "saveTemplate": "Vorlage speichern"
   },
   "pane": {
+    "label": "Bereichsbeschriftung",
+    "addLabel": "Beschreibung hinzufügen",
+    "editLabel": "Beschreibung bearbeiten",
+    "labelPlaceholder": "Wofür wird dieser Bereich genutzt?",
     "splitHorizontal": "Links und rechts teilen",
     "splitVertical": "Oben und unten teilen",
     "maximize": "Maximieren",

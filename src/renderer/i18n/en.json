@@ -274,6 +274,10 @@
     "saveTemplate": "Save template"
   },
   "pane": {
+    "label": "Pane label",
+    "addLabel": "Add description",
+    "editLabel": "Edit description",
+    "labelPlaceholder": "What is this pane used for?",
     "splitHorizontal": "Split into left & right",
     "splitVertical": "Split into top & bottom",
     "maximize": "Maximize",

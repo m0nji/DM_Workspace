@@ -17,6 +17,9 @@ export function useKeyboardShortcuts(): void {
       const s = useStore.getState();
       // The shortcut editor is capturing a key — let it through untouched.
       if (s.shortcutRecordingAction) return;
+      // Inline pane-label editing owns its keystrokes. In particular, don't let
+      // Mod+W close the pane while the user is entering its description.
+      if ((e.target as HTMLElement | null)?.closest?.('.pane-label-input')) return;
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (!mod) return;
 

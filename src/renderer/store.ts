@@ -140,6 +140,7 @@ interface StoreState extends AppState {
   launchTemplateIntoWorkspace: (workspaceId: string, templateId: string) => void;
   confirmPendingTemplateLaunch: (includeStartupCommands: boolean) => void;
   consumeStartupCommand: (paneId: string) => string | null;
+  setPaneTitle: (paneId: string, title: string) => void;
   paneTitle: (paneId: string, fallback: string) => string;
   // shortcuts
   updateShortcutBinding: (action: ShortcutAction, binding: string) => void;
@@ -765,6 +766,27 @@ export const useStore = create<StoreState>((set, get) => ({
     });
     return command;
   },
+
+  // Set a workspace-local label for a pane. An empty/whitespace-only value
+  // removes the label so the persisted map stays compact.
+  setPaneTitle: (paneId, title) => set((s) => {
+    const value = title.trim();
+    const workspaces = s.workspaces.map((w) => {
+      if (!w.layout || !collectPaneIds(w.layout).includes(paneId)) return w;
+      if ((w.paneTitles?.[paneId] ?? '') === value) return w;
+      const paneTitles = { ...(w.paneTitles ?? {}) };
+      if (value) paneTitles[paneId] = value;
+      else delete paneTitles[paneId];
+      const next: Workspace = { ...w };
+      if (Object.keys(paneTitles).length) next.paneTitles = paneTitles;
+      else delete next.paneTitles;
+      return next;
+    });
+    if (workspaces.every((w, index) => w === s.workspaces[index])) return s;
+    const next = { ...s, workspaces };
+    persist(next);
+    return next;
+  }),
 
   paneTitle: (paneId, fallback) => {
     const ws = get().workspaces.find((w) => w.paneTitles?.[paneId]);

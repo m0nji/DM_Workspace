@@ -147,6 +147,36 @@ describe('workspace store actions', () => {
     expect(saveState).not.toHaveBeenCalled();
   });
 
+  it('stores and removes a pane label in its owning workspace', () => {
+    useStore.setState({
+      workspaces: [
+        { id: 'w1', name: 'One', cwd: '/tmp', layout: { type: 'pane', id: 'old1' } },
+        { id: 'w2', name: 'Two', cwd: '/tmp', layout: { type: 'pane', id: 'old2' } }
+      ],
+      activeWorkspaceId: 'w1'
+    });
+
+    useStore.getState().setPaneTitle('old2', '  API monitoring  ');
+
+    expect(useStore.getState().workspaces[0].paneTitles).toBeUndefined();
+    expect(useStore.getState().workspaces[1].paneTitles).toEqual({ old2: 'API monitoring' });
+    expect(saveState).toHaveBeenCalledTimes(1);
+
+    useStore.getState().setPaneTitle('old2', '   ');
+    expect(useStore.getState().workspaces[1].paneTitles).toBeUndefined();
+  });
+
+  it('ignores a pane label for an unknown pane', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: { type: 'pane', id: 'old1' } }]
+    });
+
+    useStore.getState().setPaneTitle('ghost', 'Unknown');
+
+    expect(useStore.getState().workspaces[0].paneTitles).toBeUndefined();
+    expect(saveState).not.toHaveBeenCalled();
+  });
+
   it('hands focus to the closed pane\'s sibling and clears its search state', () => {
     useStore.setState({
       workspaces: [{

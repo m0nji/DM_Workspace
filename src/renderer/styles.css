@@ -573,12 +573,21 @@ input[type="checkbox"]:checked::after {
   background: var(--dm-pane-bg); }
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
   background: var(--dm-pane-header); border-bottom: 1px solid var(--border); }
-.pane-title { flex: 1; color: var(--muted); overflow: hidden;
+.pane-heading { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.pane-title { min-width: 36px; color: var(--muted); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
+.pane-label-divider { flex: 0 0 auto; color: var(--muted); opacity: .55; }
+.pane-label { min-width: 0; color: var(--text); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.pane-label-input { flex: 1; min-width: 72px; height: 22px; box-sizing: border-box;
+  background: var(--input); color: var(--text); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 1px 6px; font: inherit; font-size: 12px; outline: none; }
+.pane-label-input::placeholder { color: var(--muted); }
 .pane-btn { color: var(--muted); cursor: pointer; padding: 2px 4px; background: none;
   border: none; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 4px; }
 .pane-btn:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
+.pane-label-btn.active { color: var(--accent); }
 .pane-body { flex: 1; min-height: 0; }
 .pane-body .xterm { height: 100%; padding: 0 4px; }
 /* height:100% lets the wrapper hold a sub-cell themed strip below the pinned
