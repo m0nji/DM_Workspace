@@ -129,17 +129,17 @@
   --dm-border-default: #342f2a;
   --dm-border-strong: #47403a;
   --dm-border-hover: #59514a;
-  --dm-border-focus: #c7b299;
+  --dm-border-focus: #b89a73;
   --dm-control-highlight: rgba(245, 241, 234, 0.10);
   --dm-control-shadow: rgba(0, 0, 0, 0.38);
   --dm-pane-bg: #0c0b0a;
   --dm-pane-header: #181614;
-  --dm-accent-orange: #c7b299;
-  --dm-accent-orange-hover: #e7d7bf;
-  --dm-accent-orange-active: #ad9679;
-  --dm-accent-orange-soft: rgba(199, 178, 153, 0.14);
+  --dm-accent-orange: #b89a73;
+  --dm-accent-orange-hover: #c7b299;
+  --dm-accent-orange-active: #a5885f;
+  --dm-accent-orange-soft: rgba(184, 154, 115, 0.14);
   --dm-on-accent: #171512;
-  --shadow-focus: 0 0 0 1px rgba(199, 178, 153, 0.28), 0 10px 28px rgba(0, 0, 0, 0.30);
+  --shadow-focus: 0 0 0 1px rgba(184, 154, 115, 0.28), 0 10px 28px rgba(0, 0, 0, 0.30);
   --chrome-action-hover-bg: rgba(245, 241, 234, 0.06);
   --chrome-action-active-bg: rgba(245, 241, 234, 0.10);
   /* Brand backdrop (dm-apps-brand-tokens.css): only on elements that own their
@@ -508,6 +508,15 @@ input[type="checkbox"]:checked::after {
 .confirm-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .confirm-btn-danger { background: var(--danger); border-color: var(--danger); color: var(--on-accent); font-weight: 600; }
 .confirm-btn-danger:hover:not(:disabled) { background: var(--danger-hover); border-color: var(--danger-hover); }
+/* Graphite Sand: the filled destructive button drops the utility neon red for a
+   warm terracotta/rust that reads as "caution" without clashing with the sand
+   palette (per DM_CICD Graphite Sand). Scoped to this family so the utility
+   families keep their neon red, and inline error TEXT (--danger) stays red. Warm
+   off-white label instead of --on-accent since the darker terracotta needs it. */
+.root[data-brand-design="graphite"] .confirm-btn-danger {
+  background: #b5543a; border-color: #b5543a; color: #f5f1ea; }
+.root[data-brand-design="graphite"] .confirm-btn-danger:hover:not(:disabled) {
+  background: #c2634a; border-color: #c2634a; }
 .update-status { flex: 1; color: var(--muted); font-size: 12px; }
 
 /* Top-right update indicator (TitlebarActions → UpdateBadge). Accent pill so an
@@ -567,6 +576,10 @@ input[type="checkbox"]:checked::after {
 .splitter:hover { background: var(--accent); }
 
 .split-child { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+
+/* Slot placed by the layout tree + the stable per-pane container it adopts
+   (see pane-host.ts). Both are pure size pass-throughs around .pane. */
+.pane-slot, .pane-portal-host { width: 100%; height: 100%; min-width: 0; min-height: 0; }
 
 .pane { display: flex; flex-direction: column; border: 1px solid var(--border);
   border-radius: var(--radius-control); overflow: hidden; min-width: 0; min-height: 0; height: 100%;

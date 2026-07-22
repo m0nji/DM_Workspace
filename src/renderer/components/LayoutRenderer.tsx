@@ -1,15 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import type { LayoutNode } from '../../shared/types';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { Splitter } from './Splitter';
-import { Pane } from './Pane';
+import { acquirePaneHost } from '../pane-host';
 
 interface Props {
   node: LayoutNode;
-  cwd: string;
-  // True when this layout belongs to the visible workspace. Threaded down to each
-  // pane so only the active workspace's terminals hold a WebGL/GPU context.
-  active?: boolean;
   // When set, this pane is maximized: its siblings are kept mounted but hidden
   // (display:none) and the maximized pane's branch fills the whole area. Keeping
   // siblings mounted preserves their terminals (shell + scrollback) so restoring
@@ -17,11 +13,26 @@ interface Props {
   maximizedPaneId?: string | null;
 }
 
-export function LayoutRenderer({ node, cwd, active = true, maximizedPaneId = null }: Props): React.JSX.Element {
+// Adopts the pane's stable container (see pane-host.ts) at this layout
+// position. The slot itself is freely re-created whenever the tree shape
+// changes; appendChild MOVES the already-populated container, so the pane's
+// terminal never remounts. The actual pane content is rendered into that
+// container by WorkspaceView's flat PanePortal list.
+function PaneSlot({ paneId }: { paneId: string }): React.JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  // Layout effect: the container must be in place before paint, or the pane
+  // would flash empty for a frame on every split/close.
+  useLayoutEffect(() => {
+    ref.current!.appendChild(acquirePaneHost(paneId));
+  }, [paneId]);
+  return <div ref={ref} className="pane-slot" />;
+}
+
+export function LayoutRenderer({ node, maximizedPaneId = null }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (node.type === 'pane') {
-    return <Pane paneId={node.id} cwd={cwd} active={active} />;
+    return <PaneSlot paneId={node.id} />;
   }
 
   const horizontal = node.direction === 'h';
@@ -49,13 +60,13 @@ export function LayoutRenderer({ node, cwd, active = true, maximizedPaneId = nul
   return (
     <div ref={containerRef} className={`split-container ${node.direction}`}>
       <div style={firstStyle} className="split-child">
-        <LayoutRenderer node={node.children[0]} cwd={cwd} active={active} maximizedPaneId={maximizedPaneId} />
+        <LayoutRenderer node={node.children[0]} maximizedPaneId={maximizedPaneId} />
       </div>
       {!maximizingHere && (
         <Splitter splitId={node.id} direction={node.direction} containerRef={containerRef} />
       )}
       <div style={secondStyle} className="split-child">
-        <LayoutRenderer node={node.children[1]} cwd={cwd} active={active} maximizedPaneId={maximizedPaneId} />
+        <LayoutRenderer node={node.children[1]} maximizedPaneId={maximizedPaneId} />
       </div>
     </div>
   );

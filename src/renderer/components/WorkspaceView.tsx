@@ -1,7 +1,9 @@
 import React from 'react';
 import { useStore } from '../store';
+import { collectPaneIds } from '../../shared/layout-tree';
 import { WelcomeScreen } from './WelcomeScreen';
 import { LayoutRenderer } from './LayoutRenderer';
+import { PanePortal } from './PanePortal';
 
 // Every workspace stays mounted; only the active one is visible. This keeps each
 // terminal's xterm instance (and its scrollback) alive across workspace switches,
@@ -25,13 +27,21 @@ export function WorkspaceView(): React.JSX.Element {
         if (!ws.layout) {
           content = <WelcomeScreen workspaceId={ws.id} cwd={ws.cwd} />;
         } else {
+          // The layout tree renders only geometry (splits + per-pane slots).
+          // Pane CONTENT mounts here, in a flat paneId-keyed portal list, so a
+          // terminal's React identity survives any layout restructuring — a
+          // remount would replay saved scrollback beneath the live program and
+          // shred the pane (see pane-host.ts).
           content = (
-            <LayoutRenderer
-              node={ws.layout}
-              cwd={ws.cwd}
-              active={active}
-              maximizedPaneId={active ? maximizedPaneId : null}
-            />
+            <>
+              <LayoutRenderer
+                node={ws.layout}
+                maximizedPaneId={active ? maximizedPaneId : null}
+              />
+              {collectPaneIds(ws.layout).map((paneId) => (
+                <PanePortal key={paneId} paneId={paneId} cwd={ws.cwd} active={active} />
+              ))}
+            </>
           );
         }
         return (

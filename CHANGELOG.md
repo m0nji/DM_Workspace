@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.30 – 2026-07-22
+- fix: Opening a pane next to a running terminal (or closing its neighbor) no longer shreds the remaining pane's text. Restructuring the layout used to rebuild the squeezed terminal from its saved scrollback — replaying old line breaks and the "session restored" separator underneath the still-running program, which then painted over the wrong rows. The terminal is now moved as-is when the layout changes, exactly like during maximize/restore; a width change reflows once and the program repaints cleanly at the new size
+- change: The warm sand accent on filled buttons (update badge, "Update now", confirmation dialogs) is a touch deeper so it no longer reads as washed-out (Graphite Sand design)
+- change: The destructive confirmation button ("Clear all windows") now uses a warm terracotta that fits the Graphite Sand palette instead of the utility neon red — inline error text stays red
+
 ## 0.9.29 – 2026-07-20
 - fix: Commands recalled through shell history now fail closed in the automatic pane-title tracker, preventing SSH passwords or other interactive input from ever being mistaken for a new title when the recalled command cannot be reconstructed safely
 

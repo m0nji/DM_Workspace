@@ -219,9 +219,17 @@ app.on('before-quit', (event) => {
   if (ptyCleanupDone) return;
   event.preventDefault();
   teardownPtys().then(() => {
-    // E2E only: remove the temporary userData dir created for test isolation
+    // E2E only: remove the temporary userData dir created for test isolation.
+    // Best-effort: on Windows Chromium still holds files in the live profile
+    // open at this point, so rmSync throws EPERM — and an uncaught throw here
+    // would skip the re-quit below and hang the app forever. The Playwright
+    // global teardown sweeps leftover dmws-e2e-* dirs anyway.
     if (e2eTempDir) {
-      rmSync(e2eTempDir, { recursive: true, force: true });
+      try {
+        rmSync(e2eTempDir, { recursive: true, force: true });
+      } catch {
+        // Locked profile (Windows) — leave it for the e2e global teardown.
+      }
       e2eTempDir = null;
     }
     ptyCleanupDone = true;

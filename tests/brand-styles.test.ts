@@ -64,8 +64,10 @@ describe('DM brand styles', () => {
     expect(rule).toContain('--dm-border-default: #342f2a;');
     expect(rule).toContain('--dm-text-strong: #f5f1ea;');
     expect(rule).toContain('--dm-text-muted: #a9a39a;');
-    expect(rule).toContain('--dm-accent-orange: #c7b299;');
-    expect(rule).toContain('--dm-accent-orange-hover: #e7d7bf;');
+    // Deepened sand accent: filled buttons read washed-out at #c7b299, so the
+    // base sits one step darker and the old base became the hover.
+    expect(rule).toContain('--dm-accent-orange: #b89a73;');
+    expect(rule).toContain('--dm-accent-orange-hover: #c7b299;');
     expect(rule).toContain('--dm-on-accent: #171512;');
     expect(rule).toContain('--dm-gradient-bg:');
 
@@ -140,7 +142,8 @@ describe('DM brand styles', () => {
     expect(ruleBodies('.cwd-btn:hover')).toHaveLength(0);
 
     expect(ruleBodies('.confirm-btn:hover:not(:disabled)')).toHaveLength(1);
-    expect(ruleBodies('.confirm-btn-danger:hover:not(:disabled)')).toHaveLength(1);
+    // Base rule + the graphite-scoped terracotta override — both guarded.
+    expect(ruleBodies('.confirm-btn-danger:hover:not(:disabled)')).toHaveLength(2);
     expect(ruleBodies('.cwd-btn:hover:not(:disabled)')).toHaveLength(1);
   });
 });
