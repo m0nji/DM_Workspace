@@ -23,7 +23,9 @@
       "baseFolder": "Base folder",
       "enableTasks": "Enable tasks"
     },
+    "folderRestartTitle": "Restart workspace?",
     "folderRestartConfirm": "Restart this workspace in the new folder? The running terminals will be terminated.",
+    "folderRestartAction": "Restart",
     "deleteTitle": "Close workspace?",
     "deleteMessage": "“{{name}}” will be closed. Any running terminals will be terminated.",
     "closeConfirm": "Close workspace"

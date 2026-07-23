@@ -23,7 +23,9 @@
       "baseFolder": "Basis-Ordner",
       "enableTasks": "Tasks aktivieren"
     },
+    "folderRestartTitle": "Workspace neu starten?",
     "folderRestartConfirm": "Diesen Workspace im neuen Ordner neu starten? Die laufenden Terminals werden beendet.",
+    "folderRestartAction": "Neu starten",
     "deleteTitle": "Workspace schließen?",
     "deleteMessage": "„{{name}}“ wird geschlossen. Laufende Terminals werden beendet.",
     "closeConfirm": "Workspace schließen"

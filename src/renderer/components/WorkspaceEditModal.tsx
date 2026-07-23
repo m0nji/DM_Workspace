@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
+import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
 
 // Shared palette for workspace dots. Kept here next to the editor since this is
@@ -34,6 +35,9 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
   const [color, setColor] = useState(ws?.color);
   const [cwd, setCwd] = useState(ws?.cwd ?? '');
   const [tasksEnabled, setTasks] = useState(ws?.tasksEnabled ?? false);
+  // Folder picked while terminals are running — held until the user confirms
+  // the restart in the in-app dialog below.
+  const [pendingDir, setPendingDir] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,13 +60,16 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // The restart confirm on top owns Enter/Escape (both dialogs listen on
+      // window, so without this guard one keystroke would drive both).
+      if (pendingDir) return;
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
       else if (e.key === 'Enter') { e.preventDefault(); commit(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, color, cwd, tasksEnabled, ws]);
+  }, [name, color, cwd, tasksEnabled, ws, pendingDir]);
 
   const chooseFolder = async (): Promise<void> => {
     if (!ws) return;
@@ -70,14 +77,18 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     if (!dir || dir === ws.cwd) { if (dir) setCwd(dir); return; }
     // Changing the folder restarts the workspace's open terminals in the new
     // directory (applied on "Done"), so confirm when there are panes to lose.
+    // In-app ConfirmDialog, never window.confirm: Electron's native JS dialogs
+    // leave the renderer with a dead caret and swallowed Space key until the
+    // window loses OS focus (electron/electron#41603).
     const hasPanes = collectPaneIds(ws.layout ?? null).length > 0;
-    if (hasPanes && !window.confirm(t('workspace.folderRestartConfirm'))) return;
+    if (hasPanes) { setPendingDir(dir); return; }
     setCwd(dir);
   };
 
   if (!ws) return null;
 
   return (
+    <>
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal ws-edit-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -139,5 +150,18 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         </div>
       </div>
     </div>
+
+    {/* Sibling of the editor backdrop, not a child: a click on this dialog's
+        own backdrop must not bubble into the editor's backdrop and close it. */}
+    {pendingDir && (
+      <ConfirmDialog
+        title={t('workspace.folderRestartTitle')}
+        message={t('workspace.folderRestartConfirm')}
+        confirmLabel={t('workspace.folderRestartAction')}
+        onConfirm={() => { setCwd(pendingDir); setPendingDir(null); }}
+        onCancel={() => setPendingDir(null)}
+      />
+    )}
+    </>
   );
 }

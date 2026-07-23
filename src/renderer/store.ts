@@ -354,10 +354,15 @@ export const useStore = create<StoreState>((set, get) => ({
       if (pending) nextWs.pendingStartupCommands = pending; else delete nextWs.pendingStartupCommands;
       return nextWs;
     });
+    // Hand keyboard focus to the first restarted pane — the old focusedPaneId
+    // died with the old pane ids, so keystrokes would fall into <body> until a
+    // click. rAF: the remounted terminal has to exist in the DOM first.
+    const firstPane = collectPaneIds(layout)[0] ?? null;
+    if (firstPane) requestAnimationFrame(() => focusTerminal(firstPane));
     const next = {
       ...s, workspaces, paneStatus, paneCwd, paneAutoTitles,
       maximizedPaneId: null,
-      focusedPaneId: null
+      focusedPaneId: firstPane
     };
     persist(next);
     return next;

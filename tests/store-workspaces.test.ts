@@ -269,6 +269,32 @@ describe('workspace store actions', () => {
     expect(ws.pendingStartupCommands).toEqual({ [newIds[0]]: 'npm run dev' });
   });
 
+  it('hands focus to the first restarted pane after a cwd change', () => {
+    useStore.setState({
+      workspaces: [{
+        id: 'w1',
+        name: 'One',
+        cwd: '/tmp',
+        layout: {
+          type: 'split',
+          id: 's1',
+          direction: 'h',
+          ratio: 0.5,
+          children: [{ type: 'pane', id: 'old1' }, { type: 'pane', id: 'old2' }]
+        }
+      }],
+      activeWorkspaceId: 'w1',
+      focusedPaneId: 'old1'
+    });
+
+    useStore.getState().setWorkspaceCwd('w1', '/elsewhere');
+
+    const newIds = collectPaneIds(useStore.getState().workspaces[0].layout);
+    expect(newIds).toHaveLength(2);
+    // Keyboard must land in the restarted workspace, not fall into <body>.
+    expect(useStore.getState().focusedPaneId).toBe(newIds[0]);
+  });
+
   it('does not start a newer workspace save while an older save is still in flight', async () => {
     const releases: Array<() => void> = [];
     saveState.mockImplementation(() => new Promise<void>((resolve) => {

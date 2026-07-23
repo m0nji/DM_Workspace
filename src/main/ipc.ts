@@ -329,6 +329,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
 
   ipcMain.handle('dialog:pickDirectory', async () => {
+    // e2e-only: return a fixed path so tests can drive folder changes without
+    // a native dialog (which Playwright cannot dismiss).
+    if (process.env.DMWS_E2E && process.env.DMWS_E2E_PICK_DIR) return process.env.DMWS_E2E_PICK_DIR;
     const win = getWindow();
     if (!win) return null;
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
