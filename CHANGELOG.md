@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.31 – 2026-07-23
+- fix: Terminal sessions no longer come back "unscrollable" after an app restart or update. Saving a pane's scrollback used to also record the terminal modes a running TUI (Claude Code, Codex, vim …) had active at that moment — mouse tracking and the alternate screen — and the next launch replayed them into the fresh pane, which then started with a hijacked wheel or without any scrollback at all (macOS and Windows alike, typically right after an auto-update restarted the app mid-session). Saves now persist plain content only, and old saves carrying those modes are cleaned during restore
+- fix: A pane whose full-screen program crashed or was killed now heals itself — as soon as the local shell prompt returns, stale mouse tracking or a stuck alternate screen is reset automatically, without needing right-click → "Reset terminal"
+- feat: Shift+mouse wheel always scrolls the terminal history, even while a full-screen program has mouse tracking enabled (matching iTerm2 / GNOME Terminal)
+
 ## 0.9.30 – 2026-07-22
 - fix: Opening a pane next to a running terminal (or closing its neighbor) no longer shreds the remaining pane's text. Restructuring the layout used to rebuild the squeezed terminal from its saved scrollback — replaying old line breaks and the "session restored" separator underneath the still-running program, which then painted over the wrong rows. The terminal is now moved as-is when the layout changes, exactly like during maximize/restore; a width change reflows once and the program repaints cleanly at the new size
 - change: The warm sand accent on filled buttons (update badge, "Update now", confirmation dialogs) is a touch deeper so it no longer reads as washed-out (Graphite Sand design)

@@ -24,7 +24,7 @@ import { formatPathsForInsert } from '../../shared/path-insert';
 import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
 import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
-import { STUCK_MODE_RESET } from '../../shared/terminal-reset';
+import { STUCK_MODE_RESET, sanitizeRestoredScrollback } from '../../shared/terminal-reset';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { createResizeScheduler } from '../resize-scheduler';
@@ -187,12 +187,27 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       altClickMovesCursor: false
     });
     termRef.current = term;
-    // e2e hook (see main.tsx): expose the active buffer type per pane so tests
-    // can assert alt-screen recovery without probing xterm's DOM, whose scroll
-    // metrics don't reflect the buffer switch deterministically.
+    // e2e hooks (see main.tsx): expose the active buffer type per pane so tests
+    // can assert alt-screen recovery without probing xterm's DOM (whose scroll
+    // metrics don't reflect the buffer switch deterministically), a direct
+    // term.write to simulate renderer-side poisoning (the path a bad scrollback
+    // restore takes — ConPTY on Windows swallows mouse-tracking DECSETs coming
+    // through the shell, so tests can't create that state via the PTY), and the
+    // normal buffer's text for restore assertions independent of the viewport.
     if (window.api?.isE2E) {
-      const g = window as unknown as { __bufferTypes?: Map<string, () => string> };
+      const g = window as unknown as {
+        __bufferTypes?: Map<string, () => string>;
+        __termWrite?: Map<string, (data: string) => void>;
+        __bufferText?: Map<string, () => string>;
+      };
       (g.__bufferTypes ??= new Map()).set(paneId, () => term.buffer.active.type);
+      (g.__termWrite ??= new Map()).set(paneId, (data: string) => term.write(data));
+      (g.__bufferText ??= new Map()).set(paneId, () => {
+        const b = term.buffer.normal;
+        const rows: string[] = [];
+        for (let i = 0; i < b.length; i++) rows.push(b.getLine(i)?.translateToString(true) ?? '');
+        return rows.join('\n');
+      });
     }
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -276,6 +291,18 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
     const scrollDisp = term.onScroll(updateAtBottom);
 
+    // Shift+wheel always scrolls the viewport — even while a program has mouse
+    // tracking enabled, where xterm otherwise reports wheel events to the
+    // program instead of scrolling. A guaranteed manual escape from a hijacked
+    // wheel (matching iTerm2/GNOME Terminal); plain wheel behavior is unchanged.
+    // Ctrl+wheel stays reserved for UI zoom, Alt/Meta for programs.
+    term.attachCustomWheelEventHandler((e) => {
+      if (!e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.deltaY === 0) return true;
+      const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 40));
+      term.scrollLines(e.deltaY < 0 ? -lines : lines);
+      return false;
+    });
+
     // Live cwd reporting from the shell: OSC 9;9 (PowerShell) or OSC 7 (POSIX).
     // Update the pane title via the store; return true to mark the OSC handled.
     const reportCwd = (path: string | null): boolean => {
@@ -288,7 +315,20 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // OSC 7, it is not forwarded by a remote SSH shell, so it safely tells the
     // title tracker when a command ended and the local prompt is ready again.
     term.parser.registerOscHandler(DMWS_PROMPT_OSC, (data) => {
-      if (data === DMWS_PROMPT_PAYLOAD) autoTitleTracker.onShellPrompt();
+      if (data === DMWS_PROMPT_PAYLOAD) {
+        autoTitleTracker.onShellPrompt();
+        // The local prompt is on screen, so no full-screen program owns the
+        // terminal: an alt screen or mouse tracking still active here is stale —
+        // left behind by a TUI that crashed or was killed (e.g. by an app
+        // update mid-session) — and hijacks the wheel so the pane can't scroll.
+        // Clear it automatically instead of waiting for a manual context-menu
+        // "Reset terminal". Multiplexers (tmux, screen, zellij) swallow this
+        // private OSC from inner shells, so it never fires while they hold the
+        // terminal with mouse tracking legitimately on.
+        if (term.buffer.active.type === 'alternate' || term.modes.mouseTrackingMode !== 'none') {
+          term.write(STUCK_MODE_RESET);
+        }
+      }
       return true;
     });
 
@@ -466,11 +506,18 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
 
     // Persist the *rendered* terminal buffer (text + colors) rather than the raw
-    // PTY byte stream. SerializeAddon emits only the normal buffer — no alt-screen
-    // contents, color-query replies, or cursor-jump sequences — so a restart
-    // replays clean, reflowable history instead of control-character garbage.
+    // PTY byte stream, so a restart replays clean, reflowable history instead of
+    // control-character garbage. excludeModes/excludeAltBuffer are essential:
+    // without them serialize() appends the live DECSET modes (mouse tracking,
+    // bracketed paste, focus reporting) and any active alternate-screen frame,
+    // and replaying those on restart poisons the fresh pane — stuck in the alt
+    // screen with a hijacked wheel, the "restored session can't scroll" bug.
     const doSave = (): void => {
-      const data = serializeAddon.serialize({ scrollback: SCROLLBACK_LINES });
+      const data = serializeAddon.serialize({
+        scrollback: SCROLLBACK_LINES,
+        excludeModes: true,
+        excludeAltBuffer: true
+      });
       // Never persist the restore separator — serialize captures the rendered
       // buffer, so without this each restart's separator would be saved and they
       // would accumulate across restarts.
@@ -518,7 +565,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       if (!restorePromise) {
         restorePromise = window.api.getScrollback(paneId).then((saved) => {
           if (saved) {
-            term.write(saved);
+            // Sanitize first: saves from versions ≤ 0.9.30 embed the terminal
+            // modes and alt-screen frame active at save time, which would put
+            // the fresh pane straight back into the stuck state they came from.
+            term.write(sanitizeRestoredScrollback(saved));
             term.write(`\r\n\x1b[2m── ${RESTORE_MARKER_TEXT} ──\x1b[0m\r\n`);
           }
         });
