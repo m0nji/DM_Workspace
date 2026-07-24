@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.33 – 2026-07-24
+- fix: Automatic pane titles now work on Windows — the running shell command (an SSH session, a build) and Codex/Claude session summaries appear in the pane header just like on macOS. Windows' ConPTY enables terminal focus reporting, so every focus change (including the click into a pane before typing) sent a focus report through the same channel as your keystrokes; the title tracker took it for an unreconstructable line edit and discarded the whole command, leaving the header blank. These focus reports are now ignored
+
 ## 0.9.32 – 2026-07-23
 - fix: Changing a workspace's base folder no longer breaks keyboard input — after the restart confirmation the terminal cursor stopped blinking and the Space key went dead until the window was Alt-Tabbed away and back. The confirmation was a native browser dialog, which Electron never fully recovers from; the restart question now uses the app's own dialog
 - fix: After a folder change restarts a workspace's terminals, keyboard focus now lands in the first restarted terminal automatically — keystrokes used to fall nowhere until you clicked into a pane

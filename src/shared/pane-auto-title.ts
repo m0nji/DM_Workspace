@@ -67,6 +67,14 @@ class InputLine {
   private applyCsi(seq: string): void {
     if (seq === '[200~') { this.bracketedPaste = true; return; }
     if (seq === '[201~') { this.bracketedPaste = false; return; }
+    // Focus in/out reports (DECSET 1004). Windows ConPTY turns focus reporting
+    // on unconditionally, so xterm emits ESC[I / ESC[O into the same onData
+    // stream as keystrokes on every focus change — the focus-in from clicking
+    // the pane to type included. They are terminal→host status reports, not
+    // edits, so ignore them; otherwise the reconstructed command line is voided
+    // and the pane never gets an automatic title (SSH session, agent prompt).
+    // POSIX shells on macOS leave 1004 off, which is why this only bit Windows.
+    if (seq === '[I' || seq === '[O') return;
     if (/\[(?:\d+;)*\d*D$/.test(seq)) this.cursor = Math.max(0, this.cursor - 1);
     else if (/\[(?:\d+;)*\d*C$/.test(seq)) this.cursor = Math.min(this.chars.length, this.cursor + 1);
     else if (/\[(?:1~|H)$/.test(seq)) this.cursor = 0;

@@ -155,6 +155,21 @@ describe('pane automatic title tracker', () => {
     h.tracker.onInput('ssh root@10.0.0.9x\x7f\r');
     expect(h.current()).toBe('ssh root@10.0.0.9');
   });
+
+  it('ignores terminal focus in/out reports (Windows ConPTY enables DECSET 1004)', () => {
+    const h = harness();
+    h.tracker.onShellPrompt();
+    // Windows ConPTY turns on focus reporting, so xterm sends ESC[I / ESC[O
+    // through the same onData stream as keystrokes on every focus change —
+    // including the focus-in from clicking the pane before typing. These are
+    // terminal→host status reports, not edits, and must not void the command.
+    h.tracker.onInput('\x1b[I');
+    h.tracker.onInput('ssh root@10.0.0.8');
+    h.tracker.onInput('\x1b[O');
+    h.tracker.onInput('\x1b[I');
+    h.tracker.onInput('\r');
+    expect(h.current()).toBe('ssh root@10.0.0.8');
+  });
 });
 
 describe('pane title helpers', () => {
