@@ -1,4 +1,4 @@
-import { writeFileSync, renameSync, mkdirSync } from 'node:fs';
+import { writeFileSync, renameSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -9,6 +9,15 @@ import { randomUUID } from 'node:crypto';
 export function writeFileAtomic(file: string, content: string): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.dmws-tmp-${randomUUID()}`;
-  writeFileSync(tmp, content, 'utf8');
-  renameSync(tmp, file);
+  try {
+    writeFileSync(tmp, content, 'utf8');
+    renameSync(tmp, file);
+  } catch (err) {
+    // The temp name is unique per call, so a failed rename (locked target on
+    // Windows, cross-device, ENOSPC) would strand it next to the real file
+    // forever — and these live in the user's workspace (.dmworkspace/TASKS.md)
+    // where the litter is visible. Clean up, then report the original failure.
+    rmSync(tmp, { force: true });
+    throw err;
+  }
 }

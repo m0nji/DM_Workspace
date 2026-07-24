@@ -6,9 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import { findLinks, resolveSource, fileTarget } from '../../shared/link-detect';
 import { useStore } from '../store';
 import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
@@ -20,10 +18,15 @@ import {
   registerTerminalInputTracking, unregisterTerminalInputTracking
 } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
-import { formatPathsForInsert } from '../../shared/path-insert';
 import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
-import { clickMoveSequence, type RowMeta } from '../../shared/click-cursor';
 import { collectPaneIds } from '../../shared/layout-tree';
+// Eigenständige Terminal-Belange: jedes Modul hält Auf- und Abbau beieinander
+// und gibt seinen Disposer zurück (siehe die Disposer-Liste im Mount-Effect).
+import { registerE2EHooks } from '../terminal/e2e-hooks';
+import { attachLinkHandling } from '../terminal/links';
+import { attachClipboardShortcuts } from '../terminal/clipboard';
+import { attachFileDrop } from '../terminal/file-drop';
+import { attachClickToMove } from '../terminal/click-to-move';
 import { STUCK_MODE_RESET, sanitizeRestoredScrollback } from '../../shared/terminal-reset';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -98,6 +101,13 @@ function syncBackgrounds(host: HTMLElement | null, background: string | undefine
 
 export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
+  // Der Mount-Effect läuft bewusst nur einmal pro Pane, schreibt aber eine
+  // übersetzte Meldung (Prozess beendet). Nähme er `t` in die Deps, würde ein
+  // Sprachwechsel zur Laufzeit das Terminal disposen und die Shell neu starten —
+  // ungleich schlimmer als der Fehler, den es behebt. Über die Ref liest er
+  // stattdessen immer die aktuelle Übersetzungsfunktion.
+  const tRef = useRef(t);
+  tRef.current = t;
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   // The pane holds a WebGL/GPU context only while its workspace is active. Electron
@@ -187,28 +197,14 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       altClickMovesCursor: false
     });
     termRef.current = term;
-    // e2e hooks (see main.tsx): expose the active buffer type per pane so tests
-    // can assert alt-screen recovery without probing xterm's DOM (whose scroll
-    // metrics don't reflect the buffer switch deterministically), a direct
-    // term.write to simulate renderer-side poisoning (the path a bad scrollback
-    // restore takes — ConPTY on Windows swallows mouse-tracking DECSETs coming
-    // through the shell, so tests can't create that state via the PTY), and the
-    // normal buffer's text for restore assertions independent of the viewport.
-    if (window.api?.isE2E) {
-      const g = window as unknown as {
-        __bufferTypes?: Map<string, () => string>;
-        __termWrite?: Map<string, (data: string) => void>;
-        __bufferText?: Map<string, () => string>;
-      };
-      (g.__bufferTypes ??= new Map()).set(paneId, () => term.buffer.active.type);
-      (g.__termWrite ??= new Map()).set(paneId, (data: string) => term.write(data));
-      (g.__bufferText ??= new Map()).set(paneId, () => {
-        const b = term.buffer.normal;
-        const rows: string[] = [];
-        for (let i = 0; i < b.length; i++) rows.push(b.getLine(i)?.translateToString(true) ?? '');
-        return rows.join('\n');
-      });
-    }
+    // Jeder attach*/register* unten gibt seinen eigenen Disposer zurück und legt
+    // ihn hier ab; das Cleanup ruft die Liste rückwärts auf. Vorher stand jeder
+    // Teardown-Schritt einzeln am Ende des Effects, teils 400 Zeilen von seinem
+    // Setup entfernt — genau so gingen zwei der drei e2e-Hooks verloren.
+    const disposers: Array<() => void> = [];
+
+    disposers.push(registerE2EHooks(paneId, term));
+
     const fit = new FitAddon();
     term.loadAddon(fit);
     const search = new SearchAddon();
@@ -231,56 +227,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     syncWebgl(activeRef.current);
 
     // Clicking a link opens the right-hand preview panel instead of the OS browser.
-    const cwd0 = cwd; // spawn-time cwd; fallback until the shell reports a live cwd
-    let latestPreviewCall = 0; // guards against an older click's async result overwriting a newer one
-    const openInPreview = async (raw: string): Promise<void> => {
-      const { paneCwd, workspaces } = useStore.getState();
-      const liveCwd = paneCwd[paneId] ?? cwd0;
-      const src = resolveSource(raw, liveCwd);
-      if (!src) return;
-      if (!src.rel) {
-        // url or absolute path — open the provisional target directly
-        useStore.getState().openPreview(src);
-        return;
-      }
-      // relative path — verify against candidate bases in the main process
-      const roots = workspaces.map((w) => w.cwd);
-      const callId = ++latestPreviewCall;
-      let abs: string | null = null;
-      try {
-        abs = await window.api.resolveLink(src.rel, liveCwd, roots);
-      } catch {
-        abs = null; // IPC failed → fall back to the not-found fix UI
-      }
-      if (callId !== latestPreviewCall) return; // a newer click superseded this one
-      if (abs) {
-        useStore.getState().openPreview({ ...src, target: fileTarget(src.kind, abs), resolved: true });
-      } else {
-        useStore.getState().openPreview({ ...src, resolved: false });
-      }
-    };
-
-    // http(s) URLs.
-    term.loadAddon(new WebLinksAddon((_event: MouseEvent | undefined, uri: string) => { void openInPreview(uri); }));
-
-    // Bare *.md / *.html / *.htm paths in the output.
-    term.registerLinkProvider({
-      provideLinks(lineNo, callback) {
-        const line = term.buffer.active.getLine(lineNo - 1);
-        if (!line) { callback(undefined); return; }
-        const text = line.translateToString(true);
-        const matches = findLinks(text).filter((m) => !/^https?:\/\//i.test(m.text));
-        if (matches.length === 0) { callback(undefined); return; }
-        callback(matches.map((m) => ({
-          range: {
-            start: { x: m.startIndex + 1, y: lineNo },
-            end: { x: m.startIndex + m.length, y: lineNo }
-          },
-          text: m.text,
-          activate: () => { void openInPreview(m.text); }
-        })));
-      }
-    });
+    disposers.push(attachLinkHandling(term, { paneId, spawnCwd: cwd }));
 
     // Track whether the viewport is scrolled to the bottom (controls the
     // floating scroll-to-bottom button). baseY is the topmost scrollback row;
@@ -338,158 +285,20 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       setTimer: (fn, ms) => setTimeout(fn, ms),
       clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
     });
-    // Cmd+C copy (macOS): route the native copy through the same cleanup as the
-    // context menu, so trailing padding spaces (TUI box backgrounds are real
-    // space cells) never reach the clipboard. Only the platform copy chord —
-    // Ctrl+C is SIGINT everywhere and must reach the shell untouched, so this
-    // handler exists on macOS only (other platforms copy via the context menu).
-    const handleTerminalCopyShortcut = (e: KeyboardEvent): void => {
-      if (window.api.platform !== 'darwin') return;
-      const isCopyKey = e.key.toLowerCase() === 'c' && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
-      if (!isCopyKey || !term.hasSelection()) return;
-      e.preventDefault();
-      e.stopPropagation();
-      window.api.clipboardWrite(stripTrailingWhitespace(term.getSelection()));
-    };
-    host.addEventListener('keydown', handleTerminalCopyShortcut, true);
+    disposers.push(attachClipboardShortcuts(host, term, {
+      paneId,
+      onInput: () => activity.onInput()
+    }));
 
-    const handleTerminalPasteShortcut = (e: KeyboardEvent): void => {
-      // Only the platform's paste chord counts: Cmd+V on macOS, Ctrl+V elsewhere.
-      // On macOS Ctrl+V must reach the shell untouched (readline quoted-insert,
-      // vim's visual block), so ctrlKey may not be treated as a paste modifier there.
-      const primaryMod = window.api.platform === 'darwin'
-        ? e.metaKey && !e.ctrlKey
-        : e.ctrlKey && !e.metaKey;
-      const isPasteKey = e.key.toLowerCase() === 'v' && primaryMod && !e.altKey;
-      if (!isPasteKey) return;
+    disposers.push(attachFileDrop(host, term, {
+      onInput: () => activity.onInput()
+    }));
 
-      e.preventDefault();
-      e.stopPropagation();
-
-      void window.api.clipboardRead().then(async (text) => {
-        if (text) {
-          // Text on the clipboard (e.g. dictated text from the voice app):
-          // paste it directly. Reading the OS clipboard via the main process
-          // works even where the renderer's own clipboard is unavailable.
-          term.paste(text);
-          activity.onInput();
-          return;
-        }
-        // No text — if an image is on the clipboard, save it to a temp file and
-        // insert its path. This is tool-independent (Claude Code, Codex, opencode,
-        // … all read a file path) and works on Windows, where CLI tools can't
-        // reliably read the OS clipboard themselves. Only when saving fails do we
-        // fall back to forwarding Ctrl+V (0x16) so the program can try the
-        // clipboard itself — preserving the previous behaviour as a safety net.
-        if (await window.api.clipboardHasImage()) {
-          const file = await window.api.clipboardSaveImage();
-          if (file) {
-            term.paste(formatPathsForInsert([file], window.api.platform));
-          } else {
-            window.api.input({ paneId, data: '\x16' });
-          }
-          activity.onInput();
-        }
-      });
-    };
-    host.addEventListener('keydown', handleTerminalPasteShortcut, true);
-
-    // Drag & drop files from the OS file browser into the terminal line. We
-    // insert each dropped file's path (tool-independent — any program reads a
-    // path), instead of letting Electron navigate the window to the file.
-    const onDragOver = (e: DragEvent): void => {
-      const types = e.dataTransfer?.types;
-      if (!types || (!types.includes('Files') && !types.includes('application/x-dmws-path'))) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-      host.classList.add('drop-target');
-    };
-    const onDragLeave = (e: DragEvent): void => {
-      // Only clear when the pointer actually leaves the host (not on child enter).
-      if (e.relatedTarget && host.contains(e.relatedTarget as Node)) return;
-      // relatedTarget is often null during OS file drags (Chromium withholds it),
-      // so also keep the highlight while the pointer is still inside the host.
-      const r = host.getBoundingClientRect();
-      if (e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom) return;
-      host.classList.remove('drop-target');
-    };
-    const onDrop = (e: DragEvent): void => {
-      host.classList.remove('drop-target');
-      // Internal drag from the file browser: a single absolute path payload.
-      const internal = e.dataTransfer?.getData('application/x-dmws-path');
-      if (internal) {
-        e.preventDefault();
-        term.paste(formatPathsForInsert([internal], window.api.platform));
-        term.focus();
-        activity.onInput();
-        return;
-      }
-      const files = e.dataTransfer?.files;
-      if (!files || files.length === 0) return;
-      e.preventDefault();
-      const paths = Array.from(files)
-        .map((f) => window.api.getPathForFile(f))
-        .filter((p) => p && p.length > 0);
-      if (paths.length === 0) return;
-      term.paste(formatPathsForInsert(paths, window.api.platform));
-      term.focus();
-      activity.onInput();
-    };
-    host.addEventListener('dragover', onDragOver);
-    host.addEventListener('dragleave', onDragLeave);
-    host.addEventListener('drop', onDrop);
-
-    // Click → walk the running program's input cursor to the clicked cell,
-    // using only ←/→ (which cross line boundaries in these editors). We feed the
-    // key sequence to the PTY so the program (shell, Claude Code, Codex) moves
-    // its own cursor. Option/Alt+click always triggers; a plain click triggers
-    // only when the clickMovesCursor setting is on (a plain click otherwise has
-    // jobs of its own: focus, select, open links). A drag makes a selection and
-    // is left alone. Only fires at the bottom of the scrollback, where the live
-    // cursor is.
-    const moveTriggered = (e: MouseEvent): boolean => {
-      if (e.ctrlKey || e.metaKey || e.shiftKey) return false; // reserved for selection/links
-      if (e.altKey) return true; // Option/Alt+click: always
-      return useStore.getState().settings.clickMovesCursor ?? false; // plain click: opt-in
-    };
-    let clickMoveDownAt = -1;
-    const onMoveMouseDown = (e: MouseEvent): void => { clickMoveDownAt = moveTriggered(e) ? e.timeStamp : -1; };
-    const onMoveMouseUp = (e: MouseEvent): void => {
-      if (clickMoveDownAt < 0 || !moveTriggered(e)) { clickMoveDownAt = -1; return; }
-      const quick = e.timeStamp - clickMoveDownAt < 500; // long press → treat as selection
-      clickMoveDownAt = -1;
-      if (!quick || term.hasSelection()) return;
-      const buf = term.buffer.active;
-      if (buf.viewportY < buf.baseY) return; // scrolled up; the live cursor isn't on screen
-      const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
-      if (!screen) return;
-      const rect = screen.getBoundingClientRect();
-      const cellW = rect.width / term.cols;
-      const cellH = rect.height / term.rows;
-      if (!(cellW > 0) || !(cellH > 0)) return;
-      let col = Math.floor((e.clientX - rect.left) / cellW);
-      let row = Math.floor((e.clientY - rect.top) / cellH);
-      col = Math.min(Math.max(col, 0), term.cols - 1);
-      row = Math.min(Math.max(row, 0), term.rows - 1);
-      // Per-row content length + wrapped flag, so the move can count across
-      // newlines. Indexed by the same viewport rows as the cursor/target cells.
-      const rowsMeta: RowMeta[] = [];
-      for (let y = 0; y < term.rows; y++) {
-        const line = buf.getLine(buf.baseY + y);
-        rowsMeta.push({ length: (line?.translateToString(true) ?? '').length, wrapped: line?.isWrapped ?? false });
-      }
-      // Don't overshoot into the empty space past the end of the clicked line.
-      col = Math.min(col, rowsMeta[row].length);
-      const seq = clickMoveSequence(
-        rowsMeta,
-        { x: buf.cursorX, y: buf.cursorY },
-        { x: col, y: row },
-        term.modes.applicationCursorKeysMode
-      );
-      if (seq) { window.api.input({ paneId, data: seq }); activity.onInput(); }
-    };
-    host.addEventListener('mousedown', onMoveMouseDown, true);
-    host.addEventListener('mouseup', onMoveMouseUp, true);
+    disposers.push(attachClickToMove(host, term, {
+      paneId,
+      plainClickEnabled: () => useStore.getState().settings.clickMovesCursor ?? false,
+      onInput: () => activity.onInput()
+    }));
 
     const safeFit = (): boolean => {
       // Clear any previous pin so we measure (and fit to) the full wrapper height,
@@ -550,7 +359,9 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
       useStore.getState().setPaneAutoTitle(paneId, '');
-      term.write(`\r\n[${t('terminal.processExited', { code: exitCode })}]\r\n`);
+      // tRef statt t: die Meldung erscheint in der Sprache, die beim Beenden des
+      // Prozesses eingestellt ist — nicht in der, die beim Mount der Pane galt.
+      term.write(`\r\n[${tRef.current('terminal.processExited', { code: exitCode })}]\r\n`);
     });
     const inputDisp = term.onData((data) => {
       autoTitleTracker.onInput(data);
@@ -582,7 +393,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       if (spawned) return;
       spawned = true;
       void restoreOnce().then(() => {
-        window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 });
+        // Ein fehlgeschlagener Spawn hinterlässt eine tote Pane — sichtbar machen
+        // statt als stillen Rejection verpuffen zu lassen.
+        void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 })
+          .catch((err: unknown) => console.error(`[pane ${paneId}] spawn failed:`, err));
         spawnSent = true;
         // One-shot startup command for a pane created from a template. Consuming
         // clears it (and persists) so it never runs again after a restart. The
@@ -669,13 +483,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       unregisterTerminalInputTracking(paneId);
       autoTitleTracker.dispose();
       cancelAnimationFrame(pinRaf);
-      host.removeEventListener('keydown', handleTerminalCopyShortcut, true);
-      host.removeEventListener('keydown', handleTerminalPasteShortcut, true);
-      host.removeEventListener('dragover', onDragOver);
-      host.removeEventListener('dragleave', onDragLeave);
-      host.removeEventListener('drop', onDrop);
-      host.removeEventListener('mousedown', onMoveMouseDown, true);
-      host.removeEventListener('mouseup', onMoveMouseUp, true);
+      // Rückwärts, damit die Reihenfolge das Spiegelbild des Aufbaus ist.
+      for (let i = disposers.length - 1; i >= 0; i--) disposers[i]();
       offData();
       offExit();
       inputDisp.dispose();
@@ -684,7 +493,6 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       unregisterSearch(paneId);
       unregisterTerminal(paneId);
       unregisterTerminalFocus(paneId);
-      (window as unknown as { __bufferTypes?: Map<string, unknown> }).__bufferTypes?.delete(paneId);
       if (webglRetryRef.current) { clearTimeout(webglRetryRef.current); webglRetryRef.current = null; }
       webglRef.current?.dispose();
       webglRef.current = null;
@@ -754,10 +562,14 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       },
       {
         label: t('menu.paste'),
-        onClick: async () => {
-          const text = await window.api.clipboardRead();
-          if (text) term?.paste(text);
-          term?.focus();
+        // Kein async-Handler: MenuItem.onClick erwartet void, ein zurückgegebenes
+        // Promise würde niemand auswerten — ein Fehler beim Clipboard-Lesen wäre
+        // ein stiller Rejection.
+        onClick: () => {
+          void window.api.clipboardRead().then((text) => {
+            if (text) term?.paste(text);
+            term?.focus();
+          });
         }
       },
       { label: t('menu.selectAll'), onClick: () => { term?.selectAll(); term?.focus(); } },

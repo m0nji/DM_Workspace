@@ -18,6 +18,22 @@ import { resolveLinkPath } from '../src/main/ipc';
 
 let root: string;
 
+// Creating a *directory* symlink on Windows requires Developer Mode or elevation;
+// without either, symlinkSync throws EPERM. Probe the capability once so the
+// symlink case is skipped on an unprivileged checkout instead of failing the
+// whole suite (the behaviour it guards is POSIX-relevant and covered there).
+const canSymlink = ((): boolean => {
+  const probe = mkdtempSync(join(tmpdir(), 'symprobe-'));
+  try {
+    symlinkSync(probe, join(probe, 'l'), 'dir');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+})();
+
 beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'linkres-')); });
 afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
@@ -143,7 +159,7 @@ describe('resolveLinkPath', () => {
     }
   });
 
-  it('does not traverse into a symlinked directory', () => {
+  it.skipIf(!canSymlink)('does not traverse into a symlinked directory', () => {
     const outside = mkdtempSync(join(tmpdir(), 'outside-'));
     writeFileSync(join(outside, 'sl.md'), '# hi');
     try {

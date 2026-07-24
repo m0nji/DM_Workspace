@@ -10,7 +10,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 // (the same thing you can run by hand in DevTools to reproduce the bug).
 test('a lost WebGL context is re-acquired automatically (no permanent DOM-renderer fallback)', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();

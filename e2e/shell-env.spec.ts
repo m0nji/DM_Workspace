@@ -8,9 +8,15 @@ import { join } from 'path';
 // profile and path_helper so tools outside /usr/bin are reachable again.
 const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-env-'));
 
+// POSIX-only: der Test tippt ein Shell-Kommando mit printf/tr/grep und prüft die
+// Wirkung von `-l` (Login-Shell). Auf Windows startet die App PowerShell (siehe
+// defaultShell in pty-manager.ts), die weder die Syntax noch das -l-Konzept kennt
+// — der Test konnte dort nie grün werden und war schlicht dauerhaft rot.
+test.skip(process.platform === 'win32', 'POSIX-Login-Shell-Verhalten; Windows startet PowerShell');
+
 test('login shell restores the full PATH and reports 256-color TERM', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: {
       HOME: process.env.HOME as string,
       PATH: '/usr/bin:/bin:/usr/sbin:/sbin', // minimal, NO homebrew

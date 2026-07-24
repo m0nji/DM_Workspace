@@ -128,7 +128,7 @@ describe('resize-scheduler', () => {
 // the same tick, so the app and xterm agree on the new width atomically.
 describe('resize-scheduler width settle', () => {
   it('fits live while the width is stable (height-only resize)', () => {
-    let width = 400;
+    const width = 400;
     const h = harness(() => true, () => width);
     h.sched.onResize();
     h.fireRaf();

@@ -29,7 +29,7 @@ function isStringRecord(obj: unknown): obj is ScrollbackMap {
 
 export function deserializeScrollback(json: string): ScrollbackMap {
   try {
-    const parsed = JSON.parse(json);
+    const parsed: unknown = JSON.parse(json);
     return isStringRecord(parsed) ? parsed : {};
   } catch {
     return {};

@@ -7,7 +7,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 // workspace only — inactive workspaces, though still mounted, contribute zero.
 test('inactive workspaces release their WebGL context; switching back restores it', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();

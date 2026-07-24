@@ -12,13 +12,13 @@ function env(): Record<string, string> {
   return e;
 }
 
-async function rowsText(win: any): Promise<string> {
+function rowsText(win: any): Promise<string> {
   return win.locator('.xterm-rows').first().innerText();
 }
 
 test('separator does not accumulate across multiple restarts; fresh pane stays clean', async () => {
   // Launch 1: one pane, one command.
-  const a1 = await electron.launch({ args: ['out/main/index.js'], env: env() });
+  const a1 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w1 = await a1.firstWindow();
   await w1.getByText('1 Pane').click();
   await expect(w1.locator('.pane .xterm-screen').first()).toBeVisible();
@@ -30,14 +30,14 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   await a1.close();
 
   // Launch 2: restore (1 separator expected).
-  const a2 = await electron.launch({ args: ['out/main/index.js'], env: env() });
+  const a2 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w2 = await a2.firstWindow();
   await expect(w2.locator('.pane .xterm-screen').first()).toBeVisible();
   await w2.waitForTimeout(1800); // also lets the re-save (buffer w/o separator) flush
   await a2.close();
 
   // Launch 3: restore again. Probe: still exactly ONE separator, marker still present.
-  const a3 = await electron.launch({ args: ['out/main/index.js'], env: env() });
+  const a3 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w3 = await a3.firstWindow();
   await expect(w3.locator('.pane .xterm-screen').first()).toBeVisible();
   await w3.waitForTimeout(1500);

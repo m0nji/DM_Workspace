@@ -198,6 +198,15 @@ describe('pane title helpers', () => {
       .toBe('Prüfe token=[versteckt] und behebe den Login');
   });
 
+  // Der Bearer-Zweig von redactSensitiveValues war ungetestet. Pane-Titel landen
+  // in der Fensterleiste und in OS-Notifications — ein durchgereichtes Token wäre
+  // dort dauerhaft sichtbar.
+  it('redacts a Bearer token from a prompt title', () => {
+    const out = promptTitle('Bitte prüfe Bearer eyJhbGciOi.abc-def_ghi~x+y/z= und fahre fort.');
+    expect(out).not.toContain('eyJhbGciOi');
+    expect(out).toContain('Bearer [versteckt]');
+  });
+
   it('omits pasted code and compacts long paths in a title', () => {
     expect(promptTitle('Bitte behebe den Fehler in /Users/thomas/Projects/DM_Workspace/src/renderer/store.ts. ```const token = "secret";```'))
       .toBe('Behebe den Fehler in …/store.ts');

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, collectSplitIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
 import type { SplitNode } from '../src/shared/types';
 
 describe('createIdGenerator', () => {

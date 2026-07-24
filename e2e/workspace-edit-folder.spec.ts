@@ -16,7 +16,7 @@ import { basename, join } from 'node:path';
 test('folder change restarts panes, keeps keyboard focus and a typing space', async () => {
   const pickDir = mkdtempSync(join(tmpdir(), 'dmws-pickdir-'));
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     // DOM renderer so terminal text is readable from .xterm-rows.
     env: { ...process.env, DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1', DMWS_E2E_PICK_DIR: pickDir }
   });

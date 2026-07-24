@@ -15,9 +15,21 @@ import { pathEndsWith } from '../shared/link-detect';
 import { readPreviewFile } from './preview-file';
 import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from './fs-browser';
 import { expandTilde } from './resolve-cwd';
+import {
+  isNonEmptyString, parseAgentDone, parsePtyInput, parsePtyResize, parsePtySpawn,
+  parseScrollbackSave, parseTasksSave
+} from './ipc-validate';
 import type {
-  AppState, PtySpawnRequest, PtyInputRequest, PtyResizeRequest, PtyDataEvent, PtyExitEvent, AgentDonePayload, WindowBounds
+  AppState, PtyDataEvent, PtyExitEvent, WindowBounds
 } from '../shared/types';
+
+// Ein Payload, der die Prüfung nicht besteht, ist immer ein Bug im Renderer (die
+// einzige Gegenstelle) — also protokollieren statt still verwerfen, sonst sucht
+// man später eine Pane, die grundlos nicht reagiert. Der Payload selbst wird NICHT
+// mitgeloggt: durch pty:input laufen Tastenanschläge, also auch Passwörter.
+function rejectPayload(channel: string, raw: unknown): void {
+  console.warn(`[ipc] ${channel}: ungültiger Payload verworfen (${typeof raw})`);
+}
 
 const STATE_FILE = () => join(app.getPath('userData'), 'state.json');
 const SCROLLBACK_FILE = () => join(app.getPath('userData'), 'scrollback.json');
@@ -182,12 +194,25 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     getWindow()?.webContents.send('pty:exit', payload);
   });
 
-  ipcMain.handle('pty:spawn', (_e, req: PtySpawnRequest) => {
+  ipcMain.handle('pty:spawn', (_e, raw: unknown) => {
+    const req = parsePtySpawn(raw);
+    if (!req) { rejectPayload('pty:spawn', raw); return; }
     pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows });
   });
-  ipcMain.on('pty:input', (_e, req: PtyInputRequest) => pty.write(req.paneId, req.data));
-  ipcMain.on('pty:resize', (_e, req: PtyResizeRequest) => pty.resize(req.paneId, req.cols, req.rows));
-  ipcMain.on('pty:kill', (_e, paneId: string) => pty.kill(paneId));
+  ipcMain.on('pty:input', (_e, raw: unknown) => {
+    const req = parsePtyInput(raw);
+    if (!req) { rejectPayload('pty:input', raw); return; }
+    pty.write(req.paneId, req.data);
+  });
+  ipcMain.on('pty:resize', (_e, raw: unknown) => {
+    const req = parsePtyResize(raw);
+    if (!req) { rejectPayload('pty:resize', raw); return; }
+    pty.resize(req.paneId, req.cols, req.rows);
+  });
+  ipcMain.on('pty:kill', (_e, paneId: unknown) => {
+    if (!isNonEmptyString(paneId)) { rejectPayload('pty:kill', paneId); return; }
+    pty.kill(paneId);
+  });
 
   ipcMain.handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));
   ipcMain.handle('state:save', (_e, state: AppState) => {
@@ -199,10 +224,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     scrollback.prune(liveIds);
   });
 
-  ipcMain.handle('scrollback:get', (_e, paneId: string) => scrollback.get(paneId) ?? null);
-  ipcMain.on('scrollback:save', (_e, req: { paneId: string; data: string }) =>
-    scrollback.set(req.paneId, req.data)
+  ipcMain.handle('scrollback:get', (_e, paneId: unknown) =>
+    isNonEmptyString(paneId) ? scrollback.get(paneId) ?? null : null
   );
+  ipcMain.on('scrollback:save', (_e, raw: unknown) => {
+    const req = parseScrollbackSave(raw);
+    if (!req) { rejectPayload('scrollback:save', raw); return; }
+    scrollback.set(req.paneId, req.data);
+  });
 
   // --- Task board ---------------------------------------------------------
   // Echo-guard: remember the exact content we last wrote per dir so the file
@@ -233,7 +262,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
         if (name && name !== 'TASKS.md') return;
         if (watchDebounce) clearTimeout(watchDebounce);
         watchDebounce = setTimeout(() => {
-          let content = '';
+          let content: string;
           try { content = readFileSync(file, 'utf8'); } catch { content = ''; }
           if (content === lastWritten.get(dir)) return; // our own write
           getWindow()?.webContents.send('tasks:changed', { dir, board: loadTasks(dir) });
@@ -244,11 +273,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (!taskWatcher) watchedDir = null; // re-try arming on the next load/save
   };
 
-  ipcMain.handle('tasks:load', (_e, dir: string): TaskBoard => {
+  ipcMain.handle('tasks:load', (_e, dir: unknown): TaskBoard => {
+    if (!isNonEmptyString(dir)) { rejectPayload('tasks:load', dir); return { columns: [] }; }
     startTaskWatch(dir);
     return loadTasks(dir);
   });
-  ipcMain.on('tasks:save', (_e, req: { dir: string; board: TaskBoard }) => {
+  ipcMain.on('tasks:save', (_e, raw: unknown) => {
+    const req = parseTasksSave(raw);
+    if (!req) { rejectPayload('tasks:save', raw); return; }
     const content = saveTasks(req.dir, req.board);
     lastWritten.set(req.dir, content);
     startTaskWatch(req.dir); // (re)arm now that .dmworkspace exists
@@ -273,7 +305,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
       return null;
     }
   });
-  ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(text));
+  ipcMain.on('clipboard:write', (_e, text: unknown) => {
+    if (typeof text !== 'string') { rejectPayload('clipboard:write', text); return; }
+    clipboard.writeText(text);
+  });
 
   // Used by the markdown preview panel. The path comes from a link the user
   // clicked in terminal output, so restrict reads to text/markdown files — the
@@ -324,7 +359,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   // Open a link from the markdown preview in the system browser. http(s) only —
   // never file:/smb:/etc., which could be abused by untrusted markdown.
-  ipcMain.on('shell:openExternal', (_e, url: string) => {
+  ipcMain.on('shell:openExternal', (_e, url: unknown) => {
+    if (typeof url !== 'string') { rejectPayload('shell:openExternal', url); return; }
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
   });
 
@@ -342,7 +378,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     resolveLinkPath(req.rel, req.cwd, req.roots)
   );
 
-  ipcMain.on('notify:agentDone', (_e, payload: AgentDonePayload) => {
+  ipcMain.on('notify:agentDone', (_e, raw: unknown) => {
+    const payload = parseAgentDone(raw);
+    if (!payload) { rejectPayload('notify:agentDone', raw); return; }
     if (!Notification.isSupported()) return;
     const n = new Notification({
       title: payload.workspaceName,

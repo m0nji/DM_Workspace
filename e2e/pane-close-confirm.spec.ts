@@ -2,7 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 
 test('asks before closing a pane and only closes after confirmation', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();

@@ -237,6 +237,54 @@ describe('workspace store actions', () => {
     expect(window.api.kill).not.toHaveBeenCalled();
   });
 
+  // A preset replaces the layout wholesale. Panes it displaces are unreachable
+  // afterwards, so their PTYs must be killed here or they run on in the main
+  // process until quit, with no id left in any layout to address them.
+  it('kills the PTYs of panes a preset replaces and drops their metadata', () => {
+    useStore.setState({
+      workspaces: [{
+        id: 'w1',
+        name: 'One',
+        cwd: '/tmp',
+        layout: {
+          type: 'split',
+          id: 's1',
+          direction: 'h',
+          ratio: 0.5,
+          children: [{ type: 'pane', id: 'old1' }, { type: 'pane', id: 'old2' }]
+        }
+      }],
+      activeWorkspaceId: 'w1',
+      paneStatus: { old1: 'busy', old2: 'done' },
+      paneCwd: { old1: '/tmp/a', old2: '/tmp/b' },
+      paneAutoTitles: { old1: 'build', old2: 'test' }
+    });
+
+    useStore.getState().applyPreset('1');
+
+    expect(window.api.kill).toHaveBeenCalledWith('old1');
+    expect(window.api.kill).toHaveBeenCalledWith('old2');
+    const state = useStore.getState();
+    expect(collectPaneIds(state.workspaces[0].layout)).not.toContain('old1');
+    expect(collectPaneIds(state.workspaces[0].layout)).not.toContain('old2');
+    expect(state.paneStatus).toEqual({});
+    expect(state.paneCwd).toEqual({});
+    expect(state.paneAutoTitles).toEqual({});
+  });
+
+  // The welcome screen is the only live caller, and it has no panes to displace.
+  it('applies a preset without killing anything when the workspace is empty', () => {
+    useStore.setState({
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: null }],
+      activeWorkspaceId: 'w1'
+    });
+
+    useStore.getState().applyPreset('1');
+
+    expect(window.api.kill).not.toHaveBeenCalled();
+    expect(collectPaneIds(useStore.getState().workspaces[0].layout)).toHaveLength(1);
+  });
+
   it('remaps pane titles and pending startup commands when the cwd change restarts panes', () => {
     useStore.setState({
       workspaces: [{

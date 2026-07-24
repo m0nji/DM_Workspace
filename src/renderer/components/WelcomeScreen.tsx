@@ -37,7 +37,7 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
       <div className="welcome-cwd">
         <span className="label">{t('welcome.workingDirectory')}</span>
         <code className="cwd-value" title={cwd}>{cwd}</code>
-        <button className="cwd-btn" onClick={chooseFolder}>{t('welcome.chooseFolder')}</button>
+        <button className="cwd-btn" onClick={() => void chooseFolder()}>{t('welcome.chooseFolder')}</button>
       </div>
       <label className="welcome-tasks-toggle">
         <input type="checkbox" checked={tasksEnabled}

@@ -12,6 +12,24 @@ import { windowIconFile } from './window-icon';
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
 
+// Last-resort crash guard, armed before anything else can throw.
+//
+// Electron's default for an uncaught main-process exception is to show the "A
+// JavaScript error occurred in the main process" dialog and terminate — which in
+// this app kills every running shell (builds, agents, ssh sessions) with no way
+// to recover them. Most single-shot IPC listeners (`ipcMain.on`) are one bad
+// payload away from that: unlike `ipcMain.handle`, a throw there is NOT captured
+// into a rejected promise. Nothing above the individual handler is load-bearing,
+// so logging and staying alive is strictly better than taking the sessions down.
+// Individual subsystems still handle their own expected failures (see
+// task-watcher.ts); this only catches what they miss.
+process.on('uncaughtException', (err) => {
+  console.error('[main] uncaught exception (kept alive to preserve terminal sessions):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] unhandled rejection:', reason);
+});
+
 function isAllowedPreviewUrl(raw: string): boolean {
   try {
     const { protocol } = new URL(raw);
@@ -133,11 +151,12 @@ function createWindow(): void {
     if (!isTrustedRendererNavigation(url, rendererUrl, devServerUrl)) event.preventDefault();
   });
 
-  if (devServerUrl) {
-    mainWindow.loadURL(devServerUrl);
-  } else {
-    mainWindow.loadFile(rendererFile);
-  }
+  // Beide load*-Aufrufe geben ein Promise zurück, das bei einem Ladefehler
+  // rejectet (Dev-Server nicht erreichbar, abgebrochene Navigation). Unbehandelt
+  // wäre das ein stiller Rejection auf ein leeres Fenster — protokollieren, damit
+  // der Grund sichtbar ist.
+  const load = devServerUrl ? mainWindow.loadURL(devServerUrl) : mainWindow.loadFile(rendererFile);
+  load.catch((err: unknown) => console.error('[main] renderer failed to load:', err));
 
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   mainWindow.on('closed', () => {
@@ -175,7 +194,7 @@ function createWindow(): void {
 const ipc = registerIpc(() => mainWindow);
 registerUpdater(() => mainWindow);
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   installAppMenu();
   createWindow();
 });
@@ -218,7 +237,7 @@ let ptyCleanupDone = false;
 app.on('before-quit', (event) => {
   if (ptyCleanupDone) return;
   event.preventDefault();
-  teardownPtys().then(() => {
+  void teardownPtys().then(() => {
     // E2E only: remove the temporary userData dir created for test isolation.
     // Best-effort: on Windows Chromium still holds files in the live profile
     // open at this point, so rmSync throws EPERM — and an uncaught throw here

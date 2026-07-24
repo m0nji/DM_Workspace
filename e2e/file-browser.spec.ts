@@ -10,7 +10,7 @@ test('file browser: set root, create a file, edit, save, verify on disk', async 
   writeFileSync(join(work, 'guide.md'), '# Guide\n\nHello from markdown', 'utf8');
 
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   try {
@@ -67,7 +67,7 @@ test('file browser: html files offer a preview that renders in the webview', asy
   writeFileSync(join(work, 'report.html'), '<!doctype html><title>t</title><h1>Hello from html</h1>', 'utf8');
 
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   try {
@@ -106,7 +106,7 @@ test('file browser: reopening jumps to the focused pane live cwd', async () => {
   mkdirSync(join(work, 'pane-dir'));
 
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   try {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
-  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection
+  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection,
+  LayoutNode
 } from '../shared/types';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
@@ -386,10 +387,22 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   applyPreset: (kind) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
     const layout = makePreset(kind, nextPaneId, nextSplitId);
+    // A preset replaces the layout wholesale, so any pane it displaces is gone.
+    // Today only the welcome screen (layout === null) can reach this, but the
+    // discarded panes' PTYs would otherwise keep running in the main process
+    // with nothing left to address them — unkillable until quit. Tear them down
+    // and drop their pane-keyed metadata, exactly as closeActivePane does.
+    const paneStatus = { ...s.paneStatus };
+    const paneCwd = { ...s.paneCwd };
+    const paneAutoTitles = { ...s.paneAutoTitles };
+    collectPaneIds(ws?.layout ?? null).forEach((pid) => {
+      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+    });
     const workspaces = s.workspaces.map((w) =>
       w.id === s.activeWorkspaceId ? { ...w, layout } : w);
-    const next = { ...s, workspaces };
+    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -639,7 +652,7 @@ export const useStore = create<StoreState>((set, get) => ({
       id: nextTemplateId(),
       name: input.name,
       cwd: input.cwd ?? ws.cwd,
-      layout: JSON.parse(JSON.stringify(ws.layout)),
+      layout: JSON.parse(JSON.stringify(ws.layout)) as LayoutNode,
       confirmStartupCommands: input.confirmStartupCommands
     };
     if (ws.color) template.color = ws.color;

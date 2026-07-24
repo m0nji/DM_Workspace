@@ -8,7 +8,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 // the wrapper (.xterm-host-wrap), which always follows the pane layout.
 test('terminal refits after a height-only pane resize via splitter drag', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();

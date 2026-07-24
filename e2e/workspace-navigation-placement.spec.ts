@@ -2,7 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 
 test('switches workspace navigation to top tabs from appearance settings', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();
@@ -37,7 +37,7 @@ test('switches workspace navigation to top tabs from appearance settings', async
 
 test('reorders workspaces by drag and drop in the sidebar and top tabs', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();

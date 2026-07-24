@@ -163,14 +163,14 @@ function cleanText(value: string): string {
 }
 
 const ACTION_WORD = /\b(?:add|analy[sz]|analysier|bau|beheb|build|change|check|commit|create|deploy|document|dokumentier|ergänz|erstell|entfern|find|fix|füg|implement|investigat|mach|migrat|migrier|optimier|optimiz|prüf|publish|refactor|release|remov|review|schreib|show|such|test|untersuch|update|veröffentlich|änder|zeig)[a-zäöüß-]*\b/i;
-const REQUEST_LEAD = /^(?:(?:(?:kannst|könntest|würdest)\s+du(?:\s+bitte)?|bitte|lass(?:t)?\s+uns|please|(?:can|could|would)\s+you(?:\s+please)?|let(?:'s|\s+us)|i(?:'d|\s+would)\s+like\s+(?:you\s+)?to|i\s+want\s+(?:you\s+)?to)\s*[,;:\-]?\s*)/i;
+const REQUEST_LEAD = /^(?:(?:(?:kannst|könntest|würdest)\s+du(?:\s+bitte)?|bitte|lass(?:t)?\s+uns|please|(?:can|could|would)\s+you(?:\s+please)?|let(?:'s|\s+us)|i(?:'d|\s+would)\s+like\s+(?:you\s+)?to|i\s+want\s+(?:you\s+)?to)\s*[,;:-]?\s*)/i;
 const GERMAN_INTENT_LEAD = /^ich\s+(?:möchte|würde(?:\s+gerne)?)(?:\s+gerne)?\s*,?\s*(?:dass\s+du\s+)?/i;
 const CONTEXT_LEAD = /^(?:als\s+hintergrund|hintergrund|kontext|wir\s+haben|es\s+gibt|for\s+context|context|we\s+have|there\s+(?:is|are))\b/i;
 
 function redactSensitiveValues(value: string): string {
   return value
     .replace(/\b(api[\s_-]?key|access[\s_-]?token|token|password|passwort|secret)\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '$1=[versteckt]')
-    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer [versteckt]');
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [versteckt]');
 }
 
 function compactLongPaths(value: string): string {

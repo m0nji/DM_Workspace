@@ -17,7 +17,7 @@ function launchEnv(): Record<string, string> {
 
 test('scrollback is replayed after a restart', async () => {
   // ---- Launch 1: create a single pane and run a command ----
-  const app1 = await electron.launch({ args: ['out/main/index.js'], env: launchEnv() });
+  const app1 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: launchEnv() });
   const win1 = await app1.firstWindow();
   await expect(win1.getByText('How many terminals do you want to open?')).toBeVisible();
   await win1.getByText('1 Pane').click();
@@ -33,7 +33,7 @@ test('scrollback is replayed after a restart', async () => {
   await app1.close();
 
   // ---- Launch 2: same userData → layout + scrollback restored ----
-  const app2 = await electron.launch({ args: ['out/main/index.js'], env: launchEnv() });
+  const app2 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: launchEnv() });
   const win2 = await app2.firstWindow();
   // Layout restores straight to a pane (no welcome screen).
   await expect(win2.locator('.pane .xterm-screen').first()).toBeVisible();

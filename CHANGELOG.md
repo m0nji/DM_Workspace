@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.34 – 2026-07-25
+- fix: An unexpected error inside the app's main process no longer takes the window down with every running terminal. Such an error used to end the process immediately, so builds, agents and SSH sessions died with it and could not be recovered. The process now survives and logs the problem instead, and the values the window sends to a terminal are checked before they are used, so a malformed one is discarded rather than ending it
+- fix: A failed save no longer leaves a stray `*.dmws-tmp-*` file behind — most visibly in a workspace's `.dmworkspace` folder next to TASKS.md
+- change: The update component moved to a release without a known credential-leak advisory in one of its dependencies. DM Workspace never sent credentials over that path, so no published version was affected
+
 ## 0.9.33 – 2026-07-24
 - fix: Automatic pane titles now work on Windows — the running shell command (an SSH session, a build) and Codex/Claude session summaries appear in the pane header just like on macOS. Windows' ConPTY enables terminal focus reporting, so every focus change (including the click into a pane before typing) sent a focus report through the same channel as your keystrokes; the title tracker took it for an unreconstructable line edit and discarded the whole command, leaving the header blank. These focus reports are now ignored
 

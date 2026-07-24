@@ -68,7 +68,7 @@ test('record demo frames', async () => {
   seedEnv();
 
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: {
       ...process.env,
       DMWS_USERDATA: join(REC, 'userdata'),

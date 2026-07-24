@@ -185,7 +185,10 @@ function migrateWorkspaceTemplate(raw: unknown): WorkspaceTemplate | undefined {
 
 export function deserialize(json: string): AppState {
   try {
-    const parsed = JSON.parse(json);
+    // Explizit unknown statt des impliziten any von JSON.parse: die Guards unten
+    // (isValidRoot, migrate*) sind die einzige Stelle, an der aus diesen Daten ein
+    // Typ wird — any würde sie stillschweigend umgehbar machen.
+    const parsed: unknown = JSON.parse(json);
     if (!isValidRoot(parsed)) return defaultState();
     const rawWorkspaces = parsed.workspaces as unknown[];
     const workspaces = rawWorkspaces

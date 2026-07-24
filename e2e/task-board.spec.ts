@@ -1,5 +1,5 @@
 import { test, expect, _electron as electron } from '@playwright/test';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, mkdirSync as mkdir } from 'fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -29,7 +29,7 @@ test('task board: opt-in, create persists to TASKS.md (+gitignore), external edi
   // ── 2. Launch Electron ────────────────────────────────────────────────────
   const env: Record<string, string> = { ...process.env, DMWS_USERDATA: userData } as Record<string, string>;
   delete env.DMWS_E2E; // don't let e2e isolation override our explicit userData dir
-  const app = await electron.launch({ args: ['out/main/index.js'], env });
+  const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env });
   const win = await app.firstWindow();
 
   // Welcome screen must appear (layout is null).

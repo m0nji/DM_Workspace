@@ -14,7 +14,7 @@ const BEL = '\x07';
 export const PS_CWD_BOOTSTRAP =
   "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
   "function global:prompt{$o=& $global:__dmwsPrompt;" +
-  `\"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}$([char]7)$o\"}`;
+  `"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}$([char]7)$o"}`;
 
 // Shells we know accept `-l` (login shell). POSIX shells get `-l` so
 // /etc/zprofile (path_helper) and the user's profile run — exactly like

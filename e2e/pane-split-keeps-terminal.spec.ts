@@ -7,7 +7,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 // "text tears when a new pane opens beside a running TUI" bug.
 test('split and close move the surviving terminal instead of remounting it', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     // DOM renderer so terminal text is readable from .xterm-rows.
     env: { ...process.env, DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1' }
   });

@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 
 test('shows the active shell command and clears it when the prompt returns', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();
@@ -45,7 +45,7 @@ test('shows the active shell command and clears it when the prompt returns', asy
 
 test('collapses the folder to its last segment when the pane becomes narrow', async () => {
   const app = await electron.launch({
-    args: ['out/main/index.js'],
+    args: ['out/main/index.js', '--lang=en-US'],
     env: { ...process.env, DMWS_E2E: '1' }
   });
   const win = await app.firstWindow();
