@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.35 – 2026-07-25
+- change: The sidebar and the settings panes now read as one calm surface each — a single rounded frame around plain entries, instead of a filled panel with a divider line doing the same separating job twice. The settings options sit in one continuous frame rather than a separate box per section, and the line above the sidebar footer gave way to spacing. This follows the DM Apps design rule introduced with DM Screenshot 0.9.0, so all DM apps look alike
+
 ## 0.9.34 – 2026-07-25
 - fix: An unexpected error inside the app's main process no longer takes the window down with every running terminal. Such an error used to end the process immediately, so builds, agents and SSH sessions died with it and could not be recovered. The process now survives and logs the problem instead, and the values the window sends to a terminal are checked before they are used, so a malformed one is discarded rather than ending it
 - fix: A failed save no longer leaves a stray `*.dmws-tmp-*` file behind — most visibly in a workspace's `.dmworkspace` folder next to TASKS.md

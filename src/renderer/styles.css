@@ -230,9 +230,14 @@ body {
 /* Everything below the titlebar must stay interactive (no-drag). */
 .app, .sidebar, .workspace-view, .workspace-tabs { -webkit-app-region: no-drag; }
 
+/* Grouped surface (DM_CICD 05_ui_system/components.md, 2026-07-25): ONE rounded
+   outline holding plain rows. No fill — the app background runs through it, so the
+   frame alone marks the group and no edge is drawn twice. The old border-right plus
+   panel fill did the separating job a second time. */
 .sidebar {
-  width: 200px; flex-shrink: 0; background: var(--panel);
-  border-right: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column;
+  width: 200px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-large);
+  margin: 8px; padding: 6px; display: flex; flex-direction: column;
 }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center;
   color: var(--muted); font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }
@@ -337,8 +342,10 @@ body {
 }
 .add-workspace-tab:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 
+/* No rule above the footer: it would draw a second edge inside a group whose own
+   outline already bounds it. Groups are separated by space. */
 .sidebar-footer { margin-top: auto; display: flex; align-items: center;
-  justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); }
+  justify-content: space-between; padding-top: 14px; }
 .app-version { color: var(--muted); font-size: 11px; background: none; border: none;
   cursor: pointer; padding: 2px 4px; border-radius: 4px; font-family: inherit; }
 .app-version:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
@@ -414,10 +421,12 @@ body {
    the left nav stays put and only the content area scrolls. */
 .modal.settings-modal { width: 640px; max-width: 92vw; height: min(620px, 85vh);
   display: flex; flex-direction: column; overflow: hidden; }
-.settings-body { display: flex; gap: 20px; align-items: stretch; flex: 1; min-height: 0; }
+.settings-body { display: flex; gap: 8px; align-items: stretch; flex: 1; min-height: 0; }
+/* Grouped surface, like the sidebar: one outline around plain rows. */
 .settings-nav {
   display: flex; flex-direction: column; gap: 2px;
   min-width: 150px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 6px;
 }
 .settings-nav-item {
   text-align: left; padding: 8px 12px; border-radius: 7px;
@@ -426,7 +435,10 @@ body {
 }
 .settings-nav-item:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 .settings-nav-item.active { color: var(--accent); background: var(--accent-soft); }
-.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+/* ONE grouped surface around the whole content area — the frame stays put while the
+   sections scroll inside it. A frame per section would stack outline on outline. */
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 12px; }
 .settings-group { margin-bottom: 14px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
