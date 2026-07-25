@@ -236,14 +236,31 @@ body {
 /* Everything below the titlebar must stay interactive (no-drag). */
 .app, .sidebar, .workspace-view, .workspace-tabs { -webkit-app-region: no-drag; }
 
-/* Grouped surface (DM_CICD 05_ui_system/components.md, 2026-07-25): ONE rounded
-   outline holding plain rows. No fill — the app background runs through it, so the
-   frame alone marks the group and no edge is drawn twice. The old border-right plus
-   panel fill did the separating job a second time. */
+/* Grouped surface (DM_CICD 05_ui_system/components.md, 2026-07-25): the group is
+   marked exactly ONCE and holds plain rows. Here that one marker is the FILL —
+   flush and square, no hairline and no floating rounded card. Both departures
+   from the literal rule are forced by what sits around this element:
+   1. FILL, not an outline. The rule's outline-only variant assumes an app
+      background shows through the group. This app has none: body is deliberately
+      transparent so the macOS window vibrancy can reach the translucent
+      terminals. An unfilled sidebar therefore falls through to the system's
+      neutral-gray vibrancy material and drops out of the brand palette. Windows
+      hides that behind its opaque #090908 window — which is why 0.9.34–0.9.39
+      looked right there and wrong on macOS. With the fill present, a border
+      would mark the same edge a second time, so there is none.
+   2. FLUSH, not a floating card. A card needs air on every side, but the pane
+      grid beside it runs edge to edge (.workspace-view / .ws-host /
+      .split-container are all inset: 0). `margin: 8px` made this group 16px
+      shorter than those panes with its corners 8px adrift — loud on the opaque,
+      square Windows window, merely softened by the rounded, translucent macOS
+      one. Sharing one top and one bottom edge with the grid is what keeps the
+      two surfaces reading as one chrome.
+   The settings nav/content DO get the rounded outline: they float inside a modal
+   that gives them both the opaque backdrop and the air this one lacks. */
 .sidebar {
   width: 200px; flex-shrink: 0;
-  border: 1px solid var(--border); border-radius: var(--radius-large);
-  margin: 8px; padding: 6px; display: flex; flex-direction: column;
+  background: var(--panel);
+  padding: 8px; display: flex; flex-direction: column;
 }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center;
   color: var(--muted); font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }

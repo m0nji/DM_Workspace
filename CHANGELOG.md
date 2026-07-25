@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.40 – 2026-07-25
+- fix: The workspace sidebar lines up with the terminal panes again and is back in the app's own colour. Version 0.9.35 turned it into a floating rounded frame with no fill: it ended up 16 pixels shorter than the panes next to it with its corners 8 pixels off, because those panes run right to the window edge and leave no matching air for a frame that floats. The missing fill also let the macOS window's translucency shine through, so the sidebar was painted in the system's neutral grey instead of the app's warm palette — on Windows the opaque window hid that, which is why it only showed on the Mac. The sidebar is now one filled surface over the full window height. The settings panes keep their rounded frame; they sit inside a dialog that gives them the backdrop and the spacing the sidebar never had
+
 ## 0.9.39 – 2026-07-25
 - fix: On Windows a save no longer gets lost when another program briefly holds the file. Windows refuses to replace a file while something else has it open, and that happens routinely there — the virus scanner inspects every freshly written file, so a save could collide with the scan of the one before it. The app now waits a moment and tries again instead of dropping the write; previously a pane's terminal history could quietly fail to be stored and the next launch would bring back an older state
 - change: Every message the window sends to the app's core is now checked for where it came from. Only the app's own window is meant to reach file and terminal operations, and only it can — but nothing verified that, so a later change could have opened the door without anyone noticing. The rule is now enforced rather than assumed
