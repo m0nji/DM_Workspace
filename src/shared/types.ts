@@ -186,6 +186,10 @@ export interface RendererApi {
   disableWebgl: boolean;
   // e2e-only: true when launched with DMWS_E2E=1, gates the window.__store hook
   isE2E: boolean;
+  // Authenticates the local shell prompt marker — only a marker carrying this
+  // value arms the auto-title tracker. '' means "trust none" (see
+  // shared/prompt-nonce.ts and main/prompt-nonce.ts).
+  promptNonce: string;
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;

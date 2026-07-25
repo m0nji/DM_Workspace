@@ -180,6 +180,26 @@ describe('pane title helpers', () => {
     expect(detectAgentCommand('echo claude')).toBeNull();
   });
 
+  it('keeps quoted tokens together when picking the executable', () => {
+    expect(detectAgentCommand('"/opt/my tools/claude" --help')).toBe('claude');
+    expect(detectAgentCommand("'/opt/my tools/codex' run")).toBe('codex');
+    expect(detectAgentCommand('echo "claude" && codex')).toBe('codex');
+    // A backslash-escaped quote stays inside the token instead of ending it.
+    expect(detectAgentCommand('echo "a\\"claude" ; codex')).toBe('codex');
+  });
+
+  // The tokenizer runs synchronously in the renderer on every submitted command
+  // line, so a pathological input freezes the UI. The old quoted-token pattern
+  // was ambiguous on a backslash (both alternatives matched it), which made an
+  // unterminated quote followed by a run of backslashes take exponential time —
+  // 26 of them already cost 1.4 s, and every further one doubled it.
+  it('tokenizes an unterminated quote with many backslashes in linear time', () => {
+    const evil = `x "${'\\'.repeat(2000)}`;
+    const started = Date.now();
+    expect(detectAgentCommand(evil)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it('collapses whitespace and shortens command and prompt titles at word boundaries', () => {
     expect(commandTitle('  ssh   root@example.test  ')).toBe('ssh root@example.test');
     expect(promptTitle('# Fix the login bug. Then deploy it.')).toBe('Fix the login bug');
@@ -191,6 +211,24 @@ describe('pane title helpers', () => {
       .toBe('Den Login-Fehler analysieren und Regressionstests ergänzen?');
     expect(promptTitle('I would like you to please fix the panel title and add tests.'))
       .toBe('Fix the panel title and add tests');
+  });
+
+  // A command title is not just shown in the header: when notifications are on
+  // it becomes the body of an OS notification, which macOS keeps in Notification
+  // Center and can show on the lock screen. Anything secret on the command line
+  // must be gone before it gets that far — the prompt path already does this.
+  it('redacts secrets on the command line, including env-var prefixed names', () => {
+    expect(commandTitle('export GITHUB_TOKEN=ghp_realsecret && claude'))
+      .toBe('export GITHUB_TOKEN=[versteckt] && claude');
+    expect(commandTitle('PGPASSWORD=hunter2 psql -h db')).toBe('PGPASSWORD=[versteckt] psql -h db');
+    expect(commandTitle('curl -H "Authorization: Bearer abc.def-123"'))
+      .toBe('curl -H "Authorization: Bearer [versteckt]"');
+    expect(commandTitle('deploy --api-key "s3cr3t value"')).toBe('deploy --api-key=[versteckt]');
+  });
+
+  it('leaves ordinary commands untouched', () => {
+    expect(commandTitle('git commit -m "fix the login bug"')).toBe('git commit -m "fix the login bug"');
+    expect(commandTitle('npm run build -- --watch')).toBe('npm run build -- --watch');
   });
 
   it('redacts common secret values before displaying a prompt title', () => {

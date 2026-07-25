@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { promptNonceFromArgv } from '../shared/prompt-nonce';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
   PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload
@@ -82,6 +83,9 @@ const api: RendererApi = {
   platform: process.platform,
   disableWebgl: process.env.DMWS_DISABLE_WEBGL === '1',
   isE2E: process.env.DMWS_E2E === '1',
+  // Authenticates the local shell prompt marker; '' when absent, which makes
+  // the renderer trust no marker at all (see shared/pane-auto-title).
+  promptNonce: promptNonceFromArgv(process.argv),
   notifyAgentDone: (payload: AgentDonePayload) => ipcRenderer.send('notify:agentDone', payload),
   onWindowFocus: (cb: (focused: boolean) => void) => {
     const handler = (_e: unknown, focused: boolean) => cb(focused);

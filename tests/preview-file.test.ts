@@ -16,6 +16,14 @@ describe('readPreviewFile', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  // The renderer already refuses UNC targets, but this is the process that
+  // actually touches the disk: a "//host/share/notes.md" reaching here would
+  // make Windows fetch it over SMB and leak the user's NTLM hash to that host.
+  it('refuses a UNC path before touching the filesystem', () => {
+    expect(() => readPreviewFile('//attacker.example/share/notes.md')).toThrow('local');
+    expect(() => readPreviewFile('\\\\attacker.example\\share\\notes.md')).toThrow('local');
+  });
+
   it('rejects preview files over the byte cap', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dmws-preview-'));
     const file = join(dir, 'huge.md');

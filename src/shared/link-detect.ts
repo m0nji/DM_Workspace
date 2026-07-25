@@ -86,8 +86,37 @@ export function pathEndsWith(abs: string, rel: string): boolean {
   return true;
 }
 
+// A path opening with two separators is a UNC path ("//server/share",
+// "\\server\share"). Links come from untrusted terminal output, and on Windows
+// opening one makes the OS fetch it over SMB from the named host — which
+// auto-negotiates NTLM and hands that host the user's password hash. Chromium
+// does it for a <webview src>, readFileSync does it for a markdown preview.
+// Nothing legitimate in a preview names a remote host, so these are refused
+// outright rather than sanitized.
+export function isUncPath(raw: string): boolean {
+  return /^[\\/]{2}/.test(raw);
+}
+
+// Which URLs the preview <webview> may attach to. Lives here next to
+// resolveSource — the place that builds these targets — so the policy and the
+// construction stay in one file; the main process enforces it at attach time.
+export function isAllowedPreviewUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return true;
+    if (url.protocol !== 'file:') return false;
+    // A file: URL must stay local: no authority, and no path that re-introduces
+    // one by starting with a second slash ("file:////host/share" parses to an
+    // empty host with a "//host/share" path, which Windows resolves as UNC).
+    return url.host === '' && !url.pathname.startsWith('//');
+  } catch {
+    return false;
+  }
+}
+
 export function resolveSource(raw: string, cwd: string): PreviewSource | null {
   if (/^https?:\/\//i.test(raw)) return { kind: 'web', target: raw, resolved: true };
+  if (isUncPath(raw)) return null;
 
   const rel = isAbsolute(raw) ? undefined : raw;
   const abs = isAbsolute(raw) ? raw : joinPath(cwd, raw);

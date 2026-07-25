@@ -33,7 +33,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { createResizeScheduler } from '../resize-scheduler';
 import { createSaveScheduler, type SaveScheduler } from '../save-scheduler';
 import {
-  createPaneAutoTitleTracker, DMWS_PROMPT_OSC, DMWS_PROMPT_PAYLOAD
+  createPaneAutoTitleTracker, DMWS_PROMPT_OSC, isPromptPayload
 } from '../../shared/pane-auto-title';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
@@ -262,7 +262,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // OSC 7, it is not forwarded by a remote SSH shell, so it safely tells the
     // title tracker when a command ended and the local prompt is ready again.
     term.parser.registerOscHandler(DMWS_PROMPT_OSC, (data) => {
-      if (data === DMWS_PROMPT_PAYLOAD) {
+      // Only a marker carrying this launch's nonce counts: the sequence is
+      // plain bytes in the output stream, so without that check any program —
+      // or the remote end of an ssh session — could print it and re-arm title
+      // capture for the next line the user types (a sudo password).
+      if (isPromptPayload(data, window.api.promptNonce)) {
         autoTitleTracker.onShellPrompt();
         // The local prompt is on screen, so no full-screen program owns the
         // terminal: an alt screen or mouse tracking still active here is stale —

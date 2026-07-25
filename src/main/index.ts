@@ -8,6 +8,10 @@ import { isBoundsVisible } from './window-bounds';
 import { registerUpdater } from './updater';
 import { installAppMenu } from './menu';
 import { windowIconFile } from './window-icon';
+import { isAllowedPreviewUrl } from '../shared/link-detect';
+import { installPermissionGuards } from './permissions';
+import { promptNonce } from './prompt-nonce';
+import { PROMPT_NONCE_FLAG } from '../shared/prompt-nonce';
 
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
@@ -30,15 +34,6 @@ process.on('unhandledRejection', (reason) => {
   console.error('[main] unhandled rejection:', reason);
 });
 
-function isAllowedPreviewUrl(raw: string): boolean {
-  try {
-    const { protocol } = new URL(raw);
-    return protocol === 'file:' || protocol === 'http:' || protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function isTrustedRendererNavigation(raw: string, rendererUrl: string, devServerUrl: string | undefined): boolean {
   try {
     const next = new URL(raw);
@@ -54,6 +49,11 @@ function isTrustedRendererNavigation(raw: string, rendererUrl: string, devServer
 // sandboxed and context-isolated, so untrusted page content can't reach the host.
 app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // Refuse every browser permission on this contents' session (see
+  // permissions.ts). Installed here rather than once on defaultSession so a
+  // webview on its own partition is covered too; re-installing is idempotent.
+  installPermissionGuards(contents.session);
 
   // A file dropped anywhere on the window must never navigate the app to that
   // file (Electron's default). Our drop handlers preventDefault, but this is the
@@ -135,6 +135,11 @@ function createWindow(): void {
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      // The renderer must know this launch's prompt nonce to tell the local
+      // shell hook's marker from one a program printed (see prompt-nonce.ts).
+      // Passed as a launch argument because the preload runs sandboxed and
+      // cannot import main-process modules.
+      additionalArguments: [`${PROMPT_NONCE_FLAG}${promptNonce()}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

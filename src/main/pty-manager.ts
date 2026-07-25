@@ -5,6 +5,7 @@ import { resolveCwd } from './resolve-cwd';
 import { app } from 'electron';
 import { join } from 'path';
 import { bashPromptCommand, shellArgs, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
+import { promptNonce } from './prompt-nonce';
 
 export interface SpawnOptions {
   cwd: string;
@@ -23,7 +24,7 @@ function defaultShell(): string {
 let zshIntegrationDir: string | null = null;
 function ensureZshIntegrationDir(): string {
   if (zshIntegrationDir === null) {
-    zshIntegrationDir = writeZshIntegrationDir(join(app.getPath('userData'), 'shell-integration', 'zsh'));
+    zshIntegrationDir = writeZshIntegrationDir(join(app.getPath('userData'), 'shell-integration', 'zsh'), promptNonce());
   }
   return zshIntegrationDir;
 }
@@ -76,7 +77,8 @@ function cwdHookEnv(shell: string): Record<string, string> {
   // bash / other POSIX shells — prepend our hook to any inherited PROMPT_COMMAND
   // rather than discarding it.
   const inherited = process.env.PROMPT_COMMAND;
-  base.PROMPT_COMMAND = inherited ? `${bashPromptCommand()};${inherited}` : bashPromptCommand();
+  const hook = bashPromptCommand(promptNonce());
+  base.PROMPT_COMMAND = inherited ? `${hook};${inherited}` : hook;
   return base;
 }
 
@@ -94,7 +96,7 @@ export class PtyManager {
   spawn(paneId: string, opts: SpawnOptions): void {
     if (this.procs.has(paneId)) return;
     const shell = opts.shell || defaultShell();
-    const proc = pty.spawn(shell, shellArgs(shell), {
+    const proc = pty.spawn(shell, shellArgs(shell, promptNonce()), {
       // xterm-256color + COLORTERM=truecolor so programs render full color (e.g.
       // Claude Code's logo shows orange instead of the 16-color red fallback).
       name: 'xterm-256color',

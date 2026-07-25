@@ -1,6 +1,35 @@
 export const DMWS_PROMPT_OSC = 777;
-export const DMWS_PROMPT_PAYLOAD = 'dmws-prompt';
-export const DMWS_PROMPT_SEQUENCE = `\x1b]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}\x07`;
+
+// The private marker the LOCAL shell hook prints at every prompt. It is what
+// arms the title tracker, i.e. what makes the next typed line eligible to
+// become the pane title (and, with notifications on, an OS notification body).
+//
+// The payload therefore has to be unforgeable by anything that can merely WRITE
+// to the terminal — a malicious CLI, or the remote end of an ssh session. A
+// fixed public string was not: printing it re-armed capture at will, so a faked
+// "sudo password:" prompt got the victim's password into the title. It now
+// carries a per-launch nonce that only the installed hook knows; the nonce
+// lives in the local shell's environment / startup files, is not forwarded over
+// ssh, and never appears in the output stream an attacker can observe.
+//
+// (A malicious program running INSIDE that local shell can still read its own
+// environment and forge the marker. Closing that would need a channel outside
+// the PTY; such a program can already do far worse in the user's session.)
+const DMWS_PROMPT_PREFIX = 'dmws-prompt:';
+
+export function promptPayload(nonce: string): string {
+  return `${DMWS_PROMPT_PREFIX}${nonce}`;
+}
+
+export function promptSequence(nonce: string): string {
+  return `\x1b]${DMWS_PROMPT_OSC};${promptPayload(nonce)}\x07`;
+}
+
+// Fail closed: an empty nonce authenticates nothing, so nothing is trusted —
+// auto-titles stop rather than silently going back to a forgeable marker.
+export function isPromptPayload(data: string, nonce: string): boolean {
+  return nonce.length > 0 && data === promptPayload(nonce);
+}
 
 type AgentKind = 'claude' | 'codex';
 
@@ -167,9 +196,18 @@ const REQUEST_LEAD = /^(?:(?:(?:kannst|könntest|würdest)\s+du(?:\s+bitte)?|bit
 const GERMAN_INTENT_LEAD = /^ich\s+(?:möchte|würde(?:\s+gerne)?)(?:\s+gerne)?\s*,?\s*(?:dass\s+du\s+)?/i;
 const CONTEXT_LEAD = /^(?:als\s+hintergrund|hintergrund|kontext|wir\s+haben|es\s+gibt|for\s+context|context|we\s+have|there\s+(?:is|are))\b/i;
 
+// The keyword may carry a prefix ("GITHUB_TOKEN", "PGPASSWORD", "--api-key"):
+// on a command line that is the usual shape, and a plain \b would not match
+// there because '_' and letters are word characters. The prefix is kept in the
+// output so the title still says WHICH value was hidden.
 function redactSensitiveValues(value: string): string {
   return value
-    .replace(/\b(api[\s_-]?key|access[\s_-]?token|token|password|passwort|secret)\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '$1=[versteckt]')
+    .replace(/([A-Za-z0-9_]*(?:api[\s_-]?key|access[\s_-]?token|token|password|passwort|secret))\s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|\S+)/gi, '$1=[versteckt]')
+    // Flag form, where the value follows as a separate argument
+    // (`--api-key s3cr3t`). Deliberately limited to flags: allowing a bare
+    // keyword plus whitespace would swallow ordinary prose like "fix the
+    // password validation", which runs through here as a prompt title too.
+    .replace(/(--?[A-Za-z0-9-]*(?:api[\s_-]?key|token|password|passwort|secret)[A-Za-z0-9-]*)\s+(?:"[^"]*"|'[^']*'|\S+)/gi, '$1=[versteckt]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [versteckt]');
 }
 
@@ -215,7 +253,12 @@ function shorten(value: string, maxLength: number): string {
 }
 
 export function commandTitle(command: string, maxLength = 84): string {
-  return shorten(command, maxLength);
+  // Redacted like a prompt title, and for a sharper reason: this string is the
+  // reconstructed command LINE, where secrets are typed in the clear
+  // (`export GITHUB_TOKEN=…`, `PGPASSWORD=… psql`). It ends up in the pane
+  // header and, with notifications on, in the OS notification body — which
+  // outlives the terminal line in Notification Center and on the lock screen.
+  return shorten(redactSensitiveValues(command), maxLength);
 }
 
 export function promptTitle(prompt: string, maxLength = 64): string {
@@ -250,7 +293,13 @@ export function detectAgentCommand(command: string): AgentKind | null {
   // Inspect the executable position of each shell segment, so `echo claude`
   // does not look like an agent while `cd repo && claude` still does.
   for (const segment of command.split(/(?:&&|\|\||[;|])/)) {
-    const tokens = segment.match(/"(?:\\.|[^"])*"|'[^']*'|[^\s]+/g)?.map(unquote) ?? [];
+    // The double-quote alternative is written "unrolled" — a run of harmless
+    // chars, then escape+char, repeated — so every position matches exactly one
+    // way. The obvious `(?:\\.|[^"])*` is ambiguous on a backslash (both
+    // branches match it), and an unterminated quote followed by n backslashes
+    // then costs 2^n steps of backtracking: 26 of them already froze the
+    // renderer for 1.4 s, which any command line reaching here can trigger.
+    const tokens = segment.match(/"[^"\\]*(?:\\.[^"\\]*)*"|'[^']*'|[^\s]+/g)?.map(unquote) ?? [];
     let i = 0;
     while (i < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i])) i++;
     if (executableName(tokens[i] ?? '') === 'env') {

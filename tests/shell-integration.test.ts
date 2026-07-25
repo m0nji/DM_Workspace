@@ -1,38 +1,43 @@
 import { describe, it, expect } from 'vitest';
-import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, PS_CWD_BOOTSTRAP } from '../src/main/shell-integration';
-import { DMWS_PROMPT_OSC, DMWS_PROMPT_PAYLOAD } from '../src/shared/pane-auto-title';
+import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, psCwdBootstrap } from '../src/main/shell-integration';
+import { DMWS_PROMPT_OSC, promptPayload } from '../src/shared/pane-auto-title';
+
+// Every hook embeds this launch's nonce, so the marker it prints cannot be
+// reproduced by a program that only sees the terminal's output stream.
+const NONCE = 'deadbeefcafe';
+const MARKER = `]${DMWS_PROMPT_OSC};${promptPayload(NONCE)}`;
 
 describe('shellArgs', () => {
   it('passes the OSC 9;9 cwd bootstrap to PowerShell (any spelling or path)', () => {
-    expect(shellArgs('powershell.exe')).toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
-    expect(shellArgs('pwsh')).toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
-    expect(shellArgs('C:\\Program Files\\PowerShell\\7\\pwsh.exe'))
-      .toEqual(['-NoExit', '-Command', PS_CWD_BOOTSTRAP]);
+    expect(shellArgs('powershell.exe', NONCE)).toEqual(['-NoExit', '-Command', psCwdBootstrap(NONCE)]);
+    expect(shellArgs('pwsh', NONCE)).toEqual(['-NoExit', '-Command', psCwdBootstrap(NONCE)]);
+    expect(shellArgs('C:\\Program Files\\PowerShell\\7\\pwsh.exe', NONCE))
+      .toEqual(['-NoExit', '-Command', psCwdBootstrap(NONCE)]);
   });
 
   it('launches POSIX shells as login shells', () => {
-    expect(shellArgs('/bin/zsh')).toEqual(['-l']);
-    expect(shellArgs('/usr/bin/bash')).toEqual(['-l']);
-    expect(shellArgs('fish')).toEqual(['-l']);
+    expect(shellArgs('/bin/zsh', NONCE)).toEqual(['-l']);
+    expect(shellArgs('/usr/bin/bash', NONCE)).toEqual(['-l']);
+    expect(shellArgs('fish', NONCE)).toEqual(['-l']);
   });
 
   it('gives git-bash on Windows the login flag, not PowerShell args', () => {
-    expect(shellArgs('C:\\Program Files\\Git\\bin\\bash.exe')).toEqual(['-l']);
+    expect(shellArgs('C:\\Program Files\\Git\\bin\\bash.exe', NONCE)).toEqual(['-l']);
   });
 
   it('passes no flags to cmd.exe', () => {
-    expect(shellArgs('cmd.exe')).toEqual([]);
-    expect(shellArgs('C:\\Windows\\System32\\cmd.exe')).toEqual([]);
+    expect(shellArgs('cmd.exe', NONCE)).toEqual([]);
+    expect(shellArgs('C:\\Windows\\System32\\cmd.exe', NONCE)).toEqual([]);
   });
 });
 
 describe('bashPromptCommand', () => {
   it('emits an OSC 7 file:// sequence using $HOSTNAME and $PWD', () => {
-    const pc = bashPromptCommand();
+    const pc = bashPromptCommand(NONCE);
     expect(pc).toContain(']7;file://');
     expect(pc).toContain('$HOSTNAME');
     expect(pc).toContain('$PWD');
-    expect(pc).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
+    expect(pc).toContain(MARKER);
     // raw ESC + BEL, not the escaped \e/\a literals (env vars are not shell-parsed)
     expect(pc).toContain('\x1b');
     expect(pc).toContain('\x07');
@@ -41,7 +46,7 @@ describe('bashPromptCommand', () => {
 
 describe('zshIntegrationFiles', () => {
   const dir = '/tmp/dmws-int';
-  const files = zshIntegrationFiles(dir);
+  const files = zshIntegrationFiles(dir, NONCE);
 
   it('produces the four zsh startup files', () => {
     expect(Object.keys(files).sort()).toEqual(['.zlogin', '.zprofile', '.zshenv', '.zshrc']);
@@ -51,11 +56,11 @@ describe('zshIntegrationFiles', () => {
     expect(files['.zshrc']).toContain('_DMWS_USER_ZDOTDIR');
     expect(files['.zshrc']).toContain('precmd_functions+=(__dmws_cwd)');
     expect(files['.zshrc']).toContain(']7;file://');
-    expect(files['.zshrc']).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
+    expect(files['.zshrc']).toContain(MARKER);
   });
 
   it('PowerShell emits the private local-prompt marker alongside its cwd', () => {
-    expect(PS_CWD_BOOTSTRAP).toContain(`]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}`);
+    expect(psCwdBootstrap(NONCE)).toContain(MARKER);
   });
 
   it('.zshenv re-pins ZDOTDIR to the integration dir after sourcing the user file', () => {
@@ -63,7 +68,7 @@ describe('zshIntegrationFiles', () => {
   });
 
   it('escapes single quotes in the integration dir path', () => {
-    const f = zshIntegrationFiles("/tmp/o'brien/zsh");
+    const f = zshIntegrationFiles("/tmp/o'brien/zsh", NONCE);
     // the embedded path must use POSIX '\'' escaping, not a raw single quote
     expect(f['.zshenv']).toContain(`ZDOTDIR='/tmp/o'\\''brien/zsh'`);
   });

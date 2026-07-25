@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { DMWS_PROMPT_OSC, DMWS_PROMPT_PAYLOAD, DMWS_PROMPT_SEQUENCE } from '../shared/pane-auto-title';
+import { DMWS_PROMPT_OSC, promptPayload, promptSequence } from '../shared/pane-auto-title';
 
 // Raw control bytes for the OSC 7 cwd report. ESC ] 7 ; file://HOST PATH BEL.
 const ESC = '\x1b';
@@ -11,10 +11,11 @@ const BEL = '\x07';
 // wraps (rather than replaces) the existing prompt, so a custom prompt is kept.
 // $([char]27) = ESC, $([char]7) = BEL (the OSC terminator). Passed as a single
 // argv element, so no extra shell-quoting is needed.
-export const PS_CWD_BOOTSTRAP =
-  "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
-  "function global:prompt{$o=& $global:__dmwsPrompt;" +
-  `"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${DMWS_PROMPT_PAYLOAD}$([char]7)$o"}`;
+export function psCwdBootstrap(nonce: string): string {
+  return "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
+    "function global:prompt{$o=& $global:__dmwsPrompt;" +
+    `"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${promptPayload(nonce)}$([char]7)$o"}`;
+}
 
 // Shells we know accept `-l` (login shell). POSIX shells get `-l` so
 // /etc/zprofile (path_helper) and the user's profile run — exactly like
@@ -23,10 +24,10 @@ const POSIX_SHELLS = new Set(['bash', 'zsh', 'fish', 'sh', 'dash', 'ksh']);
 
 // Spawn args for the shell we actually launch — NOT for the platform. A custom
 // shell (cmd.exe, git-bash) must never receive the PowerShell bootstrap flags.
-export function shellArgs(shell: string): string[] {
+export function shellArgs(shell: string, nonce: string): string[] {
   // Manual basename: node's posix basename would not split a Windows path.
   const base = (shell.split(/[\\/]/).pop() ?? shell).toLowerCase().replace(/\.exe$/, '');
-  if (base === 'powershell' || base === 'pwsh') return ['-NoExit', '-Command', PS_CWD_BOOTSTRAP];
+  if (base === 'powershell' || base === 'pwsh') return ['-NoExit', '-Command', psCwdBootstrap(nonce)];
   if (base === 'cmd') return []; // cmd.exe has no -l and would choke on PS flags
   if (POSIX_SHELLS.has(base)) return ['-l'];
   // Unknown shell: assume login-shell support on POSIX (the previous behaviour
@@ -39,8 +40,8 @@ export function shellArgs(shell: string): string[] {
 // echoing a typed command into the terminal (the old stdin-injection did).
 // $HOSTNAME/$PWD are expanded by bash at prompt time, so they stay as literals
 // here; the ESC/BEL are raw bytes (env values are not shell-parsed).
-export function bashPromptCommand(): string {
-  return `printf '${ESC}]7;file://%s%s${BEL}${DMWS_PROMPT_SEQUENCE}' "$HOSTNAME" "$PWD"`;
+export function bashPromptCommand(nonce: string): string {
+  return `printf '${ESC}]7;file://%s%s${BEL}${promptSequence(nonce)}' "$HOSTNAME" "$PWD"`;
 }
 
 // zsh has no equivalent env hook, so we point ZDOTDIR at a generated dir holding
@@ -49,7 +50,7 @@ export function bashPromptCommand(): string {
 // precmd hook. .zshenv re-pins ZDOTDIR to our dir *after* sourcing the user's
 // .zshenv, so a user .zshenv that changes ZDOTDIR can't divert the later files.
 // The integration dir path is embedded as a literal because we generate the file.
-export function zshIntegrationFiles(dir: string): Record<string, string> {
+export function zshIntegrationFiles(dir: string, nonce: string): Record<string, string> {
   const source = (name: string) =>
     `case "$_DMWS_USER_ZDOTDIR" in ""|"$ZDOTDIR"|*/shell-integration/zsh) ;; *) [ -f "$_DMWS_USER_ZDOTDIR/${name}" ] && . "$_DMWS_USER_ZDOTDIR/${name}" ;; esac\n`;
   // POSIX-safe single-quote escaping for embedding dir inside a '...' literal:
@@ -60,7 +61,7 @@ export function zshIntegrationFiles(dir: string): Record<string, string> {
     '.zprofile': source('.zprofile'),
     '.zshrc':
       source('.zshrc') +
-      `__dmws_cwd(){ printf '${ESC}]7;file://%s%s${BEL}${DMWS_PROMPT_SEQUENCE}' "$HOST" "$PWD"; }\n` +
+      `__dmws_cwd(){ printf '${ESC}]7;file://%s%s${BEL}${promptSequence(nonce)}' "$HOST" "$PWD"; }\n` +
       `precmd_functions+=(__dmws_cwd)\n`,
     '.zlogin': source('.zlogin')
   };
@@ -68,9 +69,9 @@ export function zshIntegrationFiles(dir: string): Record<string, string> {
 
 // Write the zsh integration files into `dir` (created if needed) and return the
 // dir. Idempotent — safe to call once per app launch.
-export function writeZshIntegrationDir(dir: string): string {
+export function writeZshIntegrationDir(dir: string, nonce: string): string {
   mkdirSync(dir, { recursive: true });
-  const files = zshIntegrationFiles(dir);
+  const files = zshIntegrationFiles(dir, nonce);
   for (const [name, content] of Object.entries(files)) {
     writeFileSync(join(dir, name), content, 'utf8');
   }

@@ -1,6 +1,6 @@
 // tests/link-detect.test.ts
 import { describe, it, expect } from 'vitest';
-import { findLinks, resolveSource, fileTarget, pathEndsWith, isPreviewableFile } from '../src/shared/link-detect';
+import { findLinks, resolveSource, fileTarget, pathEndsWith, isPreviewableFile, isAllowedPreviewUrl } from '../src/shared/link-detect';
 
 describe('findLinks', () => {
   it('finds an http(s) URL in a line', () => {
@@ -63,6 +63,45 @@ describe('resolveSource', () => {
   it('resolves .markdown and .mdx as markdown', () => {
     expect(resolveSource('/tmp/notes.markdown', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/notes.markdown', resolved: true });
     expect(resolveSource('/tmp/page.mdx', '/home/me')).toEqual({ kind: 'markdown', target: '/tmp/page.mdx', resolved: true });
+  });
+
+  // Terminal output is untrusted, and a link starting with two slashes is a UNC
+  // path: on Windows, opening it makes Chromium (webview) or readFileSync
+  // (markdown) reach out over SMB to the attacker's host, which auto-negotiates
+  // NTLM and hands over the logged-in user's hash. Nothing legitimate needs a
+  // remote host here, so no preview source may name one.
+  it('refuses a UNC target that would reach out to a remote host', () => {
+    expect(resolveSource('//attacker.example/share/report.html', '/home/me')).toBeNull();
+    expect(resolveSource('//attacker.example/share/notes.md', '/home/me')).toBeNull();
+    expect(resolveSource('\\\\attacker.example\\share\\report.html', '/home/me')).toBeNull();
+    // Extra slashes must not slip past the check either.
+    expect(resolveSource('///attacker.example/share/x.html', '/home/me')).toBeNull();
+  });
+
+  it('still resolves ordinary rooted paths', () => {
+    expect(resolveSource('/srv/report.html', '/home/me')).toEqual({ kind: 'web', target: 'file:///srv/report.html', resolved: true });
+  });
+});
+
+describe('isAllowedPreviewUrl', () => {
+  it('allows the schemes the preview can render', () => {
+    expect(isAllowedPreviewUrl('https://example.com')).toBe(true);
+    expect(isAllowedPreviewUrl('http://example.com')).toBe(true);
+    expect(isAllowedPreviewUrl('file:///home/me/out/index.html')).toBe(true);
+  });
+
+  it('rejects everything else, including unparseable input', () => {
+    expect(isAllowedPreviewUrl('javascript:alert(1)')).toBe(false);
+    expect(isAllowedPreviewUrl('data:text/html,<script>1</script>')).toBe(false);
+    expect(isAllowedPreviewUrl('not a url')).toBe(false);
+  });
+
+  // Last line of defence for the UNC vector above: even if a file: URL naming a
+  // remote host reaches the main process, the webview must not attach to it.
+  it('rejects a file: URL that names a host', () => {
+    expect(isAllowedPreviewUrl('file://attacker.example/share/x.html')).toBe(false);
+    expect(isAllowedPreviewUrl('file:////attacker.example/share/x.html')).toBe(false);
+    expect(isAllowedPreviewUrl('file://///attacker.example/share/x.html')).toBe(false);
   });
 });
 

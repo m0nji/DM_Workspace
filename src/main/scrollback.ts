@@ -46,7 +46,11 @@ export function loadScrollbackFromFile(file: string): ScrollbackMap {
 
 export function saveScrollbackToFile(file: string, map: ScrollbackMap): void {
   try {
-    writeFileAtomic(file, JSON.stringify(map));
+    // Owner-only: this is verbatim terminal output, so it routinely holds
+    // whatever scrolled past — exported tokens, signed URLs, cloud CLI output.
+    // At the umask default it would land 0o644 and any other account on the
+    // machine could read the lot long after the window closed.
+    writeFileAtomic(file, JSON.stringify(map), { mode: 0o600 });
   } catch (err) {
     console.error(`Failed to save scrollback to ${file}:`, err);
   }

@@ -230,7 +230,9 @@ export function loadStateFromFile(file: string): AppState {
 
 export function saveStateToFile(file: string, state: AppState): void {
   try {
-    writeFileAtomic(file, serialize(state));
+    // Owner-only like the scrollback beside it: this records the user's project
+    // paths and per-workspace startup commands, which can carry credentials.
+    writeFileAtomic(file, serialize(state), { mode: 0o600 });
   } catch (err) {
     console.error(`Failed to save state to ${file}:`, err);
   }
