@@ -1,4 +1,5 @@
 import { test, expect, _electron as electron } from '@playwright/test';
+import { waitForShellPrompt } from './wait-helpers';
 
 // Splitting or closing a pane restructures the layout tree. That must MOVE the
 // existing terminals, never unmount/remount them: a remount replays the
@@ -15,7 +16,7 @@ test('split and close move the surviving terminal instead of remounting it', asy
 
   await win.getByText('1 Pane').click();
   await expect(win.locator('.pane .xterm-screen').first()).toBeVisible();
-  await win.waitForTimeout(1500); // shell prompt
+  await waitForShellPrompt(win);
 
   await win.locator('.pane .xterm-screen').first().click();
   await win.keyboard.type('echo SPLIT_PROBE_4242');

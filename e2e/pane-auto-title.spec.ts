@@ -64,16 +64,19 @@ test('a forged prompt marker printed by a running program does not capture the n
   await screen.waitFor();
   await screen.click();
 
-  // Start a program that holds the terminal and reads a line. It prints the
-  // old, unauthenticated marker first — exactly what an attacker who read the
-  // source would send. Submitting the command disarms the tracker; only a
-  // genuine local prompt may re-arm it.
-  const command = `printf '\\033]777;dmws-prompt\\007'; cat > /dev/null`;
+  // Start a program that holds the terminal and swallows what is typed into it.
+  // It prints the old, unauthenticated marker first — exactly what an attacker
+  // who read the source would send. Submitting the command disarms the tracker;
+  // only a genuine local prompt may re-arm it. Written with node rather than
+  // printf/cat so it runs under PowerShell on Windows too.
+  const command = 'node -e "process.stdout.write(\'\\u001b]777;dmws-prompt\\u0007\'); process.stdin.resume()"';
   await win.keyboard.type(command);
   await win.keyboard.press('Enter');
 
+  // Matched by substring: a title longer than the header allows is shortened
+  // with an ellipsis, and this command is.
   const automatic = pane.locator('.pane-label.automatic');
-  await expect(automatic).toHaveText(command);
+  await expect(automatic).toContainText('node -e');
 
   await win.keyboard.type('hunter2-must-not-be-a-title');
   await win.keyboard.press('Enter');
@@ -82,7 +85,8 @@ test('a forged prompt marker printed by a running program does not capture the n
 
   // The title is still the command the user actually ran, not the secret typed
   // into the program that is holding the terminal.
-  await expect(automatic).toHaveText(command);
+  await expect(automatic).toContainText('node -e');
+  await expect(automatic).not.toContainText('hunter2');
 
   await win.keyboard.press('Control+C');
   await app.close();

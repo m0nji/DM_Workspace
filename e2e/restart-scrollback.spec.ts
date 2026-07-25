@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { waitForShellPrompt, waitForScrollbackOnDisk } from './wait-helpers';
 
 // Verifies that terminal scrollback is replayed after an app restart.
 // Both launches share an explicit userData dir (DMWS_USERDATA) so the second
@@ -22,14 +23,14 @@ test('scrollback is replayed after a restart', async () => {
   await expect(win1.getByText('How many terminals do you want to open?')).toBeVisible();
   await win1.getByText('1 Pane').click();
   await expect(win1.locator('.pane .xterm-screen').first()).toBeVisible();
-  await win1.waitForTimeout(1500); // let the shell spawn + print its prompt
+  await waitForShellPrompt(win1);
 
   await win1.locator('.pane .xterm-screen').first().click();
   await win1.keyboard.type(`echo ${MARKER}`);
   await win1.keyboard.press('Enter');
-  await win1.waitForTimeout(1800); // echo output renders + debounced (1s) save fires
-
   await expect(win1.locator('.xterm-rows').first()).toContainText(MARKER);
+  // Closing before the save lands would leave launch 2 nothing to restore.
+  await waitForScrollbackOnDisk(USERDATA, MARKER);
   await app1.close();
 
   // ---- Launch 2: same userData → layout + scrollback restored ----
@@ -37,7 +38,7 @@ test('scrollback is replayed after a restart', async () => {
   const win2 = await app2.firstWindow();
   // Layout restores straight to a pane (no welcome screen).
   await expect(win2.locator('.pane .xterm-screen').first()).toBeVisible();
-  await win2.waitForTimeout(1500);
+  await waitForShellPrompt(win2);
 
   const text = await win2.locator('.xterm-rows').first().innerText();
   console.log('--- restored terminal text ---\n' + text + '\n--- end ---');

@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { waitForShellPrompt, waitForScrollbackOnDisk, waitForScrollbackRewrite, scrollbackMtime } from './wait-helpers';
 
 const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-probe-'));
 const MARKER = 'PROBE_MARK_77';
@@ -22,25 +23,31 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   const w1 = await a1.firstWindow();
   await w1.getByText('1 Pane').click();
   await expect(w1.locator('.pane .xterm-screen').first()).toBeVisible();
-  await w1.waitForTimeout(1500);
+  await waitForShellPrompt(w1);
   await w1.locator('.pane .xterm-screen').first().click();
   await w1.keyboard.type(`echo ${MARKER}`);
   await w1.keyboard.press('Enter');
-  await w1.waitForTimeout(1800);
+  await expect(w1.locator('.xterm-rows').first()).toContainText(MARKER);
+  await waitForScrollbackOnDisk(USERDATA, MARKER);
   await a1.close();
 
   // Launch 2: restore (1 separator expected).
+  const savedAfterLaunch1 = scrollbackMtime(USERDATA);
   const a2 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w2 = await a2.firstWindow();
   await expect(w2.locator('.pane .xterm-screen').first()).toBeVisible();
-  await w2.waitForTimeout(1800); // also lets the re-save (buffer w/o separator) flush
+  await waitForShellPrompt(w2);
+  // The restored buffer is re-saved (again without the separator, which is
+  // filtered before saving); launch 3 must read THAT version, so wait for the
+  // file to be rewritten rather than for a fixed span.
+  await waitForScrollbackRewrite(USERDATA, savedAfterLaunch1);
   await a2.close();
 
   // Launch 3: restore again. Probe: still exactly ONE separator, marker still present.
   const a3 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w3 = await a3.firstWindow();
   await expect(w3.locator('.pane .xterm-screen').first()).toBeVisible();
-  await w3.waitForTimeout(1500);
+  await waitForShellPrompt(w3);
   const text = await rowsText(w3);
   console.log('--- after 2 restarts ---\n' + text + '\n--- end ---');
   const separators = (text.match(/wiederhergestellt/g) || []).length;

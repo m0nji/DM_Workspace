@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.39 – 2026-07-25
+- fix: On Windows a save no longer gets lost when another program briefly holds the file. Windows refuses to replace a file while something else has it open, and that happens routinely there — the virus scanner inspects every freshly written file, so a save could collide with the scan of the one before it. The app now waits a moment and tries again instead of dropping the write; previously a pane's terminal history could quietly fail to be stored and the next launch would bring back an older state
+- change: Every message the window sends to the app's core is now checked for where it came from. Only the app's own window is meant to reach file and terminal operations, and only it can — but nothing verified that, so a later change could have opened the door without anyone noticing. The rule is now enforced rather than assumed
+- change: The image library used to generate the app icons was updated to a release without known vulnerabilities, and two build-time libraries were pinned to their patched versions. None of this ships inside the app — it is the toolchain that builds it. The icons themselves are unchanged, pixel for pixel
+
 ## 0.9.38 – 2026-07-25
 - fix: A link in terminal output can no longer point the preview at another machine. A path starting with two slashes (`//somehost/share/report.html`) names a network location, and on Windows opening one makes the system contact that host — handing it your Windows account name and password hash before anything is shown. Since terminal output can come from a build script, a log line or an agent, such targets are now refused outright, both for the preview window and for the markdown reader
 - fix: A pane title can no longer be tricked into capturing what you type into another program. Panes learn the name of the running command from a private marker your local shell prints at each prompt. Any program that writes to the terminal — including the remote side of an SSH session — could print that same marker and make the next line you typed become the pane title (and, with notifications on, the text of a system notification that macOS keeps in Notification Center). The marker now carries a secret generated fresh at every app start, which terminal output cannot know

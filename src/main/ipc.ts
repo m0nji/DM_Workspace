@@ -15,6 +15,7 @@ import { pathEndsWith } from '../shared/link-detect';
 import { readPreviewFile } from './preview-file';
 import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from './fs-browser';
 import { expandTilde } from './resolve-cwd';
+import { isTrustedSender } from './ipc-sender';
 import {
   isNonEmptyString, parseAgentDone, parsePtyInput, parsePtyResize, parsePtySpawn,
   parseScrollbackSave, parseTasksSave
@@ -165,6 +166,43 @@ export function resolveLinkPath(
 }
 
 export function registerIpc(getWindow: () => BrowserWindow | null) {
+  // Every channel below goes through these two wrappers instead of ipcMain
+  // directly, so the origin check cannot be forgotten on a new channel — see
+  // ipc-sender.ts for what is being checked and why. An invoke is rejected with
+  // an error the caller sees; a send has no reply, so it is dropped and logged.
+  const windowMainFrame = (): unknown => {
+    const win = getWindow();
+    if (!win || win.isDestroyed()) return null;
+    return win.webContents.mainFrame;
+  };
+  const rejectSender = (channel: string): void => {
+    console.error(`[ipc] ${channel}: rejected a message from an untrusted frame`);
+  };
+  const handle = (
+    channel: string,
+    fn: (event: Electron.IpcMainInvokeEvent, ...args: never[]) => unknown
+  ): void => {
+    ipcMain.handle(channel, (event, ...args) => {
+      if (!isTrustedSender(event.senderFrame, windowMainFrame())) {
+        rejectSender(channel);
+        throw new Error(`${channel}: untrusted sender`);
+      }
+      return fn(event, ...(args as never[]));
+    });
+  };
+  const on = (
+    channel: string,
+    fn: (event: Electron.IpcMainEvent, ...args: never[]) => void
+  ): void => {
+    ipcMain.on(channel, (event, ...args) => {
+      if (!isTrustedSender(event.senderFrame, windowMainFrame())) {
+        rejectSender(channel);
+        return;
+      }
+      fn(event, ...(args as never[]));
+    });
+  };
+
   const pty = new PtyManager();
   // state.json wird hier ein zweites Mal gelesen (das erste Mal geschieht über
   // state:load): das erste scrollback:get feuert beim Mount der ersten Pane und
@@ -201,28 +239,28 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     getWindow()?.webContents.send('pty:exit', payload);
   });
 
-  ipcMain.handle('pty:spawn', (_e, raw: unknown) => {
+  handle('pty:spawn', (_e, raw: unknown) => {
     const req = parsePtySpawn(raw);
     if (!req) { rejectPayload('pty:spawn', raw); return; }
     pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows });
   });
-  ipcMain.on('pty:input', (_e, raw: unknown) => {
+  on('pty:input', (_e, raw: unknown) => {
     const req = parsePtyInput(raw);
     if (!req) { rejectPayload('pty:input', raw); return; }
     pty.write(req.paneId, req.data);
   });
-  ipcMain.on('pty:resize', (_e, raw: unknown) => {
+  on('pty:resize', (_e, raw: unknown) => {
     const req = parsePtyResize(raw);
     if (!req) { rejectPayload('pty:resize', raw); return; }
     pty.resize(req.paneId, req.cols, req.rows);
   });
-  ipcMain.on('pty:kill', (_e, paneId: unknown) => {
+  on('pty:kill', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) { rejectPayload('pty:kill', paneId); return; }
     pty.kill(paneId);
   });
 
-  ipcMain.handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));
-  ipcMain.handle('state:save', (_e, state: AppState) => {
+  handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));
+  handle('state:save', (_e, state: AppState) => {
     const win = getWindow();
     if (win) state.windowBounds = currentWindowBounds(win);
     saveStateToFile(STATE_FILE(), state);
@@ -234,10 +272,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     scrollback.setEnabled(state.settings.restoreTerminalHistory !== false);
   });
 
-  ipcMain.handle('scrollback:get', (_e, paneId: unknown) =>
+  handle('scrollback:get', (_e, paneId: unknown) =>
     isNonEmptyString(paneId) ? scrollback.get(paneId) ?? null : null
   );
-  ipcMain.on('scrollback:save', (_e, raw: unknown) => {
+  on('scrollback:save', (_e, raw: unknown) => {
     const req = parseScrollbackSave(raw);
     if (!req) { rejectPayload('scrollback:save', raw); return; }
     scrollback.set(req.paneId, req.data);
@@ -283,12 +321,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (!taskWatcher) watchedDir = null; // re-try arming on the next load/save
   };
 
-  ipcMain.handle('tasks:load', (_e, dir: unknown): TaskBoard => {
+  handle('tasks:load', (_e, dir: unknown): TaskBoard => {
     if (!isNonEmptyString(dir)) { rejectPayload('tasks:load', dir); return { columns: [] }; }
     startTaskWatch(dir);
     return loadTasks(dir);
   });
-  ipcMain.on('tasks:save', (_e, raw: unknown) => {
+  on('tasks:save', (_e, raw: unknown) => {
     const req = parseTasksSave(raw);
     if (!req) { rejectPayload('tasks:save', raw); return; }
     const content = saveTasks(req.dir, req.board);
@@ -296,14 +334,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     startTaskWatch(req.dir); // (re)arm now that .dmworkspace exists
   });
 
-  ipcMain.handle('clipboard:read', () => clipboard.readText());
+  handle('clipboard:read', () => clipboard.readText());
   // Lets the renderer decide whether an image-paste keystroke should be
   // forwarded to the PTY (so the running program can read the image itself).
-  ipcMain.handle('clipboard:has-image', () => !clipboard.readImage().isEmpty());
+  handle('clipboard:has-image', () => !clipboard.readImage().isEmpty());
   // Save a clipboard image to a temp PNG so the renderer can insert its path into
   // the terminal line. This is tool-independent (any program reads a file path)
   // and works on Windows, where CLI tools can't reliably read the OS clipboard.
-  ipcMain.handle('clipboard:save-image', () => {
+  handle('clipboard:save-image', () => {
     const image = clipboard.readImage();
     if (image.isEmpty()) return null;
     try {
@@ -315,7 +353,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
       return null;
     }
   });
-  ipcMain.on('clipboard:write', (_e, text: unknown) => {
+  on('clipboard:write', (_e, text: unknown) => {
     if (typeof text !== 'string') { rejectPayload('clipboard:write', text); return; }
     clipboard.writeText(text);
   });
@@ -324,7 +362,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // clicked in terminal output, so restrict reads to text/markdown files — the
   // panel never needs anything else, and this avoids slurping arbitrary files
   // (e.g. a malicious agent printing a clickable ~/.ssh/id_rsa path).
-  ipcMain.handle('file:read', (_e, path: string): string => {
+  handle('file:read', (_e, path: string): string => {
     // expandTilde for consistency with every other fs-touching handler — a
     // '~/notes.md' link from terminal output must resolve to the home dir.
     return readPreviewFile(expandTilde(path));
@@ -337,9 +375,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // a rejected promise (shown as an inline error row). read/create surface their
   // expected FsBrowserError codes as a discriminated result so the UI can react
   // (binary/too-large => read-only; exists/invalid-name => inline message).
-  ipcMain.handle('fs:readdir', (_e, path: string) => readDir(path));
+  handle('fs:readdir', (_e, path: string) => readDir(path));
 
-  ipcMain.handle('fs:readText', (_e, path: string) => {
+  handle('fs:readText', (_e, path: string) => {
     try { return { ok: true as const, content: readTextFile(path) }; }
     catch (err) {
       if (err instanceof FsBrowserError && (err.code === 'binary' || err.code === 'too-large')) {
@@ -349,11 +387,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     }
   });
 
-  ipcMain.handle('fs:writeText', (_e, req: { path: string; content: string }) => {
+  handle('fs:writeText', (_e, req: { path: string; content: string }) => {
     writeTextFile(req.path, req.content);
   });
 
-  ipcMain.handle('fs:createFile', (_e, req: { dir: string; name: string }) => {
+  handle('fs:createFile', (_e, req: { dir: string; name: string }) => {
     try { return { ok: true as const, path: createFile(req.dir, req.name) }; }
     catch (err) {
       if (err instanceof FsBrowserError && (err.code === 'exists' || err.code === 'invalid-name')) {
@@ -365,16 +403,16 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   // Move a file or folder (recursively) to the OS trash, so a delete is always
   // recoverable. Errors (missing path / permission) reject and surface inline.
-  ipcMain.handle('fs:delete', (_e, path: string) => shell.trashItem(expandTilde(path)));
+  handle('fs:delete', (_e, path: string) => shell.trashItem(expandTilde(path)));
 
   // Open a link from the markdown preview in the system browser. http(s) only —
   // never file:/smb:/etc., which could be abused by untrusted markdown.
-  ipcMain.on('shell:openExternal', (_e, url: unknown) => {
+  on('shell:openExternal', (_e, url: unknown) => {
     if (typeof url !== 'string') { rejectPayload('shell:openExternal', url); return; }
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
   });
 
-  ipcMain.handle('dialog:pickDirectory', async () => {
+  handle('dialog:pickDirectory', async () => {
     // e2e-only: return a fixed path so tests can drive folder changes without
     // a native dialog (which Playwright cannot dismiss).
     if (process.env.DMWS_E2E && process.env.DMWS_E2E_PICK_DIR) return process.env.DMWS_E2E_PICK_DIR;
@@ -384,11 +422,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     return res.canceled ? null : res.filePaths[0];
   });
 
-  ipcMain.handle('link:resolve', (_e, req: { rel: string; cwd: string; roots: string[] }): string | null =>
+  handle('link:resolve', (_e, req: { rel: string; cwd: string; roots: string[] }): string | null =>
     resolveLinkPath(req.rel, req.cwd, req.roots)
   );
 
-  ipcMain.on('notify:agentDone', (_e, raw: unknown) => {
+  on('notify:agentDone', (_e, raw: unknown) => {
     const payload = parseAgentDone(raw);
     if (!payload) { rejectPayload('notify:agentDone', raw); return; }
     if (!Notification.isSupported()) return;
