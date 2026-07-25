@@ -2,7 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { waitForShellPrompt, waitForScrollbackOnDisk } from './wait-helpers';
+import { waitForShellPrompt, waitForScrollbackOnDisk, paneBufferText } from './wait-helpers';
 
 // Verifies that terminal scrollback is replayed after an app restart.
 // Both launches share an explicit userData dir (DMWS_USERDATA) so the second
@@ -10,10 +10,11 @@ import { waitForShellPrompt, waitForScrollbackOnDisk } from './wait-helpers';
 const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-restart-'));
 const MARKER = 'SCROLLBACK_MARKER_4242';
 
+// DMWS_E2E stays ON for the __bufferText hook (the restored history lives in the
+// scrollback, which .xterm-rows does not render). DMWS_USERDATA still decides the
+// userData path, so restart persistence is unaffected — see main/index.ts.
 function launchEnv(): Record<string, string> {
-  const env: Record<string, string> = { ...process.env, DMWS_USERDATA: USERDATA, DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
-  delete env.DMWS_E2E;
-  return env;
+  return { ...process.env, DMWS_USERDATA: USERDATA, DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
 }
 
 test('scrollback is replayed after a restart', async () => {
@@ -38,14 +39,22 @@ test('scrollback is replayed after a restart', async () => {
   const win2 = await app2.firstWindow();
   // Layout restores straight to a pane (no welcome screen).
   await expect(win2.locator('.pane .xterm-screen').first()).toBeVisible();
+  // Reaching this point now genuinely means the SHELL has printed. The replayed
+  // history is parked in the scrollback, so the viewport stays blank until the
+  // shell writes into it. Before that parking the history itself filled the
+  // viewport, so this wait was satisfied ~150ms too early — and the assertions
+  // below ran in the gap before the shell erased the screen (ESC[2J ESC[H on
+  // PowerShell) and took the history with it. Green test, wiped history.
   await waitForShellPrompt(win2);
 
-  const text = await win2.locator('.xterm-rows').first().innerText();
-  console.log('--- restored terminal text ---\n' + text + '\n--- end ---');
   await win2.screenshot({ path: join(USERDATA, 'restored.png') });
   console.log('USERDATA=' + USERDATA);
 
-  await expect(win2.locator('.xterm-rows').first()).toContainText(MARKER);
-  await expect(win2.locator('.xterm-rows').first()).toContainText('wiederhergestellt');
+  // Assert on the whole buffer, not the viewport: parked history is off-screen
+  // by design, so .xterm-rows would show none of it.
+  const text = await paneBufferText(win2);
+  console.log('--- restored terminal buffer ---\n' + text + '\n--- end ---');
+  expect(text).toContain(MARKER);
+  expect(text).toContain('wiederhergestellt');
   await app2.close();
 });

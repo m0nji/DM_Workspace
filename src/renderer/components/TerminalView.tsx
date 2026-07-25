@@ -27,7 +27,11 @@ import { attachLinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
-import { STUCK_MODE_RESET, sanitizeRestoredScrollback } from '../../shared/terminal-reset';
+import {
+  STUCK_MODE_RESET,
+  sanitizeRestoredScrollback,
+  parkRestoredHistory
+} from '../../shared/terminal-reset';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { createResizeScheduler } from '../resize-scheduler';
@@ -401,6 +405,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
             // the fresh pane straight back into the stuck state they came from.
             term.write(sanitizeRestoredScrollback(saved));
             term.write(`\r\n\x1b[2m── ${RESTORE_MARKER_TEXT} ──\x1b[0m\r\n`);
+            // Hand the shell an empty viewport. Everything above is now in the
+            // scrollback, out of reach of the full repaints the shell performs
+            // at its first prompt and on every resize — those address the
+            // viewport absolutely and would otherwise paint over this history.
+            term.write(parkRestoredHistory(term.rows));
           }
         });
       }

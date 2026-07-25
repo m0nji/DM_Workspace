@@ -48,3 +48,42 @@ export function sanitizeRestoredScrollback(data: string): string {
   // from the old format's appended modes block.
   return out.replace(/\x1b\[[0-9;?]*[hl]/g, '');
 }
+
+// Park a replayed history in the SCROLLBACK before the shell starts writing,
+// leaving it an empty viewport with the cursor at the top.
+//
+// A restored pane replays its saved history before spawning the shell, so the
+// history appears above the coming prompt rather than interleaved with it. Left
+// in the viewport, though, that history is doomed: a shell addresses the
+// viewport in absolute coordinates and assumes ITS session begins at row 0. It
+// never learns about the rows we injected, so its coordinates are offset by
+// exactly that many rows, and any full repaint paints straight over them.
+// Both repaints were observed on Windows 11 / PowerShell 5.1:
+//
+//   start:  ESC[?25l ESC[2J ESC[m ESC[H PS C:\Users\…>     — erase all, home
+//   resize: ESC[?25l ESC[8;52;74t ESC[H <prompt redrawn>    — home, then a
+//           \r\n ESC[K cascade blanking every remaining row
+//
+// The first wiped a restored history ~200ms after it appeared, and the pane's
+// next save then wrote the emptied buffer over the good one — history destroyed
+// for good, on every restart. The second did the same on the next pane split.
+//
+// Filtering those sequences out of the shell's output is not a fix: the shell
+// would still be drawing at coordinates that mean something else than it thinks,
+// and `clear`, `cls` and every TUI need them to work. Removing the offset is the
+// fix. `rows` newlines scroll everything written so far past the top of the
+// viewport and into the scrollback, where no viewport operation can reach it;
+// the trailing CUP-home then puts the cursor on row 0, so the shell's first
+// prompt starts where the shell already believes it does.
+//
+// Cost: one blank row lands in the scrollback between the restore separator and
+// the new screen. Cheaper than the alternative — writing no newlines leaves the
+// gap in the VIEWPORT instead, which shows as a screenful of blank space above
+// the prompt on any shell that does not clear at startup (bash, zsh).
+export function parkRestoredHistory(rows: number): string {
+  // Guard the row count rather than trusting it: String.repeat turns NaN into 0
+  // silently, which would emit no newline at all and leave the history exactly
+  // where it must not be.
+  const lines = Number.isFinite(rows) ? Math.max(1, Math.floor(rows)) : 1;
+  return '\n'.repeat(lines) + '\x1b[H';
+}

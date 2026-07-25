@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.41 – 2026-07-25
+- fix: Terminal history survives a restart on Windows again. It was replayed correctly and then erased a fraction of a second later: PowerShell clears the entire screen when it prints its first prompt, and the replayed history was still sitting on that screen. The pane then saved the emptied terminal over the stored history, so it was lost for good — every restart, not just the second one. A pane split did the same thing, because a shell repaints the screen when its size changes. The history is now placed into the scrollback before the shell starts, out of reach of both repaints. One visible change: after a restart a pane opens on a clean prompt and the previous session is one scroll up, rather than filling the screen — on macOS as well, so both systems behave alike
+
 ## 0.9.40 – 2026-07-25
 - fix: The workspace sidebar lines up with the terminal panes again and is back in the app's own colour. Version 0.9.35 turned it into a floating rounded frame with no fill: it ended up 16 pixels shorter than the panes next to it with its corners 8 pixels off, because those panes run right to the window edge and leave no matching air for a frame that floats. The missing fill also let the macOS window's translucency shine through, so the sidebar was painted in the system's neutral grey instead of the app's warm palette — on Windows the opaque window hid that, which is why it only showed on the Mac. The sidebar is now one filled surface over the full window height. The settings panes keep their rounded frame; they sit inside a dialog that gives them the backdrop and the spacing the sidebar never had
 

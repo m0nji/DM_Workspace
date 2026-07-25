@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { STUCK_MODE_RESET, sanitizeRestoredScrollback } from '../src/shared/terminal-reset';
+import {
+  STUCK_MODE_RESET,
+  sanitizeRestoredScrollback,
+  parkRestoredHistory
+} from '../src/shared/terminal-reset';
 
 // DECRST/DECSET private modes that must be covered so the "Reset terminal"
 // context-menu action recovers a pane whose TUI exited uncleanly.
@@ -78,5 +82,39 @@ describe('sanitizeRestoredScrollback', () => {
   it('is a no-op on saves written by the fixed format', () => {
     const clean = 'plain history\r\nsecond line';
     expect(sanitizeRestoredScrollback(clean)).toBe(clean);
+  });
+});
+
+// A replayed history left in the VIEWPORT is destroyed by the shell's first full
+// repaint, because the shell addresses the viewport absolutely and believes its
+// own session starts at row 0 — it never learns about the rows we injected.
+// Observed on Windows 11 / PowerShell 5.1: `ESC[2J ESC[H` at the first prompt
+// (history gone ~200ms after it appeared, and the next save then persisted the
+// emptied buffer over the good one), and `ESC[H` plus a `\r\n ESC[K` cascade on
+// the resize that follows a pane split. Parking the history in the scrollback
+// removes the offset instead of fighting the symptoms.
+describe('parkRestoredHistory', () => {
+  it('scrolls a full screen so everything written so far leaves the viewport', () => {
+    // One newline per row is the worst case (cursor already on the last row);
+    // fewer would leave part of the history addressable by the shell.
+    expect(parkRestoredHistory(24)).toBe('\n'.repeat(24) + '\x1b[H');
+  });
+
+  it('homes the cursor last, so the shell starts drawing where it thinks it does', () => {
+    // Without this the prompt lands at the bottom of the blank viewport and a
+    // shell that does not clear at startup (bash, zsh) shows a screenful of gap.
+    expect(parkRestoredHistory(10).endsWith('\x1b[H')).toBe(true);
+  });
+
+  it('prints nothing visible', () => {
+    expect(parkRestoredHistory(30).replace(/[\n]|\x1b\[H/g, '')).toBe('');
+  });
+
+  it('still scrolls when the terminal reports a nonsense row count', () => {
+    // safeFit runs before the restore, but a pane measured mid-layout can report
+    // 0 rows; emitting no newline at all would leave the history in the viewport.
+    for (const rows of [0, -1, Number.NaN]) {
+      expect(parkRestoredHistory(rows)).toBe('\n\x1b[H');
+    }
   });
 });

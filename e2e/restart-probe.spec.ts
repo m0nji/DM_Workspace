@@ -2,19 +2,21 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { waitForShellPrompt, waitForScrollbackOnDisk, waitForScrollbackRewrite, scrollbackMtime } from './wait-helpers';
+import {
+  waitForShellPrompt,
+  waitForScrollbackOnDisk,
+  waitForScrollbackRewrite,
+  scrollbackMtime,
+  paneBufferText
+} from './wait-helpers';
 
 const USERDATA = mkdtempSync(join(tmpdir(), 'dmws-probe-'));
 const MARKER = 'PROBE_MARK_77';
 
+// DMWS_E2E stays ON for the __bufferText hook; DMWS_USERDATA still decides the
+// userData path, so the restarts still share one profile (main/index.ts).
 function env(): Record<string, string> {
-  const e = { ...process.env, DMWS_USERDATA: USERDATA, DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
-  delete e.DMWS_E2E;
-  return e;
-}
-
-function rowsText(win: any): Promise<string> {
-  return win.locator('.xterm-rows').first().innerText();
+  return { ...process.env, DMWS_USERDATA: USERDATA, DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
 }
 
 test('separator does not accumulate across multiple restarts; fresh pane stays clean', async () => {
@@ -48,7 +50,9 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   const w3 = await a3.firstWindow();
   await expect(w3.locator('.pane .xterm-screen').first()).toBeVisible();
   await waitForShellPrompt(w3);
-  const text = await rowsText(w3);
+  // The whole buffer, not the viewport: replayed history is parked in the
+  // scrollback so the shell's opening repaint cannot reach it.
+  const text = await paneBufferText(w3);
   console.log('--- after 2 restarts ---\n' + text + '\n--- end ---');
   const separators = (text.match(/wiederhergestellt/g) || []).length;
   console.log('separator count after 2 restarts =', separators);
@@ -63,7 +67,7 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   await w3.waitForTimeout(1200);
   const paneTexts: string[] = [];
   for (let i = 0; i < 2; i++) {
-    paneTexts.push(await w3.locator('.pane .xterm-rows').nth(i).innerText());
+    paneTexts.push(await paneBufferText(w3, i));
   }
   console.log('--- pane 0 ---\n' + paneTexts[0] + '\n--- pane 1 ---\n' + paneTexts[1] + '\n--- end ---');
   const withHistory = paneTexts.filter((t) => t.includes('wiederhergestellt')).length;

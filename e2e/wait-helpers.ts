@@ -29,6 +29,34 @@ export async function waitForShellPrompt(win: Page, paneIndex = 0, timeoutMs = 2
   await until(async () => (await rows.innerText()).trim().length > 0, timeoutMs, 'the shell prompt');
 }
 
+// A pane's FULL normal buffer, scrollback included.
+//
+// `.xterm-rows` renders the viewport only, and a restored history is parked in
+// the scrollback before the shell starts (see parkRestoredHistory) — so it is
+// deliberately off-screen and a viewport assertion would miss all of it.
+//
+// Reads the __bufferText hook, which needs DMWS_E2E=1 in the launch env. That is
+// safe to combine with DMWS_USERDATA: the explicit userData dir wins over the
+// E2E temp dir (main/index.ts), so restart persistence is unaffected.
+export async function paneBufferText(win: Page, paneIndex = 0): Promise<string> {
+  return win.evaluate((i) => {
+    const hook = (window as unknown as { __bufferText?: Map<string, () => string> }).__bufferText;
+    if (!hook || hook.size <= i) return '';
+    return [...hook.values()][i]();
+  }, paneIndex);
+}
+
+// Wait until `marker` shows up anywhere in the pane's buffer.
+export async function waitForPaneBuffer(
+  win: Page, marker: string, paneIndex = 0, timeoutMs = 20000
+): Promise<void> {
+  await until(
+    async () => (await paneBufferText(win, paneIndex)).includes(marker),
+    timeoutMs,
+    `"${marker}" in the pane buffer`
+  );
+}
+
 // The pane's scrollback has actually reached disk. The renderer debounces the
 // serialize and the main process batches the write, so "the text is on screen"
 // does not mean "a restart would find it" — this waits for the file the next
