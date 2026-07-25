@@ -13,9 +13,7 @@ test('split and close move the surviving terminal instead of remounting it', asy
   });
   const win = await app.firstWindow();
 
-  // Label matching is locale-tolerant (en/de) — the e2e profile follows the OS
-  // language, so a German host shows the German UI.
-  await win.getByText(/^(1 Pane|1 Bereich)$/).click();
+  await win.getByText('1 Pane').click();
   await expect(win.locator('.pane .xterm-screen').first()).toBeVisible();
   await win.waitForTimeout(1500); // shell prompt
 
@@ -30,7 +28,7 @@ test('split and close move the surviving terminal instead of remounting it', asy
     document.querySelector('.pane .xterm-host')!.setAttribute('data-probe', 'alive');
   });
 
-  await win.locator('.pane-btn[title="Split left and right"], .pane-btn[title="Links und rechts teilen"]').first().click();
+  await win.locator('.pane-btn[title="Split into left & right"]').first().click();
   await expect(win.locator('.pane')).toHaveCount(2);
   await win.waitForTimeout(1200); // restore replay (if any) + refit would land here
 
@@ -42,9 +40,9 @@ test('split and close move the surviving terminal instead of remounting it', asy
 
   // Closing the new sibling collapses the split node — the survivor must move,
   // not remount, for the same reason.
-  await win.locator('.pane').nth(1).getByTitle(/^(Close|Schließen)$/).click();
-  await win.getByRole('alertdialog', { name: /(Close window\?|Fenster schließen\?)/ })
-    .getByRole('button', { name: /^(Close window|Fenster schließen)$/ }).click();
+  await win.locator('.pane').nth(1).getByTitle('Close').click();
+  await win.getByRole('alertdialog', { name: 'Close window?' })
+    .getByRole('button', { name: 'Close window' }).click();
   await expect(win.locator('.pane')).toHaveCount(1);
   await win.waitForTimeout(1200);
 

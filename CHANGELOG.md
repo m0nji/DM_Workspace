@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.37 – 2026-07-25
+- fix: Switching the workspace navigation between the left sidebar and the top tabs no longer kills every open pane. The panes went blank the moment the placement changed — only the splitter lines were left — and switching back did not revive them; the terminals kept running out of reach until the app was restarted. Changing the placement rebuilt the entire workspace area from scratch, and the cleanup that follows such a rebuild tore each pane's terminal out of the window again right after it had been put back in place. Both placements now build the same structure, so nothing is rebuilt and the panes simply stay; on top of that, a pane's terminal is no longer released while it is still on screen
+
 ## 0.9.36 – 2026-07-25
 - feat: Restoring terminal history after a restart can now be switched off — Settings › Session › "Restore terminal history". It stays on by default, so nothing changes unless you turn it off. With it off, every launch starts with empty terminals and no terminal content is written to disk at all: the stored history is discarded the moment you flip the switch. Your workspaces, pane layout and pane titles come back either way
 

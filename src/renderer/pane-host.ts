@@ -26,10 +26,24 @@ export function acquirePaneHost(paneId: string): HTMLDivElement {
   return el;
 }
 
-// Called when a pane is truly gone (closed, workspace deleted) — after the
-// portal content unmounted. Dropping the map entry lets a future pane with a
-// fresh id start clean; removing the node detaches it from any slot.
+// Called from the portal's unmount cleanup. That fires for two very different
+// reasons and cannot tell them apart on its own:
+//
+//   * the pane is truly gone (closed, workspace deleted) — its slot went with
+//     it, so the container is no longer in the document and must be dropped;
+//   * the workspace view was REMOUNTED around a pane that still exists (some
+//     ancestor changed shape). React runs the new slot's layout effect — which
+//     re-adopts this very container — before the old portal's cleanup, so by
+//     the time we get here a live slot already holds it.
+//
+// The document answers the question: a container a mounted slot holds is in
+// use. Dropping it there would strand the terminal in an orphaned div — panes
+// go blank and no toggle brings them back (see the placement e2e spec). Slots
+// adopt exclusively (PaneSlot replaces its content), so a container left behind
+// by a slot that moved on is detached and gets released normally.
 export function releasePaneHost(paneId: string): void {
-  hosts.get(paneId)?.remove();
+  const el = hosts.get(paneId);
+  if (!el || el.isConnected) return;
+  el.remove();
   hosts.delete(paneId);
 }

@@ -95,27 +95,22 @@ export function App(): React.JSX.Element {
           platforms have the same titlebar surface for the action buttons. */}
       <div className="titlebar"><TitlebarActions /></div>
       <div className={`app app-${workspaceNavigationPlacement}`}>
-        {workspaceNavigationPlacement === 'left' ? (
-          <>
-            <WorkspaceNavigation placement="left" />
-            <div className="view-stack">
-              <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
-                <WorkspaceView />
-              </div>
-              {showBoard && <div className="view-pane"><TaskBoard /></div>}
+        {/* Both placements render the SAME element structure; only the shell's
+            flex direction differs (see .app-left/.app-top in styles.css). The
+            two placements must not be separate branches: a different element
+            type at this position remounts the whole workspace view, which tears
+            down every PanePortal. Its cleanup then releases the pane container
+            the newly mounted slot had just re-adopted, and the terminals end up
+            in detached divs — blank panes that no further toggle repairs. */}
+        <div className="workspace-shell">
+          <WorkspaceNavigation placement={workspaceNavigationPlacement} />
+          <div className="view-stack">
+            <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
+              <WorkspaceView />
             </div>
-          </>
-        ) : (
-          <div className="workspace-shell">
-            <WorkspaceNavigation placement="top" />
-            <div className="view-stack">
-              <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
-                <WorkspaceView />
-              </div>
-              {showBoard && <div className="view-pane"><TaskBoard /></div>}
-            </div>
+            {showBoard && <div className="view-pane"><TaskBoard /></div>}
           </div>
-        )}
+        </div>
         <PreviewPanel />
       </div>
       <SettingsPanel />

@@ -220,6 +220,10 @@ body {
 .titlebar-actions { display: flex; align-items: center; gap: 6px;
   -webkit-app-region: no-drag; }
 .app { display: flex; flex: 1; min-height: 0; }
+/* Holds the workspace navigation next to the view stack. App.tsx renders this
+   same shell for both navigation placements — see the comment there for why the
+   markup must not branch — so the placement is expressed here as the axis: the
+   sidebar sits beside the view, the tabs above it. */
 .workspace-shell {
   flex: 1;
   min-width: 0;
@@ -227,6 +231,8 @@ body {
   display: flex;
   flex-direction: column;
 }
+.app-left .workspace-shell { flex-direction: row; }
+.app-top .workspace-shell { flex-direction: column; }
 /* Everything below the titlebar must stay interactive (no-drag). */
 .app, .sidebar, .workspace-view, .workspace-tabs { -webkit-app-region: no-drag; }
 

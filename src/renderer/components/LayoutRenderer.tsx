@@ -22,8 +22,15 @@ function PaneSlot({ paneId }: { paneId: string }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   // Layout effect: the container must be in place before paint, or the pane
   // would flash empty for a frame on every split/close.
+  //
+  // replaceChildren, not appendChild: React may reuse this <div> for a
+  // DIFFERENT pane (same position and type, new id — a preset replacing the
+  // layout). Appending would stack the new container under the old pane's,
+  // showing two terminals; and releasePaneHost treats a container a slot still
+  // holds as in use, so the stale one would never be cleaned up. A slot owns
+  // exactly the container it was last given.
   useLayoutEffect(() => {
-    ref.current!.appendChild(acquirePaneHost(paneId));
+    ref.current!.replaceChildren(acquirePaneHost(paneId));
   }, [paneId]);
   return <div ref={ref} className="pane-slot" />;
 }
