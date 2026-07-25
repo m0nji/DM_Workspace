@@ -28,4 +28,13 @@ describe('settings store actions', () => {
       settings: expect.objectContaining({ workspaceNavigationPlacement: 'top' })
     }));
   });
+
+  it('persists a disabled terminal history', () => {
+    useStore.getState().updateSettings({ restoreTerminalHistory: false });
+
+    expect(useStore.getState().settings.restoreTerminalHistory).toBe(false);
+    expect(saveState).toHaveBeenCalledWith(expect.objectContaining({
+      settings: expect.objectContaining({ restoreTerminalHistory: false })
+    }));
+  });
 });

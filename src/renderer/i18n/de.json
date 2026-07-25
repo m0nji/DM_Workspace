@@ -43,6 +43,7 @@
       "appearance": "Darstellung",
       "shortcuts": "Tastenkürzel",
       "templates": "Vorlagen",
+      "session": "Sitzung",
       "notifications": "Benachrichtigungen",
       "updates": "Updates"
     },
@@ -110,6 +111,11 @@
       "delete": "Löschen",
       "openLayoutFirst": "Öffne zuerst ein Layout",
       "saveCurrent": "+ Aktuellen Workspace als Vorlage speichern"
+    },
+    "session": {
+      "title": "Terminal-Sitzung",
+      "restoreHistory": "Terminal-Verlauf wiederherstellen",
+      "restoreHistoryHint": "Stellt den Inhalt der Terminals nach einem Neustart wieder her. Ausgeschaltet beginnt jeder Neustart mit leeren Terminals, und es wird kein Terminal-Inhalt auf die Festplatte geschrieben."
     },
     "notifications": {
       "sidebar": "Seitenleiste",

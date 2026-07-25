@@ -63,6 +63,7 @@ export function migrateSettings(raw: unknown): Settings {
   if (typeof r.clickMovesCursor === 'boolean') out.clickMovesCursor = r.clickMovesCursor;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
+  if (typeof r.restoreTerminalHistory === 'boolean') out.restoreTerminalHistory = r.restoreTerminalHistory;
   // brandDesign/locale MUST survive the round-trip: dropping them here is what
   // made the app fall back to Black Utility (and OS language) on every launch —
   // the next save then persisted the stripped settings, losing the choice for good.

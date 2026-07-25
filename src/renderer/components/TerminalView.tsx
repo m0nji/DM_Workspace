@@ -321,7 +321,17 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // bracketed paste, focus reporting) and any active alternate-screen frame,
     // and replaying those on restart poisons the fresh pane — stuck in the alt
     // screen with a hijacked wheel, the "restored session can't scroll" bug.
+    // Live gelesen statt über eine Effect-Dependency: der Mount-Effect hängt an
+    // [paneId], eine zusätzliche Dependency würde bei jedem Umschalten das
+    // Terminal neu aufbauen und den laufenden Prozess killen. Gleiches Muster
+    // wie plainClickEnabled weiter oben.
+    const historyEnabled = (): boolean =>
+      useStore.getState().settings.restoreTerminalHistory !== false;
+
     const doSave = (): void => {
+      // Vor dem serialize(): der Aufruf läuft den kompletten Puffer ab, und das
+      // Ergebnis würde im Main-Prozess ohnehin verworfen.
+      if (!historyEnabled()) return;
       const data = serializeAddon.serialize({
         scrollback: SCROLLBACK_LINES,
         excludeModes: true,
@@ -374,6 +384,12 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     let restorePromise: Promise<void> | null = null;
     const restoreOnce = (): Promise<void> => {
       if (!restorePromise) {
+        // Main liefert bei ausgeschalteter Option ohnehin null; die Prüfung spart
+        // den IPC-Round-Trip und verhindert den Restore-Separator im leeren Pane.
+        if (!historyEnabled()) {
+          restorePromise = Promise.resolve();
+          return restorePromise;
+        }
         restorePromise = window.api.getScrollback(paneId).then((saved) => {
           if (saved) {
             // Sanitize first: saves from versions ≤ 0.9.30 embed the terminal

@@ -43,6 +43,7 @@
       "appearance": "Appearance",
       "shortcuts": "Shortcuts",
       "templates": "Templates",
+      "session": "Session",
       "notifications": "Notifications",
       "updates": "Updates"
     },
@@ -110,6 +111,11 @@
       "delete": "Delete",
       "openLayoutFirst": "Open a layout first",
       "saveCurrent": "+ Save current workspace as template"
+    },
+    "session": {
+      "title": "Terminal session",
+      "restoreHistory": "Restore terminal history",
+      "restoreHistoryHint": "Restores terminal contents after a restart. When off, every restart begins with empty terminals and no terminal content is written to disk."
     },
     "notifications": {
       "sidebar": "Sidebar",

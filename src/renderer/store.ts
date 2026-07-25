@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: Settings = {
   clickMovesCursor: false,
   showDoneBadge: false,
   notificationsEnabled: false,
+  restoreTerminalHistory: true,
   workspaceNavigationPlacement: 'left',
   brandDesign: 'graphite'
 };

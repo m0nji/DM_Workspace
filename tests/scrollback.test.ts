@@ -150,4 +150,75 @@ describe('ScrollbackStore', () => {
     expect(new ScrollbackStore(file).get('p1')).toBe('preexisting');
     rmSync(file, { force: true });
   });
+
+  it('records nothing while disabled', () => {
+    const file = tmpFile();
+    const store = new ScrollbackStore(file, { enabled: false });
+    store.set('p1', 'output one');
+    expect(store.get('p1')).toBeUndefined();
+    store.flush();
+    expect(new ScrollbackStore(file).get('p1')).toBeUndefined();
+  });
+
+  it('wipes an existing file when constructed disabled', () => {
+    const file = tmpFile();
+    writeFileSync(file, JSON.stringify({ p1: 'leftover' }), 'utf8');
+    const store = new ScrollbackStore(file, { enabled: false });
+    expect(store.get('p1')).toBeUndefined();
+    // Sofort geschrieben, nicht erst beim Flush: ein Absturz vor dem Quit darf
+    // die abbestellten Terminal-Inhalte nicht auf der Platte zurücklassen.
+    expect(loadScrollbackFromFile(file)).toEqual({});
+  });
+
+  it('setEnabled(false) drops everything and empties the file', () => {
+    const file = tmpFile();
+    const store = new ScrollbackStore(file);
+    store.set('p1', 'output one');
+    store.flush();
+    expect(loadScrollbackFromFile(file)).toEqual({ p1: 'output one' });
+
+    store.setEnabled(false);
+    expect(store.get('p1')).toBeUndefined();
+    expect(loadScrollbackFromFile(file)).toEqual({});
+  });
+
+  it('setEnabled(true) resumes recording', () => {
+    const file = tmpFile();
+    const store = new ScrollbackStore(file, { enabled: false });
+    store.set('p1', 'ignored');
+    store.setEnabled(true);
+    store.set('p1', 'kept');
+    store.flush();
+    expect(new ScrollbackStore(file).get('p1')).toBe('kept');
+  });
+
+  it('setEnabled with the unchanged value does not touch the file', () => {
+    const file = tmpFile();
+    const store = new ScrollbackStore(file);
+    store.set('p1', 'output one');
+    store.flush();
+    store.setEnabled(true);
+    expect(loadScrollbackFromFile(file)).toEqual({ p1: 'output one' });
+  });
+
+  it('cancels a pending write when disabled mid-debounce', async () => {
+    const file = tmpFile();
+    const store = new ScrollbackStore(file, { flushDelayMs: 10 });
+    // Content alone can't tell "cancelled" apart from "not cancelled" here:
+    // wipe() clears the in-memory map before it persists, so even an
+    // uncancelled stale timer would just re-persist that same empty map a
+    // moment later — same bytes on disk either way. Spy on the private
+    // persist() to also assert *how many times* the file gets written.
+    const persistSpy = vi.spyOn(store as unknown as { persist: () => void }, 'persist');
+
+    store.set('p1', 'output one');   // debounce armed, nothing on disk yet
+    store.setEnabled(false);
+    await new Promise((r) => setTimeout(r, 40));
+
+    expect(loadScrollbackFromFile(file)).toEqual({});
+    // Exactly one write (wipe's own synchronous persist). A missing
+    // cancellation would let the pre-existing debounce timer fire ~10ms
+    // later and persist a second time.
+    expect(persistSpy).toHaveBeenCalledTimes(1);
+  });
 });

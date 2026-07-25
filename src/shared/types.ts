@@ -3,7 +3,7 @@ export type { Task, TaskColumn, TaskBoard } from './tasks-markdown';
 
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
-export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'notifications' | 'updates';
+export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'session' | 'notifications' | 'updates';
 
 export type WorkspaceNavigationPlacement = 'left' | 'top';
 
@@ -58,6 +58,7 @@ export interface Settings {
   clickMovesCursor?: boolean;  // a plain click (no modifier) moves the input cursor to the clicked cell; Option/Alt+click always does (default off)
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
+  restoreTerminalHistory?: boolean; // Terminal-Verlauf nach einem Neustart wiederherstellen (default an); aus => es wird gar kein Verlauf gespeichert
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
   shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts
   locale?: 'en' | 'de';        // UI language; unset => detect from OS, fallback 'en'

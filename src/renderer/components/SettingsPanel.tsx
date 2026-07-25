@@ -207,6 +207,7 @@ const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
   { id: 'appearance', labelKey: 'settings.nav.appearance' },
   { id: 'shortcuts', labelKey: 'settings.nav.shortcuts' },
   { id: 'templates', labelKey: 'settings.nav.templates' },
+  { id: 'session', labelKey: 'settings.nav.session' },
   { id: 'notifications', labelKey: 'settings.nav.notifications' },
   { id: 'updates', labelKey: 'settings.nav.updates' }
 ];
@@ -410,6 +411,25 @@ export function SettingsPanel(): React.JSX.Element | null {
             )}
             {section === 'shortcuts' && <ShortcutsSection />}
             {section === 'templates' && <TemplatesSection />}
+            {section === 'session' && (
+              <div className="settings-group">
+                <div className="modal-section-label">{t('settings.session.title')}</div>
+
+                <div className="setting-row">
+                  <label htmlFor="restore-history-toggle">{t('settings.session.restoreHistory')}</label>
+                  <input
+                    id="restore-history-toggle"
+                    type="checkbox"
+                    checked={settings.restoreTerminalHistory !== false}
+                    onChange={(e) => updateSettings({ restoreTerminalHistory: e.target.checked })}
+                  />
+                </div>
+
+                <p className="modal-hint">
+                  {t('settings.session.restoreHistoryHint')}
+                </p>
+              </div>
+            )}
             {section === 'notifications' && (
               <>
                 <div className="settings-group">

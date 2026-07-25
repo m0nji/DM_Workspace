@@ -7,7 +7,8 @@ import { tmpdir } from 'os';
 //   dmws-e2e-fb-*  … plus the working folders file-browser.spec creates
 //   dmws-env-*     shell-env.spec         dmws-restart-*  restart-scrollback.spec
 //   dmws-probe-*   restart-probe.spec     dmtask-*        task-board.spec
-const PREFIXES = ['dmws-e2e-', 'dmws-env-', 'dmws-restart-', 'dmws-probe-', 'dmtask-'];
+//   dmws-history-off-*  restart-history-off.spec
+const PREFIXES = ['dmws-e2e-', 'dmws-env-', 'dmws-restart-', 'dmws-probe-', 'dmtask-', 'dmws-history-off-'];
 
 // Why this lives in the harness rather than in the app:
 //

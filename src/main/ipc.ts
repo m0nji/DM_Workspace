@@ -166,7 +166,14 @@ export function resolveLinkPath(
 
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   const pty = new PtyManager();
-  const scrollback = new ScrollbackStore(SCROLLBACK_FILE());
+  // state.json wird hier ein zweites Mal gelesen (das erste Mal geschieht über
+  // state:load): das erste scrollback:get feuert beim Mount der ersten Pane und
+  // damit lange vor dem ersten state:save. Ohne diesen Lesevorgang gäbe es ein
+  // Zeitfenster, in dem der Store noch als aktiviert gilt und Verlauf ausliefert,
+  // obwohl die Option aus ist.
+  const scrollback = new ScrollbackStore(SCROLLBACK_FILE(), {
+    enabled: loadStateFromFile(STATE_FILE()).settings.restoreTerminalHistory !== false
+  });
 
   // Wipe the temp image dir on quit; pasted images only need to survive the
   // session. Also release the task watcher and its pending debounce (declared
@@ -222,6 +229,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     // Drop scrollback for panes that no longer exist in any layout (closed panes).
     const liveIds = state.workspaces.flatMap((w) => collectPaneIds(w.layout));
     scrollback.prune(liveIds);
+    // Der Renderer persistiert Settings ohne Debounce, das Umlegen des Schalters
+    // greift hier also im selben Zug.
+    scrollback.setEnabled(state.settings.restoreTerminalHistory !== false);
   });
 
   ipcMain.handle('scrollback:get', (_e, paneId: unknown) =>

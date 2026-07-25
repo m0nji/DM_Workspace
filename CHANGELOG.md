@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.9.36 – 2026-07-25
+- feat: Restoring terminal history after a restart can now be switched off — Settings › Session › "Restore terminal history". It stays on by default, so nothing changes unless you turn it off. With it off, every launch starts with empty terminals and no terminal content is written to disk at all: the stored history is discarded the moment you flip the switch. Your workspaces, pane layout and pane titles come back either way
+
 ## 0.9.35 – 2026-07-25
 - change: The sidebar and the settings panes now read as one calm surface each — a single rounded frame around plain entries, instead of a filled panel with a divider line doing the same separating job twice. The settings options sit in one continuous frame rather than a separate box per section, and the line above the sidebar footer gave way to spacing. This follows the DM Apps design rule introduced with DM Screenshot 0.9.0, so all DM apps look alike
 

@@ -58,17 +58,27 @@ export class ScrollbackStore {
   private map: ScrollbackMap;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly flushDelayMs: number;
+  private enabled: boolean;
 
-  constructor(private readonly file: string, opts: { flushDelayMs?: number } = {}) {
+  constructor(
+    private readonly file: string,
+    opts: { flushDelayMs?: number; enabled?: boolean } = {}
+  ) {
     this.map = loadScrollbackFromFile(file);
     this.flushDelayMs = opts.flushDelayMs ?? DEFAULT_FLUSH_DELAY_MS;
+    this.enabled = opts.enabled ?? true;
+    // Unsubscribed history must not survive a restart: anything written before
+    // disabling disappears here immediately — not just at the next flush,
+    // which a crash could skip.
+    if (!this.enabled) this.wipe();
   }
 
   get(paneId: string): string | undefined {
-    return this.map[paneId];
+    return this.enabled ? this.map[paneId] : undefined;
   }
 
   set(paneId: string, data: string): void {
+    if (!this.enabled) return;
     this.map[paneId] = truncateScrollback(data);
     this.schedulePersist();
   }
@@ -91,6 +101,23 @@ export class ScrollbackStore {
       }
     }
     if (changed) this.schedulePersist();
+  }
+
+  // Toggles recording. Disabling discards everything stored so far and
+  // empties the file immediately; enabling simply resumes recording from
+  // scratch (the renderer writes the full visible buffer on its next save).
+  setEnabled(next: boolean): void {
+    if (this.enabled === next) return;
+    this.enabled = next;
+    if (!next) this.wipe();
+  }
+
+  // Same as flush(), but with nothing left to persist: clears the in-memory
+  // map first (and with it any pending debounced write) before writing the
+  // now-empty map to disk.
+  private wipe(): void {
+    this.map = {};
+    this.flush();
   }
 
   flush(): void {

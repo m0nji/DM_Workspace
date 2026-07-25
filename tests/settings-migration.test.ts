@@ -98,4 +98,25 @@ describe('migrateSettings', () => {
     expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, clickMovesCursor: true }).clickMovesCursor).toBe(true);
     expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, clickMovesCursor: 'yes' }).clickMovesCursor).toBeUndefined();
   });
+
+  // Regression-Schutz in der Bauart des brandDesign-Fehlers: würde das Feld hier
+  // durchfallen, käme der Verlauf nach jedem Start ungefragt zurück und der
+  // nächste Save überschriebe die Wahl des Nutzers dauerhaft.
+  it('preserves restoreTerminalHistory across a load/save round-trip', () => {
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, restoreTerminalHistory: false
+    }).restoreTerminalHistory).toBe(false);
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, restoreTerminalHistory: true
+    }).restoreTerminalHistory).toBe(true);
+  });
+
+  it('omits a non-boolean restoreTerminalHistory so the default (on) applies', () => {
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, restoreTerminalHistory: 'yes'
+    }).restoreTerminalHistory).toBeUndefined();
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95
+    }).restoreTerminalHistory).toBeUndefined();
+  });
 });
