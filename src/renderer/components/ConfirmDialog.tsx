@@ -32,15 +32,25 @@ export function ConfirmDialog({
   const titleId = useId();
   const messageId = useId();
 
+  // Callers regularly pass inline onConfirm/onCancel closures, which get a new
+  // identity on every parent render — including renders triggered by unrelated
+  // state (e.g. a terminal status flip while this dialog is open). Reading the
+  // latest handlers through a ref keeps the mount effect below stable, so it
+  // grabs focus exactly once instead of re-stealing it back onto "confirm" on
+  // every parent re-render (which could turn a Tab-to-Cancel + stray Enter into
+  // an accidental confirm of a destructive action).
+  const handlers = useRef({ onConfirm, onCancel });
+  useEffect(() => { handlers.current = { onConfirm, onCancel }; });
+
   useEffect(() => {
     confirmRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-      else if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+      if (e.key === 'Escape') { e.preventDefault(); handlers.current.onCancel(); }
+      else if (e.key === 'Enter') { e.preventDefault(); handlers.current.onConfirm(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onConfirm, onCancel]);
+  }, []);
 
   return (
     <div className="modal-backdrop" onMouseDown={onCancel}>

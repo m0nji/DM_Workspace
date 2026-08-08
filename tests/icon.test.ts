@@ -28,3 +28,11 @@ describe('file-browser icons', () => {
     }
   });
 });
+
+describe('remote icon', () => {
+  it('definiert nicht-leere Pfade für das Server-Icon', () => {
+    expect(ICON_PATHS.server).toBeDefined();
+    expect(ICON_PATHS.server.length).toBeGreaterThan(0);
+    for (const d of ICON_PATHS.server) expect(typeof d).toBe('string');
+  });
+});

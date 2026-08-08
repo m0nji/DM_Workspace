@@ -15,6 +15,7 @@
   "workspace": {
     "sectionTitle": "WORKSPACES",
     "addWorkspace": "+ Workspace",
+    "addRemoteWorkspace": "+ Remote workspace",
     "edit": {
       "title": "Edit workspace",
       "name": "Name",
@@ -28,7 +29,10 @@
     "folderRestartAction": "Restart",
     "deleteTitle": "Close workspace?",
     "deleteMessage": "“{{name}}” will be closed. Any running terminals will be terminated.",
-    "closeConfirm": "Close workspace"
+    "closeConfirm": "Close workspace",
+    "remoteServerRemoved": "Server removed",
+    "remoteTitle": "Remote workspace on {{server}}",
+    "remoteTitleUnknown": "Remote workspace — server removed"
   },
   "tooltip": {
     "editWorkspace": "Edit workspace",
@@ -45,7 +49,28 @@
       "templates": "Templates",
       "session": "Session",
       "notifications": "Notifications",
+      "account": "Account & servers",
       "updates": "Updates"
+    },
+    "account": {
+      "title": "Workspace servers",
+      "empty": "No servers configured yet. Add a DM Workspace Web server below to open remote workspaces.",
+      "addServer": "Add server",
+      "serverName": "Name",
+      "serverUrl": "https://server.example",
+      "add": "Add",
+      "hint": "Sessions are stored encrypted on this machine (safeStorage); the token never leaves the app.",
+      "removeServer": "Remove",
+      "login": "Sign in…",
+      "loginSubmit": "Sign in",
+      "loginBrowser": "Sign in via browser",
+      "username": "Username",
+      "password": "Password",
+      "logout": "Sign out",
+      "waiting": "Waiting…",
+      "statusChecking": "checking…",
+      "statusLoggedIn": "signed in as {{user}}",
+      "statusLoggedOut": "not signed in"
     },
     "language": {
       "label": "Language",
@@ -151,6 +176,7 @@
     },
     "cmd": {
       "newWorkspace": "New workspace",
+      "newRemoteTerminal": "New terminal in this project",
       "splitHorizontal": "Split focused pane left and right",
       "splitVertical": "Split focused pane top and bottom",
       "toggleMaximize": "Toggle focused pane maximize",
@@ -245,7 +271,18 @@
     "previewRenderError": "Preview could not be rendered.",
     "accessDenied": "Access denied",
     "readError": "Couldn't read folder.",
-    "emptyFolder": "Empty folder"
+    "emptyFolder": "Empty folder",
+    "deleteMessageRemote": "Delete \"{{name}}\" on the server? This cannot be undone.",
+    "remoteNotLoggedIn": "Not signed in to this server — sign in via Settings → Account & servers.",
+    "remoteForbidden": "No permission on the server.",
+    "remoteNotFound": "Not found on the server.",
+    "remoteNetwork": "Server not reachable.",
+    "tooLargeLimit": "File exceeds the server limit of 1 MB.",
+    "readOnlyViewer": "Read-only (viewer role)",
+    "conflictMessage": "Changed on the server — reload or overwrite?",
+    "conflictReload": "Reload",
+    "conflictOverwrite": "Overwrite",
+    "userRuntimeUnavailable": "File access is not available for the personal environment yet."
   },
   "search": {
     "placeholder": "Find",
@@ -295,6 +332,16 @@
     "closeTitle": "Close window?",
     "closeMessage": "This window and its running terminal process will be closed.",
     "closeConfirm": "Close window",
+    "newRemoteTerminal": "New terminal in this project",
+    "remoteBlocked": {
+      "offline": "Not connected",
+      "viewer": "Read-only access",
+      "paneLimit": "This project already has the maximum of {{max}} terminals",
+      "lastPane": "The last terminal of a project cannot be closed"
+    },
+    "closeRemoteTitle": "Close terminal for everyone?",
+    "closeRemoteMessage": "This terminal belongs to the project. Closing it removes it for everyone connected, and any process running in it is terminated — including for whoever is currently driving it.",
+    "closeRemoteConfirm": "Close for everyone",
     "status": {
       "idle": "idle",
       "busy": "busy",
@@ -333,6 +380,65 @@
     "clearAllTitle": "Clear all windows?",
     "clearAllMessage": "All panes in this workspace will be cleared and their scrollback history lost.",
     "clearAllConfirm": "Clear all"
+  },
+  "remote": {
+    "dialogTitle": "New remote workspace",
+    "noServers": "No servers configured. Add one in Settings → Account & servers first.",
+    "chooseServer": "Server",
+    "chooseProject": "Project",
+    "loadingProjects": "Loading projects…",
+    "noProjects": "No projects on this server (or no membership).",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "role": {
+      "owner": "Owner",
+      "editor": "Editor",
+      "viewer": "Viewer (read-only)"
+    },
+    "statusTitle": "Connection status",
+    "status": {
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "reconnecting": "Reconnecting…",
+      "closed": "Disconnected",
+      "kicked": "Signed out by server",
+      "runtime-stopped": "Runtime is sleeping"
+    },
+    "kickedHint": "Access was revoked or the session ended — sign in again in Settings.",
+    "wake": "Wake",
+    "reconnect": "Reconnect",
+    "driverYou": "You are driving",
+    "driverOther": "{{name}} is driving",
+    "driverNone": "No driver",
+    "requestDriver": "Request write access",
+    "releaseDriver": "Release write access",
+    "requestPending": "Requested…",
+    "requestDenied": "Request denied",
+    "actionForbidden": "The server rejected that — your role is read-only.",
+    "actionRejected": "The server rejected that action.",
+    "actionOffline": "Not connected — the action was not sent.",
+    "actionPaneLimit": "This project already has the maximum of {{max}} terminals.",
+    "actionLastPane": "The last terminal of a project cannot be closed.",
+    "queueRequest": "{{name}} requests write access",
+    "approve": "Approve",
+    "deny": "Deny",
+    "presenceTitle": "Who is here",
+    "presenceDriver": "{{name}} (driver)",
+    "userEnvironment": "Personal environment",
+    "userRuntimeStatus": {
+      "running": "Running",
+      "sleeping": "Sleeping",
+      "none": "Not set up yet"
+    },
+    "stopRuntime": "Stop environment",
+    "stopRuntimeConfirm": "The personal environment will be stopped and running processes will be terminated. Files and installed tools are kept; \"Wake\" starts it again.",
+    "stopRuntimeAction": "Stop",
+    "pairing": {
+      "expired": "The pairing code expired — please try again.",
+      "consumed": "The pairing code was already used — please try again.",
+      "error": "Pairing failed: {{message}}"
+    },
+    "actionUnknownPane": "This terminal no longer exists — someone else closed it."
   },
   "menu": {
     "copy": "Copy",

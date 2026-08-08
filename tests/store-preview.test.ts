@@ -3,7 +3,7 @@ import { useStore } from '../src/renderer/store';
 
 describe('preview panel store', () => {
   beforeEach(() => {
-    useStore.setState({ previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null } });
+    useStore.setState({ previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null, editRemote: null } });
   });
 
   it('openPreview sets the source and opens the panel', () => {

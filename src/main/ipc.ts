@@ -1,8 +1,9 @@
-import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, shell } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { PtyManager } from './pty-manager';
+import { BackendRouter, type TerminalBackend } from './terminal-backend';
 import { createPtyDataBatcher } from './pty-data-batcher';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
@@ -17,9 +18,13 @@ import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from
 import { expandTilde } from './resolve-cwd';
 import { isTrustedSender } from './ipc-sender';
 import {
-  isNonEmptyString, parseAgentDone, parsePtyInput, parsePtyResize, parsePtySpawn,
-  parseScrollbackSave, parseTasksSave
+  isNonEmptyString, parseAgentDone, parseLoginLocal, parsePtyInput, parsePtyResize, parsePtySpawn,
+  parseRemoteDriverDecision, parseRemoteFsFile, parseRemoteFsList, parseRemoteFsRename,
+  parseRemoteFsWrite, parseRemotePaneRef, parseRemoteScopeRef, parseScrollbackSave,
+  parseServerConfig, parseServerRef, parseTasksSave
 } from './ipc-validate';
+import { AuthManager } from './remote/auth-manager';
+import { RemoteManager } from './remote/remote-manager';
 import type {
   AppState, PtyDataEvent, PtyExitEvent, WindowBounds
 } from '../shared/types';
@@ -203,7 +208,27 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     });
   };
 
-  const pty = new PtyManager();
+  // BackendRouter mit dem lokalen PtyManager als Default-Backend: Panes ohne
+  // target (bzw. kind 'local') verhalten sich exakt wie bisher. Daneben das
+  // Remote-Backend (Remote-Workspaces-Plan, 4.4): Session-Tokens bleiben
+  // vollständig im Main-Prozess (safeStorage), der Renderer sieht nur Status.
+  // Alles unter dem Router — Batcher, Kanäle, Shutdown — arbeitet nur gegen
+  // das Interface.
+  const router = new BackendRouter(new PtyManager());
+  const pty: TerminalBackend = router;
+  const auth = new AuthManager({
+    file: join(app.getPath('userData'), 'remote-auth.json'),
+    safeStorage,
+    openExternal: (url) => { if (/^https?:\/\//i.test(url)) void shell.openExternal(url); }
+  });
+  const remote = new RemoteManager({
+    auth,
+    // Serverliste beim Start aus state.json seeden; danach hält server:add/
+    // server:remove sie synchron zu den Renderer-Settings.
+    initialServers: loadStateFromFile(STATE_FILE()).settings.servers ?? [],
+    send: (channel, payload) => getWindow()?.webContents.send(channel, payload)
+  });
+  router.registerRemoteBackend(remote.backend);
   // state.json wird hier ein zweites Mal gelesen (das erste Mal geschieht über
   // state:load): das erste scrollback:get feuert beim Mount der ersten Pane und
   // damit lange vor dem ersten state:save. Ohne diesen Lesevorgang gäbe es ein
@@ -242,7 +267,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   handle('pty:spawn', (_e, raw: unknown) => {
     const req = parsePtySpawn(raw);
     if (!req) { rejectPayload('pty:spawn', raw); return; }
-    pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows });
+    pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows, target: req.target });
   });
   on('pty:input', (_e, raw: unknown) => {
     const req = parsePtyInput(raw);
@@ -257,6 +282,142 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   on('pty:kill', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) { rejectPayload('pty:kill', paneId); return; }
     pty.kill(paneId);
+  });
+
+  // --- Remote-Workspaces (Auth/Server/Verbindungen) ------------------------
+  // Login-/Statusfehler kommen als Ergebnisobjekt zurück (nicht als Throw),
+  // damit die UI die Servermeldung 1:1 anzeigen kann. Fehler der übrigen
+  // handle-Kanäle propagieren als rejected Promise.
+  handle('auth:loginLocal', (_e, raw: unknown) => {
+    const req = parseLoginLocal(raw);
+    if (!req) { rejectPayload('auth:loginLocal', raw); return { ok: false as const, error: 'invalid payload' }; }
+    return remote.loginLocal(req.serverId, req.username, req.password);
+  });
+  handle('auth:startDevicePairing', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('auth:startDevicePairing', raw); return { status: 'error' as const, message: 'invalid payload' }; }
+    return remote.startDevicePairing(req.serverId);
+  });
+  handle('auth:logout', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('auth:logout', raw); return; }
+    return remote.logout(req.serverId);
+  });
+  handle('auth:status', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('auth:status', raw); return { loggedIn: false as const }; }
+    return remote.authStatus(req.serverId);
+  });
+
+  handle('server:list', () => remote.listServers());
+  handle('server:add', (_e, raw: unknown) => {
+    const server = parseServerConfig(raw);
+    if (!server) { rejectPayload('server:add', raw); return; }
+    remote.addServer(server);
+  });
+  handle('server:remove', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('server:remove', raw); return; }
+    remote.removeServer(req.serverId);
+  });
+
+  handle('remote:projects', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('remote:projects', raw); return []; }
+    return remote.projects(req.serverId);
+  });
+  // Persönliche User-Runtime (Phase D): Status für den Workspace-Dialog und
+  // Stop als Gegenstück zum 4205-„Wecken". Fehler als ok:false-Ergebnis.
+  handle('remote:userRuntime', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('remote:userRuntime', raw); return { ok: false as const, error: 'invalid payload' }; }
+    return remote.userRuntime(req.serverId);
+  });
+  handle('remote:userRuntimeStop', (_e, raw: unknown) => {
+    const req = parseServerRef(raw);
+    if (!req) { rejectPayload('remote:userRuntimeStop', raw); return { ok: false as const, error: 'invalid payload' }; }
+    return remote.userRuntimeStop(req.serverId);
+  });
+  handle('remote:connectWorkspace', (_e, raw: unknown) => {
+    const req = parseRemoteScopeRef(raw);
+    if (!req) { rejectPayload('remote:connectWorkspace', raw); throw new Error('invalid payload'); }
+    return remote.connectWorkspace(req.serverId, req.scopeKey);
+  });
+  handle('remote:panes', (_e, raw: unknown) => {
+    const req = parseRemoteScopeRef(raw);
+    if (!req) { rejectPayload('remote:panes', raw); return null; }
+    return remote.backend.connectionInfo(req.serverId, req.scopeKey);
+  });
+  on('remote:disconnect', (_e, raw: unknown) => {
+    const req = parseRemoteScopeRef(raw);
+    if (!req) { rejectPayload('remote:disconnect', raw); return; }
+    remote.disconnect(req.serverId, req.scopeKey);
+  });
+  on('remote:driverRequest', (_e, raw: unknown) => {
+    const req = parseRemotePaneRef(raw);
+    if (!req) { rejectPayload('remote:driverRequest', raw); return; }
+    remote.backend.driverRequest(req.serverId, req.scopeKey, req.paneId);
+  });
+  on('remote:driverRelease', (_e, raw: unknown) => {
+    const req = parseRemotePaneRef(raw);
+    if (!req) { rejectPayload('remote:driverRelease', raw); return; }
+    remote.backend.driverRelease(req.serverId, req.scopeKey, req.paneId);
+  });
+  on('remote:driverApprove', (_e, raw: unknown) => {
+    const req = parseRemoteDriverDecision(raw);
+    if (!req) { rejectPayload('remote:driverApprove', raw); return; }
+    remote.backend.driverApprove(req.serverId, req.scopeKey, req.paneId, req.clientId);
+  });
+  on('remote:driverDeny', (_e, raw: unknown) => {
+    const req = parseRemoteDriverDecision(raw);
+    if (!req) { rejectPayload('remote:driverDeny', raw); return; }
+    remote.backend.driverDeny(req.serverId, req.scopeKey, req.paneId, req.clientId);
+  });
+  on('remote:paneCreate', (_e, raw: unknown) => {
+    const req = parseRemoteScopeRef(raw);
+    if (!req) { rejectPayload('remote:paneCreate', raw); return; }
+    remote.backend.paneCreate(req.serverId, req.scopeKey);
+  });
+  on('remote:paneClose', (_e, raw: unknown) => {
+    const req = parseRemotePaneRef(raw);
+    if (!req) { rejectPayload('remote:paneClose', raw); return; }
+    remote.backend.paneClose(req.serverId, req.scopeKey, req.paneId);
+  });
+
+  // --- Remote-Dateizugriff (B3) --------------------------------------------
+  // Wie bei den Auth-Kanälen kommen Fehler als ok:false-Ergebnis zurück, damit
+  // die UI Servermeldungen und den 409-Konflikt gezielt behandeln kann. Ein
+  // ungültiger Payload ist ein Renderer-Bug -> loggen + invalid-path melden.
+  const invalidFsPayload = { ok: false as const, code: 'invalid-path' as const };
+  handle('remoteFs:list', (_e, raw: unknown) => {
+    const req = parseRemoteFsList(raw);
+    if (!req) { rejectPayload('remoteFs:list', raw); return invalidFsPayload; }
+    return remote.files.list(req.serverId, req.projectId, req.path);
+  });
+  handle('remoteFs:read', (_e, raw: unknown) => {
+    const req = parseRemoteFsFile(raw);
+    if (!req) { rejectPayload('remoteFs:read', raw); return invalidFsPayload; }
+    return remote.files.read(req.serverId, req.projectId, req.path);
+  });
+  handle('remoteFs:write', (_e, raw: unknown) => {
+    const req = parseRemoteFsWrite(raw);
+    if (!req) { rejectPayload('remoteFs:write', raw); return invalidFsPayload; }
+    return remote.files.write(req.serverId, req.projectId, req.path, req.content, req.baseMtime);
+  });
+  handle('remoteFs:mkdir', (_e, raw: unknown) => {
+    const req = parseRemoteFsFile(raw);
+    if (!req) { rejectPayload('remoteFs:mkdir', raw); return invalidFsPayload; }
+    return remote.files.mkdir(req.serverId, req.projectId, req.path);
+  });
+  handle('remoteFs:delete', (_e, raw: unknown) => {
+    const req = parseRemoteFsFile(raw);
+    if (!req) { rejectPayload('remoteFs:delete', raw); return invalidFsPayload; }
+    return remote.files.remove(req.serverId, req.projectId, req.path);
+  });
+  handle('remoteFs:rename', (_e, raw: unknown) => {
+    const req = parseRemoteFsRename(raw);
+    if (!req) { rejectPayload('remoteFs:rename', raw); return invalidFsPayload; }
+    return remote.files.rename(req.serverId, req.projectId, req.from, req.to);
   });
 
   handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));

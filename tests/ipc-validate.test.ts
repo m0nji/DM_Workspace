@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   MAX_DIMENSION, asDimension, isNonEmptyString, isRecord,
-  parseAgentDone, parsePtyInput, parsePtyResize, parsePtySpawn,
-  parseScrollbackSave, parseTasksSave
+  parseAgentDone, parseLoginLocal, parsePtyInput, parsePtyResize, parsePtySpawn,
+  parseRemoteDriverDecision, parseRemoteFsFile, parseRemoteFsList, parseRemoteFsRename,
+  parseRemoteFsWrite, parseRemotePaneRef, parseRemoteRef, parseRemoteScopeRef, parseScrollbackSave,
+  parseServerConfig, parseServerRef, parseTasksSave, isSafeRemoteFsPath
 } from '../src/main/ipc-validate';
 
 // Anders als der Rest von src/main importiert ipc-validate kein Electron —
@@ -117,6 +119,153 @@ describe('parsePtySpawn', () => {
   });
 });
 
+// Das optionale target-Feld (Remote-Workspaces, Arbeitspaket B1): fehlend =
+// lokal; vorhanden wird es strikt geprüft. Ein kaputtes target verwirft den
+// ganzen Payload, statt still auf lokal zurückzufallen.
+describe('parsePtySpawn target', () => {
+  const base = { paneId: 'p1', cwd: '/tmp', cols: 80, rows: 24 };
+
+  it('omits target when the field is missing (local spawn)', () => {
+    const parsed = parsePtySpawn(base);
+    expect(parsed).toEqual(base);
+    expect(parsed).not.toHaveProperty('target');
+  });
+
+  it("accepts an explicit { kind: 'local' }", () => {
+    expect(parsePtySpawn({ ...base, target: { kind: 'local' } }))
+      .toEqual({ ...base, target: { kind: 'local' } });
+  });
+
+  it('accepts a remote target with project scope', () => {
+    const target = {
+      kind: 'remote', serverId: 's1',
+      scope: { kind: 'project', projectId: 'pr1' }, remotePaneId: 'rp1'
+    };
+    expect(parsePtySpawn({ ...base, target })).toEqual({ ...base, target });
+  });
+
+  it('accepts a remote target with user scope', () => {
+    const target = { kind: 'remote', serverId: 's1', scope: { kind: 'user' }, remotePaneId: 'rp1' };
+    expect(parsePtySpawn({ ...base, target })).toEqual({ ...base, target });
+  });
+
+  it('rejects an unknown target kind and non-object targets', () => {
+    expect(parsePtySpawn({ ...base, target: { kind: 'ssh' } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: 'local' })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: null })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: [] })).toBeNull();
+  });
+
+  it('rejects a remote target with a missing or empty serverId/remotePaneId', () => {
+    const scope = { kind: 'user' };
+    expect(parsePtySpawn({ ...base, target: { kind: 'remote', scope, remotePaneId: 'rp1' } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { kind: 'remote', serverId: '', scope, remotePaneId: 'rp1' } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { kind: 'remote', serverId: 's1', scope } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { kind: 'remote', serverId: 's1', scope, remotePaneId: '' } })).toBeNull();
+  });
+
+  it('rejects a remote target with a broken scope', () => {
+    const remote = { kind: 'remote', serverId: 's1', remotePaneId: 'rp1' };
+    expect(parsePtySpawn({ ...base, target: remote })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { ...remote, scope: { kind: 'team' } } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { ...remote, scope: { kind: 'project' } } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { ...remote, scope: { kind: 'project', projectId: '' } } })).toBeNull();
+    expect(parsePtySpawn({ ...base, target: { ...remote, scope: 'user' } })).toBeNull();
+  });
+
+  // Wie überall in dieser Datei: nur die bekannten Felder werden übernommen.
+  it('drops unknown fields inside target and scope', () => {
+    const parsed = parsePtySpawn({
+      ...base,
+      target: {
+        kind: 'remote', serverId: 's1', remotePaneId: 'rp1', evil: 1,
+        scope: { kind: 'project', projectId: 'pr1', sneaky: true }
+      }
+    });
+    expect(parsed?.target).toEqual({
+      kind: 'remote', serverId: 's1',
+      scope: { kind: 'project', projectId: 'pr1' }, remotePaneId: 'rp1'
+    });
+  });
+});
+
+// ---- Remote-Workspaces (Arbeitspaket B2) -----------------------------------
+
+describe('parseServerConfig', () => {
+  it('accepts a well-formed server and normalizes a trailing slash', () => {
+    expect(parseServerConfig({ id: 's1', name: 'Dev', baseUrl: 'https://dmw.example/' }))
+      .toEqual({ id: 's1', name: 'Dev', baseUrl: 'https://dmw.example' });
+  });
+
+  it('rejects non-http(s) schemes', () => {
+    expect(parseServerConfig({ id: 's1', name: 'Dev', baseUrl: 'file:///etc' })).toBeNull();
+    expect(parseServerConfig({ id: 's1', name: 'Dev', baseUrl: 'ws://dmw.example' })).toBeNull();
+    expect(parseServerConfig({ id: 's1', name: 'Dev', baseUrl: 'not a url' })).toBeNull();
+  });
+
+  // Eingebettete Credentials in der URL würden im Klartext in state.json landen.
+  it('rejects URLs with embedded credentials', () => {
+    expect(parseServerConfig({ id: 's1', name: 'Dev', baseUrl: 'https://oauth2:tok@dmw.example' })).toBeNull();
+  });
+
+  it('rejects missing fields', () => {
+    expect(parseServerConfig({ name: 'Dev', baseUrl: 'https://x' })).toBeNull();
+    expect(parseServerConfig({ id: 's1', baseUrl: 'https://x' })).toBeNull();
+    expect(parseServerConfig({ id: 's1', name: 'Dev' })).toBeNull();
+    expect(parseServerConfig(null)).toBeNull();
+  });
+});
+
+describe('parseServerRef / parseRemoteRef / parseRemoteScopeRef / parseRemotePaneRef / parseRemoteDriverDecision', () => {
+  it('accepts well-formed refs and drops unknown fields', () => {
+    expect(parseServerRef({ serverId: 's1', evil: 1 })).toEqual({ serverId: 's1' });
+    expect(parseRemoteRef({ serverId: 's1', projectId: 'p1', evil: 1 }))
+      .toEqual({ serverId: 's1', projectId: 'p1' });
+    expect(parseRemoteScopeRef({ serverId: 's1', scopeKey: 'p1', evil: 1 }))
+      .toEqual({ serverId: 's1', scopeKey: 'p1' });
+    // Der reservierte scopeKey der persönlichen User-Runtime ist ein normaler
+    // nicht-leerer String — dieselbe Prüfung wie eine Projekt-UUID.
+    expect(parseRemoteScopeRef({ serverId: 's1', scopeKey: 'user' }))
+      .toEqual({ serverId: 's1', scopeKey: 'user' });
+    expect(parseRemotePaneRef({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1', evil: 1 }))
+      .toEqual({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1' });
+    expect(parseRemoteDriverDecision({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1', clientId: 'c9' }))
+      .toEqual({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1', clientId: 'c9' });
+  });
+
+  it('rejects missing or empty fields at every level', () => {
+    expect(parseServerRef({})).toBeNull();
+    expect(parseServerRef({ serverId: '' })).toBeNull();
+    expect(parseRemoteRef({ serverId: 's1' })).toBeNull();
+    expect(parseRemoteScopeRef({ serverId: 's1' })).toBeNull();
+    expect(parseRemoteScopeRef({ serverId: 's1', scopeKey: '' })).toBeNull();
+    expect(parseRemotePaneRef({ serverId: 's1', scopeKey: 'p1' })).toBeNull();
+    expect(parseRemoteDriverDecision({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1' })).toBeNull();
+    expect(parseRemoteDriverDecision({ serverId: 's1', scopeKey: 'p1', paneId: 'rp1', clientId: '' })).toBeNull();
+  });
+
+  it('rejects non-objects', () => {
+    expect(parseServerRef('s1')).toBeNull();
+    expect(parseRemoteRef(null)).toBeNull();
+    expect(parseRemoteScopeRef(null)).toBeNull();
+    expect(parseRemotePaneRef([])).toBeNull();
+  });
+});
+
+describe('parseLoginLocal', () => {
+  it('accepts a well-formed payload (empty password is structurally valid)', () => {
+    expect(parseLoginLocal({ serverId: 's1', username: 'karl', password: '' }))
+      .toEqual({ serverId: 's1', username: 'karl', password: '' });
+  });
+
+  it('rejects a missing username or non-string password', () => {
+    expect(parseLoginLocal({ serverId: 's1', password: 'x' })).toBeNull();
+    expect(parseLoginLocal({ serverId: 's1', username: '', password: 'x' })).toBeNull();
+    expect(parseLoginLocal({ serverId: 's1', username: 'k', password: 42 })).toBeNull();
+    expect(parseLoginLocal(null)).toBeNull();
+  });
+});
+
 describe('parseScrollbackSave', () => {
   it('accepts an empty buffer', () => {
     expect(parseScrollbackSave({ paneId: 'p1', data: '' })).toEqual({ paneId: 'p1', data: '' });
@@ -176,5 +325,100 @@ describe('parseTasksSave', () => {
 
   it('rejects a missing dir', () => {
     expect(parseTasksSave({ board })).toBeNull();
+  });
+});
+
+// ---- Remote-Dateizugriff (B3) ----------------------------------------------
+
+describe('isSafeRemoteFsPath', () => {
+  it('accepts relative project paths incl. the empty root path', () => {
+    expect(isSafeRemoteFsPath('')).toBe(true);
+    expect(isSafeRemoteFsPath('README.md')).toBe(true);
+    expect(isSafeRemoteFsPath('src/app/main.ts')).toBe(true);
+    // '..' als Namensbestandteil ist harmlos — nur das Segment '..' klettert.
+    expect(isSafeRemoteFsPath('a..b/notes..md')).toBe(true);
+  });
+
+  it('rejects any ".." path segment (zusätzlich zur serverseitigen Prüfung)', () => {
+    expect(isSafeRemoteFsPath('..')).toBe(false);
+    expect(isSafeRemoteFsPath('../etc/passwd')).toBe(false);
+    expect(isSafeRemoteFsPath('src/../..')).toBe(false);
+    expect(isSafeRemoteFsPath('a/../b')).toBe(false);
+  });
+
+  it('rejects Windows backslashes and NUL bytes', () => {
+    // Der Renderer baut Remote-Pfade immer mit '/'; ein Backslash wäre ein Bug
+    // (und '..\\' würde die Segmentprüfung unterlaufen).
+    expect(isSafeRemoteFsPath('src\\app.ts')).toBe(false);
+    expect(isSafeRemoteFsPath('..\\..\\etc')).toBe(false);
+    expect(isSafeRemoteFsPath('a' + String.fromCharCode(0) + 'b')).toBe(false);
+  });
+
+  it('rejects non-strings', () => {
+    expect(isSafeRemoteFsPath(undefined)).toBe(false);
+    expect(isSafeRemoteFsPath(42)).toBe(false);
+    expect(isSafeRemoteFsPath(['a'])).toBe(false);
+  });
+});
+
+describe('parseRemoteFsList / parseRemoteFsFile', () => {
+  const base = { serverId: 'srv1', projectId: 'proj1' };
+
+  it('list accepts the empty path (project root)', () => {
+    expect(parseRemoteFsList({ ...base, path: '' })).toEqual({ ...base, path: '' });
+    expect(parseRemoteFsList({ ...base, path: 'src' })).toEqual({ ...base, path: 'src' });
+  });
+
+  it('file requires a non-empty path (root is never a file target)', () => {
+    expect(parseRemoteFsFile({ ...base, path: '' })).toBeNull();
+    expect(parseRemoteFsFile({ ...base, path: 'a.txt' })).toEqual({ ...base, path: 'a.txt' });
+  });
+
+  it('rejects missing ids, missing path and unsafe paths', () => {
+    expect(parseRemoteFsList({ serverId: 'srv1', path: 'x' })).toBeNull();
+    expect(parseRemoteFsList({ ...base })).toBeNull();
+    expect(parseRemoteFsList({ ...base, path: '../x' })).toBeNull();
+    expect(parseRemoteFsFile({ ...base, path: 'a\\b.txt' })).toBeNull();
+    expect(parseRemoteFsList('nope')).toBeNull();
+  });
+});
+
+describe('parseRemoteFsWrite', () => {
+  const base = { serverId: 'srv1', projectId: 'proj1', path: 'notes.md', content: 'hallo' };
+
+  it('accepts content with and without baseMtime', () => {
+    expect(parseRemoteFsWrite(base)).toEqual(base);
+    expect(parseRemoteFsWrite({ ...base, baseMtime: 1700000000 })).toEqual({ ...base, baseMtime: 1700000000 });
+    // content darf leer sein (neue Datei anlegen).
+    expect(parseRemoteFsWrite({ ...base, content: '' })).toEqual({ ...base, content: '' });
+  });
+
+  it('rejects a broken baseMtime instead of dropping it silently', () => {
+    expect(parseRemoteFsWrite({ ...base, baseMtime: -1 })).toBeNull();
+    expect(parseRemoteFsWrite({ ...base, baseMtime: NaN })).toBeNull();
+    expect(parseRemoteFsWrite({ ...base, baseMtime: '123' })).toBeNull();
+  });
+
+  it('rejects missing content and unsafe paths', () => {
+    expect(parseRemoteFsWrite({ serverId: 'srv1', projectId: 'proj1', path: 'x' })).toBeNull();
+    expect(parseRemoteFsWrite({ ...base, path: '../notes.md' })).toBeNull();
+    expect(parseRemoteFsWrite({ ...base, path: '' })).toBeNull();
+  });
+});
+
+describe('parseRemoteFsRename', () => {
+  const base = { serverId: 'srv1', projectId: 'proj1' };
+
+  it('accepts two safe non-empty paths', () => {
+    expect(parseRemoteFsRename({ ...base, from: 'a.txt', to: 'b/c.txt' }))
+      .toEqual({ ...base, from: 'a.txt', to: 'b/c.txt' });
+  });
+
+  it('rejects empty or unsafe endpoints', () => {
+    expect(parseRemoteFsRename({ ...base, from: '', to: 'b' })).toBeNull();
+    expect(parseRemoteFsRename({ ...base, from: 'a', to: '' })).toBeNull();
+    expect(parseRemoteFsRename({ ...base, from: 'a', to: '../b' })).toBeNull();
+    expect(parseRemoteFsRename({ ...base, from: 'a\\b', to: 'c' })).toBeNull();
+    expect(parseRemoteFsRename({ ...base, from: 'a' })).toBeNull();
   });
 });

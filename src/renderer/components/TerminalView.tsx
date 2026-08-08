@@ -34,6 +34,10 @@ import {
 } from '../../shared/terminal-reset';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
+import { RemotePaneBar } from './RemotePaneBar';
+import { parseRemotePaneKey, remoteScopeFromKey } from '../../shared/remote-pane-key';
+import { isPaneWritable } from '../store';
+import type { SpawnTarget } from '../../shared/types';
 import { createResizeScheduler } from '../resize-scheduler';
 import { createSaveScheduler, type SaveScheduler } from '../save-scheduler';
 import {
@@ -105,6 +109,9 @@ function syncBackgrounds(host: HTMLElement | null, background: string | undefine
 
 export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
+  // Remote-Pane? Der namespaced Schlüssel trägt Server/Projekt/Server-Pane in
+  // sich (shared/remote-pane-key.ts); für die Lebenszeit der Pane konstant.
+  const remoteRef = parseRemotePaneKey(paneId);
   // Der Mount-Effect läuft bewusst nur einmal pro Pane, schreibt aber eine
   // übersetzte Meldung (Prozess beendet). Nähme er `t` in die Deps, würde ein
   // Sprachwechsel zur Laufzeit das Terminal disposen und die Shell neu starten —
@@ -184,6 +191,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
   useEffect(() => {
     const host = hostRef.current!;
+    // Im Effect neu abgeleitet (statt remoteRef aus dem Render zu schließen):
+    // der Effect hängt bewusst nur an paneId, und der Schlüssel bestimmt das
+    // Ziel vollständig.
+    const remote = parseRemotePaneKey(paneId);
     const term = new Terminal({
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
       fontSize: 13,
@@ -333,8 +344,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // [paneId], eine zusätzliche Dependency würde bei jedem Umschalten das
     // Terminal neu aufbauen und den laufenden Prozess killen. Gleiches Muster
     // wie plainClickEnabled weiter oben.
+    // Remote-Panes speichern keinen lokalen Verlauf: ihr Scrollback kommt beim
+    // (Re-)Subscribe vom Server (Seq-Resume) — eine lokale Kopie würde beim
+    // nächsten Start doppelt replayed.
     const historyEnabled = (): boolean =>
-      useStore.getState().settings.restoreTerminalHistory !== false;
+      !remote && useStore.getState().settings.restoreTerminalHistory !== false;
 
     const doSave = (): void => {
       // Vor dem serialize(): der Aufruf läuft den kompletten Puffer ab, und das
@@ -382,6 +396,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       term.write(`\r\n[${tRef.current('terminal.processExited', { code: exitCode })}]\r\n`);
     });
     const inputDisp = term.onData((data) => {
+      // Driver-Gating: Ohne Schreibrecht wird Input einer Remote-Pane lokal
+      // verworfen (der Server lehnt ihn ohnehin ab) — so tippt niemand
+      // "ins Leere" mit sichtbarer Verzögerung bis zur Server-Ablehnung.
+      if (remote && !isPaneWritable(useStore.getState(), paneId)) return;
       autoTitleTracker.onInput(data);
       window.api.input({ paneId, data });
       activity.onInput();
@@ -422,9 +440,20 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       if (spawned) return;
       spawned = true;
       void restoreOnce().then(() => {
+        // Remote-Panes spawnen mit target: der BackendRouter reicht sie an das
+        // RemotePtyBackend weiter (Subscribe statt lokalem PTY). Der scopeKey
+        // aus dem Pane-Schlüssel bestimmt Projekt- vs. User-Scope.
+        const target: SpawnTarget | undefined = remote
+          ? {
+              kind: 'remote',
+              serverId: remote.serverId,
+              scope: remoteScopeFromKey(remote.scopeKey),
+              remotePaneId: remote.remotePaneId
+            }
+          : undefined;
         // Ein fehlgeschlagener Spawn hinterlässt eine tote Pane — sichtbar machen
         // statt als stillen Rejection verpuffen zu lassen.
-        void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24 })
+        void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24, ...(target ? { target } : {}) })
           .catch((err: unknown) => console.error(`[pane ${paneId}] spawn failed:`, err));
         spawnSent = true;
         // One-shot startup command for a pane created from a template. Consuming
@@ -610,11 +639,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: t('menu.resetTerminal'), onClick: () => { term?.write(STUCK_MODE_RESET); term?.focus(); } },
       { label: '-' },
       { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
+      // Auch für Remote-Panes: requestClosePane entscheidet im Store zwischen
+      // lokalem Layout und pane.close und stellt in beiden Fällen die Rückfrage.
       { label: t('menu.closeTerminal'), onClick: () => requestClosePane(paneId) }
     ];
   };
 
-  return (
+  const hostWrap = (
     <div
       className="xterm-host-wrap"
       onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
@@ -661,6 +692,17 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           </svg>
         </button>
       )}
+    </div>
+  );
+
+  // Lokale Panes behalten exakt die bisherige DOM-Struktur; Remote-Panes
+  // bekommen darüber die schmale Status-/Driver-Leiste. remoteRef ist für die
+  // Lebenszeit der Pane konstant, die Struktur wechselt also nie zur Laufzeit.
+  if (!remoteRef) return hostWrap;
+  return (
+    <div className="remote-pane-stack">
+      <RemotePaneBar paneId={paneId} />
+      {hostWrap}
     </div>
   );
 }

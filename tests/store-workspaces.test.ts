@@ -30,7 +30,7 @@ describe('workspace store actions', () => {
       settings: { themeId: 'default', terminalOpacity: 0.75 },
       maximizedPaneId: 'p1',
       paneAutoTitles: {},
-      pendingClosePaneId: null
+      pendingClosePane: null
     });
   });
 
@@ -229,11 +229,11 @@ describe('workspace store actions', () => {
     });
 
     useStore.getState().requestClosePane('old1');
-    expect(useStore.getState().pendingClosePaneId).toBe('old1');
+    expect(useStore.getState().pendingClosePane).toEqual({ paneId: 'old1', remote: false });
     expect(collectPaneIds(useStore.getState().workspaces[0].layout)).toEqual(['old1']);
 
     useStore.getState().cancelClosePane();
-    expect(useStore.getState().pendingClosePaneId).toBeNull();
+    expect(useStore.getState().pendingClosePane).toBeNull();
     expect(window.api.kill).not.toHaveBeenCalled();
   });
 

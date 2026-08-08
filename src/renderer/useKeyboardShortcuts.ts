@@ -53,7 +53,13 @@ export function useKeyboardShortcuts(): void {
       if (is('openSettings')) { stop(); s.setSettingsOpen(true); return; }
       if (is('togglePreview')) { stop(); s.togglePreview(); return; }
       if (is('toggleMaximize')) { if (s.focusedPaneId) { stop(); s.toggleMaximize(s.focusedPaneId); } return; }
-      if (is('closePane')) { if (s.focusedPaneId) { stop(); s.requestClosePane(s.focusedPaneId); } return; }
+      // Auch remote geht es über requestClosePane: der Store entscheidet dort
+      // zwischen lokalem Layout und pane.close und stellt in beiden Fällen die
+      // Rückfrage — ein Tastendruck darf kein Terminal für alle beenden.
+      if (is('closePane')) {
+        if (s.focusedPaneId) { stop(); s.requestClosePane(s.focusedPaneId); }
+        return;
+      }
       if (is('searchPane')) { if (s.focusedPaneId) { stop(); s.setSearchOpen(s.focusedPaneId); } return; }
       // Exact matching disambiguates the two split bindings (vertical carries an extra modifier).
       if (is('splitVertical')) { if (s.focusedPaneId) { stop(); s.splitActivePane(s.focusedPaneId, 'v'); } return; }

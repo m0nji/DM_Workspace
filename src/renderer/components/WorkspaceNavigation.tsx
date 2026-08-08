@@ -2,16 +2,23 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
-import type { WorkspaceNavigationPlacement } from '../../shared/types';
+import type { ServerConfig, WorkspaceNavigationPlacement } from '../../shared/types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ChangelogModal } from './ChangelogModal';
 import { WorkspaceEditModal } from './WorkspaceEditModal';
 import { Icon } from './Icon';
 import { changelogVersions } from '../changelog-data';
+import { remoteServerName } from '../remote-server-label';
 
 interface WorkspaceNavigationProps {
   placement: WorkspaceNavigationPlacement;
 }
+
+// Zustand 5 memoisiert Selektoren nicht: `s.settings.servers ?? []` liefert ohne
+// konfigurierten Server bei JEDER Momentaufnahme ein neues Array und würde die
+// Navigation bei jedem Store-Ereignis neu rendern — genau das, was die
+// paneStatus-Optimierung unten vermeidet. Eine feste Konstante bleibt identisch.
+const NO_SERVERS: ServerConfig[] = [];
 
 export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): React.JSX.Element {
   const { t } = useTranslation();
@@ -21,6 +28,9 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
   const addWorkspace = useStore((s) => s.addWorkspace);
   const reorderWorkspace = useStore((s) => s.reorderWorkspace);
   const deleteWorkspace = useStore((s) => s.deleteWorkspace);
+  const servers = useStore((s) => s.settings.servers ?? NO_SERVERS);
+  const hasServers = servers.length > 0;
+  const setRemoteDialogOpen = useStore((s) => s.setRemoteWorkspaceDialogOpen);
   const showDoneBadge = useStore((s) => s.settings.showDoneBadge ?? false);
   // Subscribe to paneStatus only while the done badge is on — status flips on
   // every terminal's running/idle/done transition and would re-render the whole
@@ -55,6 +65,10 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
       {workspaces.map((w) => {
         const paneIds = paneIdsByWs.get(w.id) ?? [];
         const count = paneIds.length;
+        // Remote-Workspaces zeigen ein Server-Icon statt des Farbpunkts sowie den
+        // Servernamen als zweite Zeile (bzw. im title, wenn kein Platz dafür ist).
+        const isRemote = w.kind === 'remote';
+        const serverName = isRemote ? remoteServerName(servers, w.remote) : null;
         // Badge: number of "done" panes in INACTIVE workspaces (where you can't see them).
         const doneCount = !showDoneBadge || !paneStatus || w.id === activeId
           ? 0
@@ -64,10 +78,16 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
             key={w.id}
             className={[
               itemClass,
+              isRemote ? 'remote' : '',
               w.id === activeId ? 'active' : '',
               w.id === draggedId ? 'dragging' : '',
               dropTarget?.id === w.id ? `drop-${dropTarget.position}` : ''
             ].filter(Boolean).join(' ')}
+            title={isRemote
+              ? (serverName
+                  ? t('workspace.remoteTitle', { server: serverName })
+                  : t('workspace.remoteTitleUnknown'))
+              : undefined}
             draggable
             onClick={() => selectWorkspace(w.id)}
             onDoubleClick={(e) => { e.preventDefault(); setEditingId(w.id); }}
@@ -110,8 +130,19 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
               setDropTarget(null);
             }}
           >
-            <span className="dot" style={w.color ? { background: w.color } : undefined} />
-            <span className="name">{w.name}</span>
+            {isRemote
+              ? <span className="ws-remote-icon"><Icon name="server" size={13} /></span>
+              : <span className="dot" style={w.color ? { background: w.color } : undefined} />}
+            {isRemote && !top ? (
+              <span className="ws-text">
+                <span className="name">{w.name}</span>
+                <span className={['ws-sub', serverName ? '' : 'missing'].filter(Boolean).join(' ')}>
+                  {serverName ?? t('workspace.remoteServerRemoved')}
+                </span>
+              </span>
+            ) : (
+              <span className="name">{w.name}</span>
+            )}
             <span className="ws-end">
               <span className="ws-actions">
                 <span
@@ -138,6 +169,24 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
       >
         {top ? '+' : t('workspace.addWorkspace')}
       </div>
+      {/* Nur sichtbar, wenn Server konfiguriert sind — ohne Remote-Setup bleibt
+          die Navigation exakt wie bisher (auch für die bestehenden E2E-Specs). */}
+      {hasServers && (
+        <div
+          className={top ? 'add-workspace-tab' : 'add-ws'}
+          title={t('workspace.addRemoteWorkspace')}
+          onClick={() => setRemoteDialogOpen(true)}
+        >
+          {top ? (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3.6 9h16.8M3.6 15h16.8" />
+              <path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0 -18" />
+            </svg>
+          ) : t('workspace.addRemoteWorkspace')}
+        </div>
+      )}
 
       {!top && (
         <div className="sidebar-footer">

@@ -56,6 +56,66 @@ describe('persistence serialize/deserialize', () => {
     expect(s.activeWorkspaceId).toBe(s.workspaces[0].id);
   });
 
+  // Remote-Workspaces: kind/remote müssen den Round-Trip überleben; ein halber
+  // Eintrag (kind ohne Verweis) fällt auf lokal zurück.
+  it('round-trips a remote workspace (kind + remote reference)', () => {
+    const withRemote: AppState = {
+      ...sample,
+      workspaces: [
+        ...sample.workspaces,
+        {
+          id: 'w2', name: 'Projekt X', cwd: '~',
+          layout: { type: 'pane', id: 'r:srv1:proj1:p1' },
+          kind: 'remote', remote: { serverId: 'srv1', scope: 'project', projectId: 'proj1' }
+        },
+        {
+          id: 'w3', name: 'Meine Umgebung', cwd: '~',
+          layout: { type: 'pane', id: 'r:srv1:user:p1' },
+          kind: 'remote', remote: { serverId: 'srv1', scope: 'user' }
+        }
+      ]
+    };
+    expect(deserialize(serialize(withRemote))).toEqual(withRemote);
+  });
+
+  // Bestände aus B2/B3 tragen kein scope-Feld — das war immer ein Projekt.
+  it('migrates a scope-less remote reference to scope project', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [
+        {
+          id: 'w1', name: 'Projekt X', cwd: '~', layout: null,
+          kind: 'remote', remote: { serverId: 'srv1', projectId: 'proj1' }
+        }
+      ],
+      settings: { themeId: 'default', terminalOpacity: 0.75 }
+    }));
+    expect(result.workspaces[0].kind).toBe('remote');
+    expect(result.workspaces[0].remote).toEqual({ serverId: 'srv1', scope: 'project', projectId: 'proj1' });
+  });
+
+  it('drops an incomplete remote reference back to a local workspace', () => {
+    const result = deserialize(JSON.stringify({
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [
+        { id: 'w1', name: 'X', cwd: '~', layout: null, kind: 'remote' },
+        { id: 'w2', name: 'Y', cwd: '~', layout: null, kind: 'remote', remote: { serverId: 'srv1' } },
+        // scope 'project' ohne projectId ist genauso unvollständig …
+        { id: 'w3', name: 'Z', cwd: '~', layout: null, kind: 'remote', remote: { serverId: 'srv1', scope: 'project' } },
+        // … wie ein User-Verweis ohne serverId.
+        { id: 'w4', name: 'U', cwd: '~', layout: null, kind: 'remote', remote: { scope: 'user' } }
+      ],
+      settings: { themeId: 'default', terminalOpacity: 0.75 }
+    }));
+    expect(result.workspaces).toHaveLength(4);
+    for (const ws of result.workspaces) {
+      expect(ws.kind).toBeUndefined();
+      expect(ws.remote).toBeUndefined();
+    }
+  });
+
   it('round-trips windowBounds through serialize/deserialize', () => {
     const withBounds: AppState = {
       ...sample,

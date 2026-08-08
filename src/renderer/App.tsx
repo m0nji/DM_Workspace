@@ -11,6 +11,7 @@ import { TemplateWizard } from './components/TemplateWizard';
 import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
 import { TaskBoard } from './components/TaskBoard';
 import { ClosePaneConfirmDialog } from './components/ClosePaneConfirmDialog';
+import { RemoteWorkspaceDialog } from './components/RemoteWorkspaceDialog';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): React.JSX.Element {
@@ -25,6 +26,9 @@ export function App(): React.JSX.Element {
   const applyTasksChanged = useStore((s) => s.applyTasksChanged);
   const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
+  const pendingClosePane = useStore((s) => s.pendingClosePane);
+  const confirmClosePane = useStore((s) => s.confirmClosePane);
+  const cancelClosePane = useStore((s) => s.cancelClosePane);
   // Board shows only when toggled on AND the active workspace opted in. Guards the
   // case where you switch to a non-task workspace while the board is open.
   const showBoard = taskView && tasksEnabled;
@@ -70,6 +74,18 @@ export function App(): React.JSX.Element {
 
   // Live-update the board when TASKS.md changes outside the app.
   useEffect(() => window.api.onTasksChanged(applyTasksChanged), [applyTasksChanged]);
+
+  // Remote-Workspaces: Verbindungs-, Driver- und Presence-Pushes aus dem
+  // Main-Prozess in den Store spiegeln (Muster: tasks:changed oben).
+  useEffect(() => {
+    const s = useStore.getState();
+    const offs = [
+      window.api.onRemoteStatus(s.applyRemoteStatus),
+      window.api.onRemoteDriver(s.applyRemoteDriver),
+      window.api.onRemotePresence(s.applyRemotePresence)
+    ];
+    return () => { offs.forEach((off) => off()); };
+  }, []);
 
   // When the active workspace changes while the board is open, rebind it to the
   // newly active workspace (reloads its TASKS.md, re-arms the file watcher, and
@@ -117,7 +133,16 @@ export function App(): React.JSX.Element {
       <CommandPalette />
       <TemplateWizard />
       <StartupCommandConfirmDialog />
-      <ClosePaneConfirmDialog />
+      {/* Global, damit jeder Einstiegspunkt (Kopf-Knopf, Kontextmenü, Palette,
+          Tastenkürzel) dieselbe Rückfrage bekommt, statt eigenen Zustand zu halten. */}
+      {pendingClosePane && (
+        <ClosePaneConfirmDialog
+          remote={pendingClosePane.remote}
+          onConfirm={confirmClosePane}
+          onCancel={cancelClosePane}
+        />
+      )}
+      <RemoteWorkspaceDialog />
     </div>
   );
 }

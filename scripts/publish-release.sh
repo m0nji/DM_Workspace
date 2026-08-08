@@ -37,6 +37,27 @@ RAW=( \
 FILES=()
 for f in "${RAW[@]}"; do
   base="$(basename "$f")"
+  # Nur Artefakte DIESER Version. dist/ wird von electron-builder nicht
+  # aufgeraeumt: ein aelterer Build hinterlaesst seine Installer dort, und ohne
+  # diesen Filter landeten sie im Release der neuen Version — ein Download von
+  # der 0.10.0-Seite haette dann eine 0.4.0 liefern koennen.
+  #
+  # Die latest*.yml tragen die Version nicht im Dateinamen, sondern im Inhalt,
+  # und sind der heikelste Fall: Sie steuern den Auto-Updater. Eine
+  # stehengebliebene latest.yml einer alten Version wuerde jeder Installation
+  # als "neuester Stand" untergeschoben. Deshalb wird hier die Version IM
+  # Dokument geprueft — Dateiname genuegt nicht.
+  case "$base" in
+    latest*.yml)
+      ymlver="$(sed -n 's/^version:[[:space:]]*//p' "$f" | head -1 | tr -d '\r')"
+      if [ "$ymlver" != "$VERSION" ]; then
+        echo "  übersprungen (meldet Version ${ymlver:-unbekannt}): $base"
+        continue
+      fi
+      ;;
+    *"$VERSION"*) ;;
+    *) echo "  übersprungen (Fremdversion): $base"; continue ;;
+  esac
   safe="${base// /-}"
   if [ "$base" != "$safe" ]; then cp -f "$f" "dist/$safe"; f="dist/$safe"; fi
   FILES+=( "$f" )

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
 import { Icon } from './Icon';
-import type { SettingsSection } from '../../shared/types';
+import type { RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
 import {
   SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, formatShortcutCaps, shortcutFromEvent,
@@ -203,12 +203,187 @@ function UpdateSection(): React.JSX.Element {
   );
 }
 
+// Konto & Server: Workspace-Server verwalten und pro Server anmelden — direkt
+// (Benutzer/Passwort) oder per Gerätekopplung im Browser. Der Renderer sieht
+// dabei nie ein Token, nur den Status aus dem Main-Prozess.
+function ServerRow({ server }: { server: ServerConfig }): React.JSX.Element {
+  const { t } = useTranslation();
+  const removeServer = useStore((s) => s.removeServer);
+  const [status, setStatus] = useState<RemoteAuthStatus | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshStatus = React.useCallback((): void => {
+    window.api.authStatus(server.id).then(setStatus, () => setStatus({ loggedIn: false }));
+  }, [server.id]);
+
+  useEffect(() => { refreshStatus(); }, [refreshStatus]);
+
+  const submitLogin = (): void => {
+    if (busy || !username) return;
+    setBusy(true);
+    setError(null);
+    window.api.authLoginLocal(server.id, username, password)
+      .then((result) => {
+        if (result.ok) {
+          setLoginOpen(false);
+          setPassword('');
+          refreshStatus();
+        } else {
+          setError(result.error);
+        }
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const browserLogin = (): void => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    window.api.authStartDevicePairing(server.id)
+      .then((result) => {
+        if (result.status === 'ok') refreshStatus();
+        else setError(t(`remote.pairing.${result.status}`, { message: result.message ?? '' }));
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const logout = (): void => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    void window.api.authLogout(server.id)
+      .catch(() => undefined)
+      .then(() => refreshStatus())
+      .finally(() => setBusy(false));
+  };
+
+  const statusLabel = status === null
+    ? t('settings.account.statusChecking')
+    : status.loggedIn
+      ? t('settings.account.statusLoggedIn', { user: status.user.displayName })
+      : t('settings.account.statusLoggedOut');
+
+  return (
+    <div className="server-row">
+      <div className="template-row">
+        <span className="template-info">
+          <span className="template-name">{server.name}</span>
+          <span className="template-meta">{server.baseUrl} · {statusLabel}</span>
+        </span>
+        {status?.loggedIn ? (
+          <button className="cwd-btn ghost" disabled={busy} onClick={logout}>{t('settings.account.logout')}</button>
+        ) : (
+          <>
+            <button className="cwd-btn" disabled={busy} onClick={() => { setError(null); setLoginOpen((v) => !v); }}>
+              {t('settings.account.login')}
+            </button>
+            <button className="cwd-btn" disabled={busy} onClick={browserLogin}>
+              {busy ? t('settings.account.waiting') : t('settings.account.loginBrowser')}
+            </button>
+          </>
+        )}
+        <button className="cwd-btn ghost danger" disabled={busy} onClick={() => removeServer(server.id)}>
+          {t('settings.account.removeServer')}
+        </button>
+      </div>
+      {error && <div className="setting-error">{error}</div>}
+      {loginOpen && !status?.loggedIn && (
+        <form
+          className="server-login-form"
+          onSubmit={(e) => { e.preventDefault(); submitLogin(); }}
+        >
+          <input
+            className="wizard-input"
+            placeholder={t('settings.account.username')}
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            className="wizard-input"
+            type="password"
+            placeholder={t('settings.account.password')}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button className="cwd-btn" type="submit" disabled={busy || !username}>
+            {busy ? t('settings.account.waiting') : t('settings.account.loginSubmit')}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// Stabile Referenz statt `?? []` im Selector — ein frisches Array pro Snapshot
+// ließe useSyncExternalStore endlos re-rendern (React #185).
+const NO_SERVERS: ServerConfig[] = [];
+
+function AccountSection(): React.JSX.Element {
+  const { t } = useTranslation();
+  const servers = useStore((s) => s.settings.servers) ?? NO_SERVERS;
+  const addServer = useStore((s) => s.addServer);
+  const [name, setName] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+
+  const urlOk = /^https?:\/\/\S+$/i.test(baseUrl.trim());
+  const canAdd = name.trim().length > 0 && urlOk;
+  const submit = (): void => {
+    if (!canAdd) return;
+    addServer(name.trim(), baseUrl.trim());
+    setName('');
+    setBaseUrl('');
+  };
+
+  return (
+    <>
+      <div className="settings-group">
+        <div className="modal-section-label">{t('settings.account.title')}</div>
+        {servers.length === 0 && (
+          <p className="modal-hint" style={{ marginTop: 0 }}>{t('settings.account.empty')}</p>
+        )}
+        <div className="template-list">
+          {servers.map((srv) => <ServerRow key={srv.id} server={srv} />)}
+        </div>
+      </div>
+
+      <div className="settings-group">
+        <div className="modal-section-label">{t('settings.account.addServer')}</div>
+        <form className="server-login-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+          <input
+            className="wizard-input"
+            placeholder={t('settings.account.serverName')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            className="wizard-input"
+            placeholder={t('settings.account.serverUrl')}
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+          />
+          <button className="cwd-btn" type="submit" disabled={!canAdd}>{t('settings.account.add')}</button>
+        </form>
+        <p className="modal-hint">{t('settings.account.hint')}</p>
+      </div>
+    </>
+  );
+}
+
 const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
   { id: 'appearance', labelKey: 'settings.nav.appearance' },
   { id: 'shortcuts', labelKey: 'settings.nav.shortcuts' },
   { id: 'templates', labelKey: 'settings.nav.templates' },
   { id: 'session', labelKey: 'settings.nav.session' },
   { id: 'notifications', labelKey: 'settings.nav.notifications' },
+  { id: 'account', labelKey: 'settings.nav.account' },
   { id: 'updates', labelKey: 'settings.nav.updates' }
 ];
 
@@ -469,6 +644,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
               </>
             )}
+            {section === 'account' && <AccountSection />}
             {section === 'updates' && <UpdateSection />}
           </div>
         </div>

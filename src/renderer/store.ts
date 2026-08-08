@@ -1,14 +1,17 @@
 import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection,
-  LayoutNode
+  LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
+  RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope
 } from '../shared/types';
+import type { RemoteFilesContext } from './files-api';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
 } from '../shared/layout-tree';
 import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
+import { USER_SCOPE_KEY, isRemotePaneKey, parseRemotePaneKey, remotePaneKey, remoteScopeKey } from '../shared/remote-pane-key';
 import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
 import { focusTerminal, refreshTerminalLayoutAfterCommit, trackTerminalInput } from './terminal-registry';
@@ -43,6 +46,183 @@ const nextPaneId = createIdGenerator('p');
 const nextSplitId = createIdGenerator('s');
 const nextWsId = createIdGenerator('w');
 const nextTemplateId = createIdGenerator('tpl');
+const nextServerId = createIdGenerator('srv');
+
+// ---- Remote-Workspaces ------------------------------------------------------
+
+// Verbindungszustand einer (Server, Scope)-Verbindung, gespeist aus den
+// remote:*-Pushes des Main-Prozesses. Schlüssel: remoteConnKey(); scopeKey ist
+// die Projekt-UUID oder 'user' (shared/remote-pane-key.ts).
+export interface RemoteConnectionState {
+  status: RemoteConnectionStatus;
+  clientId: string | null;             // eigene Presence-Identität
+  role: RemoteRole | null;             // eigene Projektrolle (null = noch unbekannt)
+  panes: RemotePaneInfo[];             // Server-Panes inkl. Driver/Queue
+  presence: RemotePresenceUser[];
+  deniedPaneId: string | null;         // Remote-Pane, deren eigene Driver-Anfrage abgelehnt wurde
+  // Zuletzt abgelehnte Aktion — vom Server (code aus dem Protokoll) oder schon
+  // hier blockiert (code aus RemoteBlockReason). `at` ist der Zeitpunkt: die
+  // Meldung verschwindet nach REMOTE_ERROR_TTL_MS wieder von selbst, sonst
+  // bliebe eine einzelne Ablehnung dauerhaft rot stehen (siehe RemotePaneBar).
+  lastError: { code: string; paneId: string | null; at: number } | null;
+}
+
+// Wie lange eine abgelehnte Aktion angezeigt wird. Lang genug zum Lesen, kurz
+// genug, dass sie nicht als Dauerzustand missverstanden wird.
+export const REMOTE_ERROR_TTL_MS = 8000;
+
+// Spiegelt MAX_PANES aus dem Server-Repo (DM_Workspace_Web,
+// server/src/session/hub.ts). Der Server antwortet inzwischen mit `pane_limit`,
+// wenn man es trotzdem versucht — das Duplikat bleibt trotzdem, weil es einen
+// anderen Zweck erfüllt: Der Desktop deaktiviert den Knopf VORHER und nennt den
+// Grund, statt den Nutzer klicken zu lassen und ihm danach eine Fehlermeldung
+// zu zeigen. Bei einer Änderung im Server muss dieser Wert mitgezogen werden;
+// die Grenze gehört perspektivisch nach @dmw/shared, dann kommt sie über
+// `npm run sync:dmw-client` mit statt von Hand.
+export const REMOTE_MAX_PANES = 6;
+
+export const remoteConnKey = (serverId: string, scopeKey: string): string => `${serverId}:${scopeKey}`;
+
+// Nur die Verbindung prüfen (Status 'connected'), unabhängig von der Rolle —
+// getrennt von der Rollenprüfung, weil „nicht verbunden" und „nur Lesezugriff"
+// in der Oberfläche verschiedene Gründe sind (siehe RemoteBlockReason).
+function isRemoteConnected(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): boolean {
+  const ref = parseRemotePaneKey(paneId);
+  if (!ref) return false;
+  return remote[remoteConnKey(ref.serverId, ref.scopeKey)]?.status === 'connected';
+}
+
+// Anlegen und Schließen von Projekt-Panes verlangt serverseitig Schreibrolle
+// (canWrite = role !== 'viewer') und eine stehende Verbindung. Wir prüfen beides
+// vorab, damit die Knöpfe deaktiviert statt wirkungslos sind.
+function canActOnRemotePanes(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): boolean {
+  if (!isRemoteConnected(remote, paneId)) return false;
+  const ref = parseRemotePaneKey(paneId)!;
+  const conn = remote[remoteConnKey(ref.serverId, ref.scopeKey)]!;
+  return conn.role !== null && conn.role !== 'viewer';
+}
+
+// Warum eine Remote-Pane-Aktion gerade nicht geht. Die Namen sind zugleich der
+// i18n-Teilschlüssel (`pane.remoteBlocked.<reason>`) und der Fehlercode im
+// lastError-Slot — ein Grund, eine Zeichenkette, keine Übersetzungstabelle.
+export type RemoteBlockReason = 'offline' | 'viewer' | 'paneLimit' | 'lastPane';
+
+function remoteConnOf(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): RemoteConnectionState | undefined {
+  const ref = parseRemotePaneKey(paneId);
+  return ref ? remote[remoteConnKey(ref.serverId, ref.scopeKey)] : undefined;
+}
+
+// Anlegen: verlangt Verbindung, Schreibrolle und Platz im Projekt. Die
+// Kapazitätsgrenze prüfen wir selbst, weil der Server sie zwar durchsetzt, das
+// Ergebnis von createPane aber verwirft — ein `+` am Limit bliebe sonst wirkungslos.
+export function remotePaneCreateBlock(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): RemoteBlockReason | null {
+  if (!isRemoteConnected(remote, paneId)) return 'offline';
+  if (!canActOnRemotePanes(remote, paneId)) return 'viewer';
+  const conn = remoteConnOf(remote, paneId);
+  if (conn && conn.panes.length >= REMOTE_MAX_PANES) return 'paneLimit';
+  return null;
+}
+
+// Schließen: dieselben Voraussetzungen, dazu die Server-Regel „das letzte Pane
+// bleibt" (hub.closePane gibt dort false zurück, ebenfalls ohne Meldung). Ohne
+// diese Prüfung fragt der Dialog „für alle schließen?", und danach passiert nichts.
+export function remotePaneCloseBlock(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): RemoteBlockReason | null {
+  if (!isRemoteConnected(remote, paneId)) return 'offline';
+  if (!canActOnRemotePanes(remote, paneId)) return 'viewer';
+  const conn = remoteConnOf(remote, paneId);
+  if (conn && conn.panes.length <= 1) return 'lastPane';
+  return null;
+}
+
+// Eine hier blockierte Aktion landet im selben lastError-Slot wie eine
+// Server-Ablehnung — RemotePaneBar zeigt beides an derselben Stelle. Der Grund
+// wird auf die auslösende Pane eingegrenzt, damit er nicht in fremden Panes
+// derselben Verbindung aufpoppt.
+function withRemoteError(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string,
+  code: string
+): Record<string, RemoteConnectionState> {
+  const ref = parseRemotePaneKey(paneId);
+  const conn = ref ? remote[remoteConnKey(ref.serverId, ref.scopeKey)] : undefined;
+  if (!ref || !conn) return remote;
+  const key = remoteConnKey(ref.serverId, ref.scopeKey);
+  return { ...remote, [key]: { ...conn, lastError: { code, paneId: ref.remotePaneId, at: Date.now() } } };
+}
+
+// Gegenstück: eine gelungene Aktion räumt die vorige Meldung ab, damit nicht
+// die Ablehnung von eben neben dem gerade erfolgreichen Klick stehen bleibt.
+function withoutRemoteError(
+  remote: Record<string, RemoteConnectionState>,
+  paneId: string
+): Record<string, RemoteConnectionState> {
+  const ref = parseRemotePaneKey(paneId);
+  const conn = ref ? remote[remoteConnKey(ref.serverId, ref.scopeKey)] : undefined;
+  if (!ref || !conn?.lastError) return remote;
+  return { ...remote, [remoteConnKey(ref.serverId, ref.scopeKey)]: { ...conn, lastError: null } };
+}
+
+// scopeKey des persistierten Remote-Verweises eines Workspace.
+export function workspaceScopeKey(ref: RemoteWorkspaceRef): string {
+  return ref.scope === 'user' ? USER_SCOPE_KEY : ref.projectId;
+}
+
+const EMPTY_REMOTE_CONNECTION: RemoteConnectionState = {
+  status: 'closed', clientId: null, role: null, panes: [], presence: [], deniedPaneId: null, lastError: null
+};
+
+// Backend-bewusste Pane-Freigabe: für lokale Panes beendet der Main-Prozess den
+// PTY-Prozess; für Remote-Panes routet der BackendRouter denselben Aufruf auf
+// RemotePtyBackend.kill = Unsubscribe — der Prozess gehört dem Projekt und
+// läuft auf dem Server weiter (nie pane.close).
+function releasePane(paneId: string): void {
+  window.api.kill(paneId);
+}
+
+// Ist die eigene Verbindung Driver dieser (Remote-)Pane? Lokale Panes sind
+// immer "Driver" — dort gibt es das Konzept nicht und Input fließt normal.
+export function isPaneWritable(s: Pick<StoreState, 'remote'>, paneId: string): boolean {
+  const ref = parseRemotePaneKey(paneId);
+  if (!ref) return true;
+  const conn = s.remote[remoteConnKey(ref.serverId, ref.scopeKey)];
+  if (!conn?.clientId) return false;
+  const pane = conn.panes.find((p) => p.paneId === ref.remotePaneId);
+  return !!pane && pane.driver === conn.clientId;
+}
+
+// Baut aus N Remote-Panes ein ausgewogenes lokales Layout (abwechselnd h/v).
+// Die Anordnung ist danach lokal frei (Plan-Entscheidung E8).
+function buildRemoteLayout(paneKeys: string[], direction: Direction = 'h'): LayoutNode | null {
+  if (paneKeys.length === 0) return null;
+  if (paneKeys.length === 1) return { type: 'pane', id: paneKeys[0] };
+  const mid = Math.ceil(paneKeys.length / 2);
+  const other: Direction = direction === 'h' ? 'v' : 'h';
+  return {
+    type: 'split',
+    id: nextSplitId(),
+    direction,
+    ratio: 0.5,
+    children: [
+      buildRemoteLayout(paneKeys.slice(0, mid), other)!,
+      buildRemoteLayout(paneKeys.slice(mid), other)!
+    ]
+  };
+}
 
 // Fields the wizard collects when saving the active workspace as a template.
 export interface SaveTemplateInput {
@@ -58,7 +238,7 @@ export interface TemplateWizardState {
   templateId?: string | null; // set => editing an existing template; null/undefined => save current workspace
 }
 
-interface StoreState extends AppState {
+export interface StoreState extends AppState {
   maximizedPaneId: string | null;
   hydrated: boolean;
   settingsOpen: boolean;
@@ -66,7 +246,10 @@ interface StoreState extends AppState {
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
   focusedPaneId: string | null;
-  pendingClosePaneId: string | null;
+  // Offene Rückfrage vor dem Schließen. `remote` unterscheidet nur den Text und
+  // den Vollzug — der Dialog selbst ist für beide Fälle derselbe (App.tsx), damit
+  // kein Einstiegspunkt still an der Rückfrage vorbeikommt.
+  pendingClosePane: { paneId: string; remote: boolean } | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
   taskView: boolean;                 // true => board visible instead of terminals
@@ -89,6 +272,10 @@ interface StoreState extends AppState {
     tab: 'files' | 'preview';
     browseRoot: string | null; // current folder shown in the Files tab
     editPath: string | null;   // file open in the inline editor (preview tab)
+    // Herkunft der editierten Datei: null = lokal, sonst (Server, Projekt) —
+    // damit der Editor auch nach einem Workspace-Wechsel gegen die richtige
+    // Quelle lädt/speichert (editPath allein wäre für Remote mehrdeutig).
+    editRemote: RemoteFilesContext | null;
   };
   openPreview: (source: PreviewSource) => void;
   closePreview: () => void;
@@ -97,7 +284,7 @@ interface StoreState extends AppState {
   openFiles: () => void;
   setPanelTab: (tab: 'files' | 'preview') => void;
   setBrowseRoot: (path: string) => void;
-  openInEditor: (path: string) => void;
+  openInEditor: (path: string, remote?: RemoteFilesContext | null) => void;
   clearEditor: () => void; // drop the inline editor (e.g. its file was deleted)
   // lifecycle
   hydrate: () => Promise<void>;
@@ -114,6 +301,7 @@ interface StoreState extends AppState {
   splitActivePane: (paneId: string, direction: Direction) => void;
   requestClosePane: (paneId: string) => void;
   cancelClosePane: () => void;
+  confirmClosePane: () => void;
   closeActivePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number, persistNow?: boolean) => void;
   toggleMaximize: (paneId: string) => void;
@@ -156,6 +344,24 @@ interface StoreState extends AppState {
   checkForUpdates: () => void;
   downloadUpdate: () => void;
   installUpdate: () => void;
+  // remote workspaces
+  remote: Record<string, RemoteConnectionState>; // Schlüssel: remoteConnKey()
+  remoteWorkspaceDialogOpen: boolean;
+  setRemoteWorkspaceDialogOpen: (open: boolean) => void;
+  addServer: (name: string, baseUrl: string) => void;
+  removeServer: (serverId: string) => void;
+  // verbindet (Server, Scope) — ein Projekt oder die persönliche User-Runtime —
+  // und legt den zugehörigen Remote-Workspace an (bzw. aktiviert einen
+  // bestehenden); wirft bei Verbindungsfehlern.
+  addRemoteWorkspace: (serverId: string, scope: SpawnTargetScope) => Promise<void>;
+  // erneuter Verbindungsaufbau (Wecken nach 4205 / Reconnect nach kicked)
+  reconnectRemote: (serverId: string, scopeKey: string) => void;
+  applyRemoteStatus: (e: RemoteStatusEvent) => void;
+  applyRemoteDriver: (e: RemoteDriverEvent) => void;
+  applyRemotePresence: (e: RemotePresenceEvent) => void;
+  createRemotePane: (paneId: string) => void;
+  closeRemotePane: (paneId: string) => void;
+  clearRemoteError: (serverId: string, scopeKey: string) => void;
 }
 
 // Remove a pane-keyed entry from an optional string map, returning undefined when
@@ -209,9 +415,12 @@ function persist(state: AppState): void {
 
 // Folder the file browser should land on when it opens: the focused pane's live
 // cwd (reported over OSC as the user cds around), falling back to the workspace
-// folder while a fresh pane has not reported one yet.
-function activePaneCwd(s: StoreState): string {
+// folder while a fresh pane has not reported one yet. Remote workspaces browse
+// the server project instead — their root is always the project root '/'
+// (pane cwds there are container paths and mean nothing to the local browser).
+function activeBrowseRoot(s: StoreState): string {
   const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+  if (ws?.kind === 'remote') return '/';
   const paneCwd = s.focusedPaneId ? s.paneCwd[s.focusedPaneId] : undefined;
   return paneCwd ?? ws?.cwd ?? '~';
 }
@@ -230,7 +439,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneCwd: {},
   paneAutoTitles: {},
   focusedPaneId: null,
-  pendingClosePaneId: null,
+  pendingClosePane: null,
   windowFocused: true,
   searchOpenPaneId: null,
   taskView: false,
@@ -241,7 +450,9 @@ export const useStore = create<StoreState>((set, get) => ({
   pendingTemplateLaunch: null,
   shortcutRecordingAction: null,
   update: { status: 'idle' },
-  previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null },
+  remote: {},
+  remoteWorkspaceDialogOpen: false,
+  previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null, editRemote: null },
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -260,6 +471,7 @@ export const useStore = create<StoreState>((set, get) => ({
     ]);
     nextWsId.seed(loaded.workspaces.map((w) => w.id));
     nextTemplateId.seed(templates.map((t) => t.id));
+    nextServerId.seed((loaded.settings.servers ?? []).map((srv) => srv.id));
     set({ ...loaded, workspaceTemplates: templates, hydrated: true });
   },
 
@@ -332,6 +544,9 @@ export const useStore = create<StoreState>((set, get) => ({
   // still on the welcome screen there are no panes, so this just sets the cwd.)
   setWorkspaceCwd: (id, cwd) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === id);
+    // Remote-Workspaces haben kein lokales Arbeitsverzeichnis, in dem Panes
+    // neu gestartet werden könnten — die Prozesse laufen auf dem Server.
+    if (ws?.kind === 'remote') return s;
     if (!ws?.layout) {
       const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, cwd } : w) };
       persist(next);
@@ -341,7 +556,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws.layout).forEach((pid) => {
-      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
     // pane-keyed metadata has to follow the id change or titles/pending startup
@@ -376,19 +591,30 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
-      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
+    const remote = { ...s.remote };
+    if (ws?.kind === 'remote' && ws.remote) {
+      // Remote-Workspace schließen = Verbindung trennen, NICHT Prozesse killen —
+      // das Projekt bzw. die User-Runtime (und ihre Panes) lebt auf dem Server weiter.
+      const scopeKey = workspaceScopeKey(ws.remote);
+      window.api.remoteDisconnect(ws.remote.serverId, scopeKey);
+      delete remote[remoteConnKey(ws.remote.serverId, scopeKey)];
+    }
     const workspaces = s.workspaces.filter((w) => w.id !== id);
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
 
   applyPreset: (kind) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    // In Remote-Workspaces bestimmt der Server die Panes (welcome/pane.*) —
+    // ein lokales Preset würde lokale Shells hineinmischen.
+    if (ws?.kind === 'remote') return s;
     const layout = makePreset(kind, nextPaneId, nextSplitId);
     // A preset replaces the layout wholesale, so any pane it displaces is gone.
     // Today only the welcome screen (layout === null) can reach this, but the
@@ -399,7 +625,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws?.layout ?? null).forEach((pid) => {
-      window.api.kill(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     const workspaces = s.workspaces.map((w) =>
       w.id === s.activeWorkspaceId ? { ...w, layout } : w);
@@ -411,6 +637,10 @@ export const useStore = create<StoreState>((set, get) => ({
   splitActivePane: (paneId, direction) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
     if (!ws?.layout || !collectPaneIds(ws.layout).includes(paneId)) return s;
+    // Remote-Panes kommen vom Server; ein Split würde eine lokale Shell in den
+    // Remote-Workspace mischen. Das Remote-Gegenstück ist ein weiteres Terminal
+    // im Projekt (createRemotePane), keine Aufteilung des vorhandenen Panes.
+    if (ws.kind === 'remote') return s;
     const newPaneId = nextPaneId();
     const workspaces = s.workspaces.map((w) =>
       w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
@@ -425,17 +655,36 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
+  // Einziger Einstieg in die Rückfrage — Kopf-Knopf, Kontextmenü, Palette und
+  // Tastenkürzel laufen alle hierher, damit keiner von ihnen ohne Rückfrage
+  // schließt (remote beendet das Terminal für ALLE Verbundenen).
   requestClosePane: (paneId) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
-    return ws?.layout && collectPaneIds(ws.layout).includes(paneId)
-      ? { pendingClosePaneId: paneId }
-      : s;
+    if (!ws?.layout || !collectPaneIds(ws.layout).includes(paneId)) return s;
+    if (!isRemotePaneKey(paneId)) return { pendingClosePane: { paneId, remote: false } };
+    // Remote: nicht erst fragen und dann feststellen, dass es nicht geht — der
+    // Grund erscheint sofort an der Pane (RemotePaneBar).
+    const blocked = remotePaneCloseBlock(s.remote, paneId);
+    if (blocked) return { remote: withRemoteError(s.remote, paneId, blocked) };
+    return { pendingClosePane: { paneId, remote: true } };
   }),
 
-  cancelClosePane: () => set({ pendingClosePaneId: null }),
+  cancelClosePane: () => set({ pendingClosePane: null }),
+
+  // Vollzug der Rückfrage: lokal über das Layout, remote über pane.close.
+  confirmClosePane: () => {
+    const pending = get().pendingClosePane;
+    if (!pending) return;
+    if (!pending.remote) { get().closeActivePane(pending.paneId); return; }
+    // closeRemotePane prüft erneut — fiel die Verbindung zwischen Frage und
+    // Bestätigung aus, meldet es das, statt still nichts zu tun.
+    set({ pendingClosePane: null });
+    get().closeRemotePane(pending.paneId);
+  },
 
   closeActivePane: (paneId) => set((s) => {
-    window.api.kill(paneId);
+    if (isRemotePaneKey(paneId)) return s; // Remote-Panes: siehe closeRemotePane
+    releasePane(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const paneAutoTitles = { ...s.paneAutoTitles }; delete paneAutoTitles[paneId];
@@ -473,7 +722,7 @@ export const useStore = create<StoreState>((set, get) => ({
       focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
       searchOpenPaneId: s.searchOpenPaneId === paneId ? null : s.searchOpenPaneId,
-      pendingClosePaneId: s.pendingClosePaneId === paneId ? null : s.pendingClosePaneId
+      pendingClosePane: s.pendingClosePane?.paneId === paneId ? null : s.pendingClosePane
     };
     persist(next);
     return next;
@@ -583,7 +832,7 @@ export const useStore = create<StoreState>((set, get) => ({
   // a single pane on the welcome screen).
   runTaskInNewPane: (text) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
-    if (!ws) return s;
+    if (!ws || ws.kind === 'remote') return s; // Remote-Panes kommen vom Server
     const newPaneId = nextPaneId();
     let layout;
     if (!ws.layout) {
@@ -601,7 +850,7 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   openPreview: (source) => set((s) => ({
-    previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: null, source }
+    previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: null, editRemote: null, source }
   })),
   closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),
   // Opening (closed → open) re-syncs the browse root to where the user is
@@ -609,18 +858,20 @@ export const useStore = create<StoreState>((set, get) => ({
   togglePreview: () => set((s) => {
     const open = !s.previewPanel.open;
     if (!open) return { previewPanel: { ...s.previewPanel, open } };
-    return { previewPanel: { ...s.previewPanel, open, browseRoot: activePaneCwd(s) } };
+    return { previewPanel: { ...s.previewPanel, open, browseRoot: activeBrowseRoot(s) } };
   }),
   setPreviewWidth: (px) => set((s) => ({
     previewPanel: { ...s.previewPanel, widthPx: Math.min(1200, Math.max(240, px)) }
   })),
   openFiles: () => set((s) => ({
-    previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot: activePaneCwd(s), editPath: null }
+    previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot: activeBrowseRoot(s), editPath: null, editRemote: null }
   })),
   setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
-  setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null } })),
-  openInEditor: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, source: null } })),
-  clearEditor: () => set((s) => ({ previewPanel: { ...s.previewPanel, editPath: null, tab: 'files' } })),
+  setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null, editRemote: null } })),
+  openInEditor: (path, remote = null) => set((s) => ({
+    previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, editRemote: remote, source: null }
+  })),
+  clearEditor: () => set((s) => ({ previewPanel: { ...s.previewPanel, editPath: null, editRemote: null, tab: 'files' } })),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
@@ -864,5 +1115,228 @@ export const useStore = create<StoreState>((set, get) => ({
 
   checkForUpdates: () => { set({ update: { status: 'checking' } }); window.api.checkForUpdates(); },
   downloadUpdate: () => { set({ update: { status: 'downloading', percent: 0 } }); window.api.downloadUpdate(); },
-  installUpdate: () => window.api.quitAndInstall()
+  installUpdate: () => window.api.quitAndInstall(),
+
+  // ---- Remote-Workspaces ----------------------------------------------------
+
+  setRemoteWorkspaceDialogOpen: (open) => set({ remoteWorkspaceDialogOpen: open }),
+
+  addServer: (name, baseUrl) => set((s) => {
+    const server: ServerConfig = { id: nextServerId(), name, baseUrl: baseUrl.replace(/\/+$/, '') };
+    // Main-Registry synchron halten (dort hängen Auth und WS-Verbindungen dran).
+    void window.api.serverAdd(server).catch((err: unknown) => console.error('server:add failed:', err));
+    const next = { ...s, settings: { ...s.settings, servers: [...(s.settings.servers ?? []), server] } };
+    persist(next);
+    return next;
+  }),
+
+  removeServer: (serverId) => set((s) => {
+    // Erst die Remote-Workspaces dieses Servers schließen (Panes abbestellen),
+    // dann den Server samt gespeicherter Session im Main-Prozess entfernen.
+    const paneStatus = { ...s.paneStatus };
+    const paneCwd = { ...s.paneCwd };
+    const paneAutoTitles = { ...s.paneAutoTitles };
+    const remote = { ...s.remote };
+    const workspaces = s.workspaces.filter((w) => {
+      if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
+      collectPaneIds(w.layout).forEach((pid) => {
+        releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      });
+      delete remote[remoteConnKey(serverId, workspaceScopeKey(w.remote))];
+      return false;
+    });
+    void window.api.serverRemove(serverId).catch((err: unknown) => console.error('server:remove failed:', err));
+    const servers = (s.settings.servers ?? []).filter((srv) => srv.id !== serverId);
+    const settings: Settings = { ...s.settings };
+    if (servers.length) settings.servers = servers; else delete settings.servers;
+    const activeWorkspaceId = workspaces.some((w) => w.id === s.activeWorkspaceId)
+      ? s.activeWorkspaceId
+      : (workspaces[0]?.id ?? null);
+    const next = { ...s, workspaces, settings, remote, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
+    persist(next);
+    return next;
+  }),
+
+  addRemoteWorkspace: async (serverId, scope) => {
+    // Verbindet (bzw. weckt) die Verbindung und wartet auf das welcome; wirft
+    // bei Fehlern — der Dialog zeigt die Meldung an. scope 'user' verbindet
+    // mit der persönlichen User-Runtime (?scope=user) statt einem Projekt.
+    const scopeKey = remoteScopeKey(scope);
+    const info = await window.api.remoteConnectWorkspace(serverId, scopeKey);
+    set((s) => {
+      const key = remoteConnKey(serverId, scopeKey);
+      const remote = {
+        ...s.remote,
+        [key]: {
+          ...(s.remote[key] ?? EMPTY_REMOTE_CONNECTION),
+          status: 'connected' as const,
+          clientId: info.clientId || null,
+          role: info.role,
+          panes: info.panes
+        }
+      };
+      const existing = s.workspaces.find(
+        (w) => w.kind === 'remote' && w.remote?.serverId === serverId && workspaceScopeKey(w.remote) === scopeKey
+      );
+      if (existing) {
+        // Denselben Remote-Workspace nicht doppelt anlegen — nur aktivieren;
+        // den Pane-Abgleich übernimmt der folgende panes-Push.
+        const next = { ...s, remote, activeWorkspaceId: existing.id, remoteWorkspaceDialogOpen: false };
+        persist(next);
+        return next;
+      }
+      const layout = buildRemoteLayout(
+        info.panes.map((p) => remotePaneKey(serverId, scopeKey, p.paneId))
+      );
+      const ws: Workspace = {
+        id: nextWsId(),
+        // Anzeigename aus dem welcome (Projektname bzw. „Meine Umgebung").
+        name: info.projectName || scopeKey,
+        cwd: '~',
+        layout,
+        kind: 'remote',
+        remote: scope.kind === 'user'
+          ? { serverId, scope: 'user' }
+          : { serverId, scope: 'project', projectId: scope.projectId }
+      };
+      const next = {
+        ...s,
+        remote,
+        workspaces: [...s.workspaces, ws],
+        activeWorkspaceId: ws.id,
+        maximizedPaneId: null,
+        focusedPaneId: null,
+        remoteWorkspaceDialogOpen: false
+      };
+      persist(next);
+      return next;
+    });
+  },
+
+  reconnectRemote: (serverId, scopeKey) => {
+    // Wecken (4205) bzw. erneuter Versuch nach kicked/closed. Das Ergebnis
+    // kommt als remote:status-Push zurück; Fehler nur loggen — die Statusleiste
+    // zeigt den Zustand ohnehin an.
+    set((s) => {
+      const key = remoteConnKey(serverId, scopeKey);
+      return {
+        remote: { ...s.remote, [key]: { ...(s.remote[key] ?? EMPTY_REMOTE_CONNECTION), status: 'connecting' } }
+      };
+    });
+    window.api.remoteConnectWorkspace(serverId, scopeKey).catch((err: unknown) => {
+      console.error('remote reconnect failed:', err);
+    });
+  },
+
+  applyRemoteStatus: (e) => set((s) => {
+    const key = remoteConnKey(e.serverId, e.scopeKey);
+    const prev = s.remote[key] ?? EMPTY_REMOTE_CONNECTION;
+    if (e.kind === 'connection') {
+      // Ein Statuswechsel (reconnecting/connected/…) macht eine alte Ablehnung
+      // ungültig — sie bezog sich auf den vorigen Verbindungszustand. Ohne das
+      // bliebe „nur lesend" z. B. nach einem Reconnect mit neuer Rolle stehen,
+      // obwohl seither nichts mehr abgelehnt wurde.
+      return { ...s, remote: { ...s.remote, [key]: { ...prev, status: e.status, lastError: null } } };
+    }
+    if (e.kind === 'error') {
+      // Vom Server abgelehnte Aktion (z. B. forbidden) — kein Verbindungsabbruch,
+      // nur eine Meldung für die auslösende Stelle (RemotePaneBar). Sie räumt sich
+      // auf drei Wegen wieder ab: nach REMOTE_ERROR_TTL_MS (Zeitstempel `at`),
+      // bei der nächsten gelungenen Aktion und sobald ein Panes- oder
+      // Verbindungs-Ereignis zeigt, dass der alte Zustand überholt ist.
+      return {
+        ...s,
+        remote: { ...s.remote, [key]: { ...prev, lastError: { code: e.code, paneId: e.paneId, at: Date.now() } } }
+      };
+    }
+    // kind === 'panes': Verbindungszustand aktualisieren und das Layout des
+    // zugehörigen Remote-Workspace nachziehen — pane.added ergänzt, pane.removed
+    // entfernt; die Anordnung vorhandener Panes bleibt unangetastet (E8).
+    const remote = {
+      ...s.remote,
+      [key]: {
+        ...prev, clientId: e.clientId ?? prev.clientId, role: e.role ?? prev.role, panes: e.panes,
+        lastError: null
+      }
+    };
+    const ws = s.workspaces.find(
+      (w) => w.kind === 'remote' && w.remote?.serverId === e.serverId && workspaceScopeKey(w.remote) === e.scopeKey
+    );
+    if (!ws) return { ...s, remote };
+    const wanted = e.panes.map((p) => remotePaneKey(e.serverId, e.scopeKey, p.paneId));
+    let layout = ws.layout;
+    for (const pid of collectPaneIds(layout)) {
+      if (isRemotePaneKey(pid) && !wanted.includes(pid)) {
+        layout = layout ? closePane(layout, pid) : null;
+      }
+    }
+    for (const pid of wanted) {
+      if (!collectPaneIds(layout).includes(pid)) {
+        if (!layout) {
+          layout = { type: 'pane', id: pid };
+        } else {
+          const ids = collectPaneIds(layout);
+          layout = splitPane(layout, ids[ids.length - 1], 'h', pid, nextSplitId());
+        }
+      }
+    }
+    if (layout === ws.layout) return { ...s, remote };
+    const workspaces = s.workspaces.map((w) => (w.id === ws.id ? { ...w, layout } : w));
+    const next = { ...s, remote, workspaces };
+    persist(next);
+    return next;
+  }),
+
+  applyRemoteDriver: (e) => set((s) => {
+    const key = remoteConnKey(e.serverId, e.scopeKey);
+    const prev = s.remote[key];
+    if (!prev) return s;
+    const panes = prev.panes.map((p) =>
+      p.paneId === e.paneId
+        ? { ...p, driver: e.driver, driverQueue: e.driverQueue, queueDeadline: e.queueDeadline }
+        : p
+    );
+    const deniedPaneId = e.denied ? e.paneId : (prev.deniedPaneId === e.paneId ? null : prev.deniedPaneId);
+    return {
+      ...s,
+      remote: { ...s.remote, [key]: { ...prev, panes, clientId: e.clientId ?? prev.clientId, deniedPaneId } }
+    };
+  }),
+
+  applyRemotePresence: (e) => set((s) => {
+    const key = remoteConnKey(e.serverId, e.scopeKey);
+    const prev = s.remote[key] ?? EMPTY_REMOTE_CONNECTION;
+    return { ...s, remote: { ...s.remote, [key]: { ...prev, presence: e.users } } };
+  }),
+
+  // Das Layout fassen beide Aktionen nicht an: es ändert sich erst, wenn der
+  // Server pane.added bzw. pane.removed schickt — genau ein Pfad, egal ob
+  // Desktop oder Browser ausgelöst hat. Gesetzt wird hier nur der Fehlerslot,
+  // damit eine blockierte Aktion nicht still endet.
+  createRemotePane: (paneId) => {
+    const ref = parseRemotePaneKey(paneId);
+    if (!ref) return;
+    const blocked = remotePaneCreateBlock(get().remote, paneId);
+    if (blocked) { set((s) => ({ remote: withRemoteError(s.remote, paneId, blocked) })); return; }
+    set((s) => ({ remote: withoutRemoteError(s.remote, paneId) }));
+    window.api.remotePaneCreate(ref.serverId, ref.scopeKey);
+  },
+
+  closeRemotePane: (paneId) => {
+    const ref = parseRemotePaneKey(paneId);
+    if (!ref) return;
+    const blocked = remotePaneCloseBlock(get().remote, paneId);
+    if (blocked) { set((s) => ({ remote: withRemoteError(s.remote, paneId, blocked) })); return; }
+    set((s) => ({ remote: withoutRemoteError(s.remote, paneId) }));
+    window.api.remotePaneClose(ref.serverId, ref.scopeKey, ref.remotePaneId);
+  },
+
+  // Abräumen der Meldung nach Ablauf der Anzeigedauer (RemotePaneBar stellt den
+  // Wecker) — ohne das bliebe eine einmalige Ablehnung dauerhaft im Zustand.
+  clearRemoteError: (serverId, scopeKey) => set((s) => {
+    const key = remoteConnKey(serverId, scopeKey);
+    const conn = s.remote[key];
+    if (!conn?.lastError) return s;
+    return { remote: { ...s.remote, [key]: { ...conn, lastError: null } } };
+  })
 }));

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon, IconName } from './Icon';
 import { ContextMenu, MenuItem } from './ContextMenu';
 import { isPreviewableFile } from '../../shared/link-detect';
+import type { FilesApi } from '../files-api';
 import type { DirEntry } from '../../shared/types';
 
 // Map a filename to a flat icon + a tint class. Config patterns win over the
@@ -31,13 +32,14 @@ interface NodeProps {
   entry: DirEntry;
   depth: number;
   refreshKey: number;
+  api: FilesApi;
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onOpenFile: (path: string) => void;
   onContext: (e: React.MouseEvent, entry: DirEntry) => void;
 }
 
-function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
+function TreeNode({ entry, depth, refreshKey, api, selectedPath, onSelect, onOpenFile, onContext }: NodeProps): React.JSX.Element {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<DirEntry[] | null>(null);
@@ -47,10 +49,10 @@ function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile
   const loadChildren = useCallback(() => {
     if (inFlight.current) return; // ignore a second expand while a read is pending
     inFlight.current = true;
-    window.api.readDir(entry.path)
+    api.readDir(entry.path)
       .then((list) => { inFlight.current = false; setChildren(list); setError(null); })
       .catch((err: unknown) => { inFlight.current = false; setError(String(err)); });
-  }, [entry.path]);
+  }, [api, entry.path]);
 
   // A refresh (delete/create/manual reload) must reach expanded subfolders too,
   // not just the root listing — otherwise a file deleted inside an open folder
@@ -89,7 +91,7 @@ function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile
         className={`ftree-row${selected ? ' sel' : ''}`}
         style={{ paddingLeft: 6 + depth * 14 }}
         draggable
-        onDragStart={(e) => setDragPayload(e, entry.path)}
+        onDragStart={(e) => setDragPayload(e, api.terminalPath(entry.path))}
         onClick={onClick}
         onDoubleClick={onDouble}
         onContextMenu={(e) => { e.preventDefault(); onSelect(entry.path); onContext(e, entry); }}
@@ -112,7 +114,7 @@ function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile
           : children === null
             ? <div className="ftree-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>{t('files.loading')}</div>
             : children.map((c) => (
-                <TreeNode key={c.path} entry={c} depth={depth + 1} refreshKey={refreshKey} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
+                <TreeNode key={c.path} entry={c} depth={depth + 1} refreshKey={refreshKey} api={api} selectedPath={selectedPath} onSelect={onSelect} onOpenFile={onOpenFile} onContext={onContext} />
               ))
       )}
     </>
@@ -122,12 +124,14 @@ function TreeNode({ entry, depth, refreshKey, selectedPath, onSelect, onOpenFile
 interface FileTreeProps {
   root: string;
   refreshKey: number;       // bump to force a reload of the root
+  api: FilesApi;            // local fs or the remote project of the workspace
+  canWrite?: boolean;       // false (remote viewer role) hides destructive actions
   onOpenFile: (path: string) => void;
   onPreviewFile?: (path: string) => void; // rendered preview (offered for markdown)
   onRequestDelete: (entry: DirEntry) => void; // open a confirm before trashing
 }
 
-export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onRequestDelete }: FileTreeProps): React.JSX.Element {
+export function FileTree({ root, refreshKey, api, canWrite = true, onOpenFile, onPreviewFile, onRequestDelete }: FileTreeProps): React.JSX.Element {
   const { t } = useTranslation();
   const [entries, setEntries] = useState<DirEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,11 +143,11 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onReques
     setEntries(null);
     setError(null);
     setSelectedPath(null);
-    window.api.readDir(root)
+    api.readDir(root)
       .then((list) => { if (!cancelled) setEntries(list); })
       .catch((err: unknown) => { if (!cancelled) setError(String(err)); });
     return () => { cancelled = true; };
-  }, [root, refreshKey]);
+  }, [api, root, refreshKey]);
 
   // Right-click any entry for its actions: Preview/Edit (files) plus Delete.
   const onContext = useCallback((e: React.MouseEvent, entry: DirEntry) => {
@@ -162,16 +166,19 @@ export function FileTree({ root, refreshKey, onOpenFile, onPreviewFile, onReques
         ...(!menu.entry.isDir
           ? [{ label: t('files.edit'), onClick: () => onOpenFile(menu.entry.path) }]
           : []),
-        { label: t('common.delete'), onClick: () => onRequestDelete(menu.entry) }
+        ...(canWrite
+          ? [{ label: t('common.delete'), onClick: () => onRequestDelete(menu.entry) }]
+          : [])
       ]
     : [];
 
   return (
     <div className="ftree" role="tree">
       {entries.map((e) => (
-        <TreeNode key={e.path} entry={e} depth={0} refreshKey={refreshKey} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} onContext={onContext} />
+        <TreeNode key={e.path} entry={e} depth={0} refreshKey={refreshKey} api={api} selectedPath={selectedPath} onSelect={setSelectedPath} onOpenFile={onOpenFile} onContext={onContext} />
       ))}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
+      {/* Ordner einer Viewer-Rolle haben keine Aktionen — dann gar kein Menü. */}
+      {menu && menuItems.length > 0 && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>
   );
 }

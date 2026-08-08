@@ -2,7 +2,8 @@ import { homedir } from 'os';
 import { readFileSync } from 'fs';
 import { writeFileAtomic } from './atomic-write';
 import type {
-  AppState, LayoutNode, Settings, WindowBounds, Workspace, WorkspaceTemplate, WorkspaceNavigationPlacement
+  AppState, LayoutNode, ServerConfig, Settings, WindowBounds, Workspace, WorkspaceTemplate,
+  WorkspaceNavigationPlacement
 } from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 import { SHORTCUT_ACTIONS, type ShortcutAction } from '../shared/shortcuts';
@@ -40,6 +41,27 @@ function migrateLocale(raw: unknown): Settings['locale'] {
   return raw === 'en' || raw === 'de' ? raw : undefined;
 }
 
+// Konfigurierte Workspace-Server (Remote-Workspaces). Nur strukturell gültige
+// Einträge mit http(s)-URL überleben; doppelte ids kollabieren auf den ersten
+// Eintrag, damit ein kaputter Stand nicht zwei Server mit derselben Identität
+// (und demselben safeStorage-Token) erzeugt.
+function migrateServers(raw: unknown): ServerConfig[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<string>();
+  const out: ServerConfig[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const r = entry as Record<string, unknown>;
+    if (typeof r.id !== 'string' || r.id.length === 0) continue;
+    if (typeof r.name !== 'string' || r.name.length === 0) continue;
+    if (typeof r.baseUrl !== 'string' || !/^https?:\/\//i.test(r.baseUrl)) continue;
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push({ id: r.id, name: r.name, baseUrl: r.baseUrl.replace(/\/+$/, '') });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export function defaultSettings(): Settings {
   return { themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, workspaceNavigationPlacement: 'left' };
 }
@@ -75,6 +97,10 @@ export function migrateSettings(raw: unknown): Settings {
   if (shortcutBindings) out.shortcutBindings = shortcutBindings;
   const workspaceNavigationPlacement = migrateWorkspaceNavigationPlacement(r.workspaceNavigationPlacement);
   if (workspaceNavigationPlacement) out.workspaceNavigationPlacement = workspaceNavigationPlacement;
+  // Serverliste MUSS den Round-Trip überleben (wie brandDesign/locale): ohne
+  // diesen Zweig würde jeder Neustart die konfigurierten Server verwerfen.
+  const servers = migrateServers(r.servers);
+  if (servers) out.servers = servers;
   return out;
 }
 
@@ -155,6 +181,25 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
   if (paneTitles) out.paneTitles = paneTitles;
   const pendingStartupCommands = migrateStringMap(r.pendingStartupCommands);
   if (pendingStartupCommands) out.pendingStartupCommands = pendingStartupCommands;
+  // Remote-Workspace nur, wenn kind UND Verweis vollständig sind — ein halber
+  // Eintrag würde als Remote-Hülle ohne Server auferstehen. Sonst fällt der
+  // Workspace auf lokal zurück (kind bleibt weg, wie vor der Migration).
+  // Bestände aus B2/B3 tragen kein scope-Feld: das war immer ein Projekt
+  // (User-Workspaces gibt es erst seit dem scope-Feld) -> 'project' ergänzen.
+  if (r.kind === 'remote' && typeof r.remote === 'object' && r.remote !== null) {
+    const remote = r.remote as Record<string, unknown>;
+    const serverId = typeof remote.serverId === 'string' && remote.serverId.length > 0 ? remote.serverId : null;
+    if (serverId && remote.scope === 'user') {
+      out.kind = 'remote';
+      out.remote = { serverId, scope: 'user' };
+    } else if (
+      serverId && (remote.scope === 'project' || remote.scope === undefined) &&
+      typeof remote.projectId === 'string' && remote.projectId.length > 0
+    ) {
+      out.kind = 'remote';
+      out.remote = { serverId, scope: 'project', projectId: remote.projectId };
+    }
+  }
   return out;
 }
 

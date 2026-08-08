@@ -6,7 +6,7 @@ export type IconName =
   | 'command-palette' | 'settings' | 'preview' | 'search'
   | 'back' | 'forward' | 'reload' | 'folder' | 'close'
   | 'folder-open' | 'file-code' | 'file-text' | 'file-config'
-  | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit';
+  | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit' | 'server';
 
 // Every icon authored on a 24×24 canvas as stroked paths so they share weight,
 // scale and optical size. Values are arrays of SVG path `d` strings.
@@ -79,6 +79,12 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   edit: [
     'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4',
     'M13.5 6.5l4 4'
+  ],
+  server: [
+    'M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z',
+    'M3 14m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z',
+    'M7 8l0 .01',
+    'M7 18l0 .01'
   ]
 };
 

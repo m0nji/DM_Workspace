@@ -1,9 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../store';
+import {
+  useStore, remotePaneCloseBlock, remotePaneCreateBlock, REMOTE_MAX_PANES,
+  type RemoteBlockReason
+} from '../store';
 import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
 import { basename } from '../../shared/fs-path';
+import { isRemotePaneKey } from '../../shared/remote-pane-key';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -66,6 +70,17 @@ function Close(): React.JSX.Element {
   );
 }
 
+// Remote-Pendant zum Split: legt ein neues Terminal IM PROJEKT an statt lokal
+// zu splitten.
+function Plus(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
+      <line x1="8" y1="3.5" x2="8" y2="12.5" />
+      <line x1="3.5" y1="8" x2="12.5" y2="8" />
+    </svg>
+  );
+}
+
 function Label(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
@@ -78,8 +93,19 @@ function Label(): React.JSX.Element {
 
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
+  const isRemote = isRemotePaneKey(paneId);
   const splitActivePane = useStore((s) => s.splitActivePane);
   const requestClosePane = useStore((s) => s.requestClosePane);
+  const createRemotePane = useStore((s) => s.createRemotePane);
+  // Warum ein Knopf deaktiviert ist, gehört in den Tooltip: „nicht verbunden",
+  // „nur Lesezugriff", „Terminal-Grenze erreicht" und „letztes Terminal" sind
+  // vier verschiedene Gründe und verdienen vier verschiedene Sätze.
+  const createBlock = useStore((s) => (isRemote ? remotePaneCreateBlock(s.remote, paneId) : null));
+  const closeBlock = useStore((s) => (isRemote ? remotePaneCloseBlock(s.remote, paneId) : null));
+  // Aktion und Grund kombinieren statt ersetzen — sonst verschwindet aus dem
+  // Tooltip, was der Knopf überhaupt täte.
+  const withReason = (action: string, reason: RemoteBlockReason | null): string =>
+    reason ? `${action} — ${t(`pane.remoteBlocked.${reason}`, { max: REMOTE_MAX_PANES })}` : action;
   const toggleMaximize = useStore((s) => s.toggleMaximize);
   const maximized = useStore((s) => s.maximizedPaneId === paneId);
   const status = useStore((s) => s.paneStatus[paneId] ?? 'idle');
@@ -158,14 +184,31 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
           aria-label={t(manualLabel ? 'pane.editLabel' : automatic ? 'pane.overrideLabel' : 'pane.addLabel')}
           onClick={() => setEditingLabel(true)}
         ><Label /></button>
-        <button className="pane-btn" title={t('pane.splitHorizontal')}
-                onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
-        <button className="pane-btn" title={t('pane.splitVertical')}
-                onClick={() => splitActivePane(paneId, 'v')}><SplitTopBottom /></button>
+        {/* Lokal: Splitten. Remote: ein neues Terminal IM PROJEKT — ein Split
+            würde eine lokale Shell in den Remote-Workspace mischen. */}
+        {isRemote ? (
+          <button
+            className="pane-btn"
+            disabled={!!createBlock}
+            title={withReason(t('pane.newRemoteTerminal'), createBlock)}
+            onClick={() => createRemotePane(paneId)}
+          ><Plus /></button>
+        ) : (
+          <>
+            <button className="pane-btn" title={t('pane.splitHorizontal')}
+                    onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
+            <button className="pane-btn" title={t('pane.splitVertical')}
+                    onClick={() => splitActivePane(paneId, 'v')}><SplitTopBottom /></button>
+          </>
+        )}
         <button className="pane-btn" title={maximized ? t('pane.restore') : t('pane.maximize')}
                 onClick={() => toggleMaximize(paneId)}>{maximized ? <Restore /> : <Maximize />}</button>
-        <button className="pane-btn" title={t('common.close')}
-                onClick={() => requestClosePane(paneId)}><Close /></button>
+        <button
+          className="pane-btn"
+          disabled={!!closeBlock}
+          title={withReason(t('common.close'), closeBlock)}
+          onClick={() => requestClosePane(paneId)}
+        ><Close /></button>
       </div>
       <div className="pane-body">
         <SearchBar paneId={paneId} />

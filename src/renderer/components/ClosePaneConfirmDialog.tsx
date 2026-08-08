@@ -1,25 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../store';
 import { ConfirmDialog } from './ConfirmDialog';
 
-// Global so every close entry point (header button, context menu, palette and
-// shortcut) gets the same confirmation instead of duplicating local state.
-export function ClosePaneConfirmDialog(): React.JSX.Element | null {
-  const { t } = useTranslation();
-  const paneId = useStore((s) => s.pendingClosePaneId);
-  const cancel = useStore((s) => s.cancelClosePane);
-  const close = useStore((s) => s.closeActivePane);
+interface Props { remote?: boolean; onConfirm: () => void; onCancel: () => void; }
 
-  if (!paneId) return null;
+// Gemeinsamer Bestätigungstext für lokales Schließen (Kopf-Button, Kontextmenü,
+// Palette, Shortcut) und für das Schließen einer Remote-Pane — Letzteres betrifft
+// alle Verbundenen, deshalb der eigene `remote`-Textsatz.
+export function ClosePaneConfirmDialog({ remote, onConfirm, onCancel }: Props): React.JSX.Element {
+  const { t } = useTranslation();
 
   return (
     <ConfirmDialog
-      title={t('pane.closeTitle')}
-      message={t('pane.closeMessage')}
-      confirmLabel={t('pane.closeConfirm')}
-      onConfirm={() => close(paneId)}
-      onCancel={cancel}
+      title={t(remote ? 'pane.closeRemoteTitle' : 'pane.closeTitle')}
+      message={t(remote ? 'pane.closeRemoteMessage' : 'pane.closeMessage')}
+      confirmLabel={t(remote ? 'pane.closeRemoteConfirm' : 'pane.closeConfirm')}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
     />
   );
 }

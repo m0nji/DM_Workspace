@@ -2,7 +2,12 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { promptNonceFromArgv } from '../shared/prompt-nonce';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
-  PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload
+  PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload,
+  RemoteAuthStatus, RemoteLoginResult, DevicePairingResult, RemoteProject,
+  RemoteUserRuntimeResult, RemoteUserRuntimeStopResult,
+  RemoteWorkspaceInfo, RemoteConnectionInfo, RemoteStatusEvent, RemoteDriverEvent,
+  RemotePresenceEvent, RemoteFsListResult, RemoteFsReadResult, RemoteFsWriteResult,
+  RemoteFsOkResult, ServerConfig
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -96,7 +101,69 @@ const api: RendererApi = {
     const handler = (_e: unknown, workspaceId: string) => cb(workspaceId);
     ipcRenderer.on('notify:activateWorkspace', handler);
     return () => ipcRenderer.removeListener('notify:activateWorkspace', handler);
-  }
+  },
+  // ---- Remote-Workspaces: alles Token-Handling bleibt im Main-Prozess ----
+  authLoginLocal: (serverId: string, username: string, password: string) =>
+    ipcRenderer.invoke('auth:loginLocal', { serverId, username, password }) as Promise<RemoteLoginResult>,
+  authStartDevicePairing: (serverId: string) =>
+    ipcRenderer.invoke('auth:startDevicePairing', { serverId }) as Promise<DevicePairingResult>,
+  authLogout: (serverId: string) => ipcRenderer.invoke('auth:logout', { serverId }) as Promise<void>,
+  authStatus: (serverId: string) => ipcRenderer.invoke('auth:status', { serverId }) as Promise<RemoteAuthStatus>,
+  serverAdd: (server: ServerConfig) => ipcRenderer.invoke('server:add', server) as Promise<void>,
+  serverRemove: (serverId: string) => ipcRenderer.invoke('server:remove', { serverId }) as Promise<void>,
+  remoteProjects: (serverId: string) =>
+    ipcRenderer.invoke('remote:projects', { serverId }) as Promise<RemoteProject[]>,
+  remoteUserRuntime: (serverId: string) =>
+    ipcRenderer.invoke('remote:userRuntime', { serverId }) as Promise<RemoteUserRuntimeResult>,
+  remoteUserRuntimeStop: (serverId: string) =>
+    ipcRenderer.invoke('remote:userRuntimeStop', { serverId }) as Promise<RemoteUserRuntimeStopResult>,
+  // scopeKey: Projekt-UUID oder 'user' (shared/remote-pane-key.ts).
+  remoteConnectWorkspace: (serverId: string, scopeKey: string) =>
+    ipcRenderer.invoke('remote:connectWorkspace', { serverId, scopeKey }) as Promise<RemoteWorkspaceInfo>,
+  remotePanes: (serverId: string, scopeKey: string) =>
+    ipcRenderer.invoke('remote:panes', { serverId, scopeKey }) as Promise<RemoteConnectionInfo | null>,
+  remoteDisconnect: (serverId: string, scopeKey: string) =>
+    ipcRenderer.send('remote:disconnect', { serverId, scopeKey }),
+  remoteDriverRequest: (serverId: string, scopeKey: string, paneId: string) =>
+    ipcRenderer.send('remote:driverRequest', { serverId, scopeKey, paneId }),
+  remoteDriverRelease: (serverId: string, scopeKey: string, paneId: string) =>
+    ipcRenderer.send('remote:driverRelease', { serverId, scopeKey, paneId }),
+  remoteDriverApprove: (serverId: string, scopeKey: string, paneId: string, clientId: string) =>
+    ipcRenderer.send('remote:driverApprove', { serverId, scopeKey, paneId, clientId }),
+  remoteDriverDeny: (serverId: string, scopeKey: string, paneId: string, clientId: string) =>
+    ipcRenderer.send('remote:driverDeny', { serverId, scopeKey, paneId, clientId }),
+  remotePaneCreate: (serverId: string, scopeKey: string) =>
+    ipcRenderer.send('remote:paneCreate', { serverId, scopeKey }),
+  remotePaneClose: (serverId: string, scopeKey: string, paneId: string) =>
+    ipcRenderer.send('remote:paneClose', { serverId, scopeKey, paneId }),
+  onRemoteStatus: (cb: (e: RemoteStatusEvent) => void) => {
+    const handler = (_e: unknown, payload: RemoteStatusEvent) => cb(payload);
+    ipcRenderer.on('remote:status', handler);
+    return () => ipcRenderer.removeListener('remote:status', handler);
+  },
+  onRemoteDriver: (cb: (e: RemoteDriverEvent) => void) => {
+    const handler = (_e: unknown, payload: RemoteDriverEvent) => cb(payload);
+    ipcRenderer.on('remote:driver', handler);
+    return () => ipcRenderer.removeListener('remote:driver', handler);
+  },
+  onRemotePresence: (cb: (e: RemotePresenceEvent) => void) => {
+    const handler = (_e: unknown, payload: RemotePresenceEvent) => cb(payload);
+    ipcRenderer.on('remote:presence', handler);
+    return () => ipcRenderer.removeListener('remote:presence', handler);
+  },
+  // ---- Remote-Dateizugriff (B3): relative Projektpfade, '' = Root ----
+  remoteFsList: (serverId: string, projectId: string, path: string) =>
+    ipcRenderer.invoke('remoteFs:list', { serverId, projectId, path }) as Promise<RemoteFsListResult>,
+  remoteFsRead: (serverId: string, projectId: string, path: string) =>
+    ipcRenderer.invoke('remoteFs:read', { serverId, projectId, path }) as Promise<RemoteFsReadResult>,
+  remoteFsWrite: (serverId: string, projectId: string, path: string, content: string, baseMtime?: number) =>
+    ipcRenderer.invoke('remoteFs:write', { serverId, projectId, path, content, baseMtime }) as Promise<RemoteFsWriteResult>,
+  remoteFsMkdir: (serverId: string, projectId: string, path: string) =>
+    ipcRenderer.invoke('remoteFs:mkdir', { serverId, projectId, path }) as Promise<RemoteFsOkResult>,
+  remoteFsDelete: (serverId: string, projectId: string, path: string) =>
+    ipcRenderer.invoke('remoteFs:delete', { serverId, projectId, path }) as Promise<RemoteFsOkResult>,
+  remoteFsRename: (serverId: string, projectId: string, from: string, to: string) =>
+    ipcRenderer.invoke('remoteFs:rename', { serverId, projectId, from, to }) as Promise<RemoteFsOkResult>
 };
 
 contextBridge.exposeInMainWorld('api', api);

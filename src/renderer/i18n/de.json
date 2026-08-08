@@ -15,6 +15,7 @@
   "workspace": {
     "sectionTitle": "WORKSPACES",
     "addWorkspace": "+ Workspace",
+    "addRemoteWorkspace": "+ Remote-Workspace",
     "edit": {
       "title": "Workspace bearbeiten",
       "name": "Name",
@@ -28,7 +29,10 @@
     "folderRestartAction": "Neu starten",
     "deleteTitle": "Workspace schließen?",
     "deleteMessage": "„{{name}}“ wird geschlossen. Laufende Terminals werden beendet.",
-    "closeConfirm": "Workspace schließen"
+    "closeConfirm": "Workspace schließen",
+    "remoteServerRemoved": "Server entfernt",
+    "remoteTitle": "Remote-Workspace auf {{server}}",
+    "remoteTitleUnknown": "Remote-Workspace — Server entfernt"
   },
   "tooltip": {
     "editWorkspace": "Workspace bearbeiten",
@@ -45,7 +49,28 @@
       "templates": "Vorlagen",
       "session": "Sitzung",
       "notifications": "Benachrichtigungen",
+      "account": "Konto & Server",
       "updates": "Updates"
+    },
+    "account": {
+      "title": "Workspace-Server",
+      "empty": "Noch keine Server konfiguriert. Unten einen DM-Workspace-Web-Server hinzufügen, um Remote-Workspaces zu öffnen.",
+      "addServer": "Server hinzufügen",
+      "serverName": "Name",
+      "serverUrl": "https://server.example",
+      "add": "Hinzufügen",
+      "hint": "Sitzungen werden auf diesem Rechner verschlüsselt gespeichert (safeStorage); das Token verlässt die App nie.",
+      "removeServer": "Entfernen",
+      "login": "Anmelden…",
+      "loginSubmit": "Anmelden",
+      "loginBrowser": "Im Browser anmelden",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "logout": "Abmelden",
+      "waiting": "Bitte warten…",
+      "statusChecking": "prüfe…",
+      "statusLoggedIn": "angemeldet als {{user}}",
+      "statusLoggedOut": "nicht angemeldet"
     },
     "language": {
       "label": "Sprache",
@@ -151,6 +176,7 @@
     },
     "cmd": {
       "newWorkspace": "Neuer Workspace",
+      "newRemoteTerminal": "Neues Terminal in diesem Projekt",
       "splitHorizontal": "Fokussierten Bereich links und rechts teilen",
       "splitVertical": "Fokussierten Bereich oben und unten teilen",
       "toggleMaximize": "Fokussierten Bereich maximieren umschalten",
@@ -245,7 +271,18 @@
     "previewRenderError": "Vorschau konnte nicht gerendert werden.",
     "accessDenied": "Zugriff verweigert",
     "readError": "Ordner konnte nicht gelesen werden.",
-    "emptyFolder": "Leerer Ordner"
+    "emptyFolder": "Leerer Ordner",
+    "deleteMessageRemote": "„{{name}}“ auf dem Server löschen? Das kann nicht rückgängig gemacht werden.",
+    "remoteNotLoggedIn": "Nicht an diesem Server angemeldet — Anmeldung über Einstellungen → Konto & Server.",
+    "remoteForbidden": "Keine Berechtigung auf dem Server.",
+    "remoteNotFound": "Auf dem Server nicht gefunden.",
+    "remoteNetwork": "Server nicht erreichbar.",
+    "tooLargeLimit": "Datei überschreitet das Server-Limit von 1 MB.",
+    "readOnlyViewer": "Nur Lesen (Viewer-Rolle)",
+    "conflictMessage": "Auf dem Server geändert — neu laden oder überschreiben?",
+    "conflictReload": "Neu laden",
+    "conflictOverwrite": "Überschreiben",
+    "userRuntimeUnavailable": "Dateizugriff ist für die persönliche Umgebung noch nicht verfügbar."
   },
   "search": {
     "placeholder": "Suchen",
@@ -295,6 +332,16 @@
     "closeTitle": "Fenster schließen?",
     "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
     "closeConfirm": "Fenster schließen",
+    "newRemoteTerminal": "Neues Terminal in diesem Projekt",
+    "remoteBlocked": {
+      "offline": "Nicht verbunden",
+      "viewer": "Nur Lesezugriff",
+      "paneLimit": "Dieses Projekt hat bereits die maximalen {{max}} Terminals",
+      "lastPane": "Das letzte Terminal eines Projekts lässt sich nicht schließen"
+    },
+    "closeRemoteTitle": "Terminal für alle schließen?",
+    "closeRemoteMessage": "Dieses Terminal gehört zum Projekt. Beim Schließen verschwindet es für alle Verbundenen, und jeder darin laufende Prozess wird beendet — auch für denjenigen, der es gerade fährt.",
+    "closeRemoteConfirm": "Für alle schließen",
     "status": {
       "idle": "untätig",
       "busy": "beschäftigt",
@@ -333,6 +380,65 @@
     "clearAllTitle": "Alle Fenster leeren?",
     "clearAllMessage": "Alle Bereiche in diesem Workspace werden geleert und ihr Scrollback-Verlauf geht verloren.",
     "clearAllConfirm": "Alle leeren"
+  },
+  "remote": {
+    "dialogTitle": "Neuer Remote-Workspace",
+    "noServers": "Keine Server konfiguriert. Zuerst unter Einstellungen → Konto & Server einen anlegen.",
+    "chooseServer": "Server",
+    "chooseProject": "Projekt",
+    "loadingProjects": "Projekte werden geladen…",
+    "noProjects": "Keine Projekte auf diesem Server (oder keine Mitgliedschaft).",
+    "connect": "Verbinden",
+    "connecting": "Verbinde…",
+    "role": {
+      "owner": "Owner",
+      "editor": "Editor",
+      "viewer": "Viewer (nur lesend)"
+    },
+    "statusTitle": "Verbindungsstatus",
+    "status": {
+      "connecting": "Verbinde…",
+      "connected": "Verbunden",
+      "reconnecting": "Verbindung wird wiederhergestellt…",
+      "closed": "Getrennt",
+      "kicked": "Vom Server abgemeldet",
+      "runtime-stopped": "Runtime schläft"
+    },
+    "kickedHint": "Zugriff wurde entzogen oder die Sitzung ist beendet — in den Einstellungen neu anmelden.",
+    "wake": "Wecken",
+    "reconnect": "Neu verbinden",
+    "driverYou": "Du hast das Schreibrecht",
+    "driverOther": "{{name}} schreibt",
+    "driverNone": "Kein Driver",
+    "requestDriver": "Schreibrecht anfordern",
+    "releaseDriver": "Schreibrecht abgeben",
+    "requestPending": "Angefragt…",
+    "requestDenied": "Anfrage abgelehnt",
+    "actionForbidden": "Der Server hat das abgelehnt — deine Rolle ist nur lesend.",
+    "actionRejected": "Der Server hat diese Aktion abgelehnt.",
+    "actionOffline": "Nicht verbunden — die Aktion wurde nicht gesendet.",
+    "actionPaneLimit": "Dieses Projekt hat bereits die maximalen {{max}} Terminals.",
+    "actionLastPane": "Das letzte Terminal eines Projekts lässt sich nicht schließen.",
+    "queueRequest": "{{name}} möchte das Schreibrecht",
+    "approve": "Übergeben",
+    "deny": "Ablehnen",
+    "presenceTitle": "Wer ist da",
+    "presenceDriver": "{{name}} (Driver)",
+    "userEnvironment": "Persönliche Umgebung",
+    "userRuntimeStatus": {
+      "running": "Läuft",
+      "sleeping": "Schläft",
+      "none": "Noch nicht eingerichtet"
+    },
+    "stopRuntime": "Umgebung stoppen",
+    "stopRuntimeConfirm": "Die persönliche Umgebung wird gestoppt und laufende Prozesse werden beendet. Dateien und installierte Tools bleiben erhalten; „Wecken“ startet sie wieder.",
+    "stopRuntimeAction": "Stoppen",
+    "pairing": {
+      "expired": "Der Kopplungscode ist abgelaufen — bitte erneut versuchen.",
+      "consumed": "Der Kopplungscode wurde bereits verwendet — bitte erneut versuchen.",
+      "error": "Kopplung fehlgeschlagen: {{message}}"
+    },
+    "actionUnknownPane": "Dieses Terminal gibt es nicht mehr — jemand anderes hat es geschlossen."
   },
   "menu": {
     "copy": "Kopieren",

@@ -119,4 +119,35 @@ describe('migrateSettings', () => {
       themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95
     }).restoreTerminalHistory).toBeUndefined();
   });
+
+  // Remote-Workspaces: Die Serverliste MUSS den Round-Trip überleben — sonst
+  // verlöre jeder Neustart die konfigurierten Server (gleiche Fehlerbauart wie
+  // beim brandDesign-Regression oben).
+  it('preserves configured servers across a load/save round-trip', () => {
+    const out = migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95,
+      servers: [{ id: 'srv1', name: 'Dev', baseUrl: 'https://dmw.example/' }]
+    });
+    expect(out.servers).toEqual([{ id: 'srv1', name: 'Dev', baseUrl: 'https://dmw.example' }]);
+  });
+
+  it('drops malformed server entries and duplicate ids, omitting an empty list', () => {
+    const out = migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95,
+      servers: [
+        { id: 'srv1', name: 'Dev', baseUrl: 'https://a.example' },
+        { id: 'srv1', name: 'Doppelt', baseUrl: 'https://b.example' },
+        { id: 'srv2', name: 'kaputt', baseUrl: 'ftp://x' },
+        { id: '', name: 'leer', baseUrl: 'https://c.example' },
+        'nope'
+      ]
+    });
+    expect(out.servers).toEqual([{ id: 'srv1', name: 'Dev', baseUrl: 'https://a.example' }]);
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, servers: []
+    }).servers).toBeUndefined();
+    expect(migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, servers: 'nope'
+    }).servers).toBeUndefined();
+  });
 });

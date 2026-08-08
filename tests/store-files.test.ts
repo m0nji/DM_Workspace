@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../src/renderer/store';
 
-const blankPanel = { open: false, widthPx: 480, source: null, tab: 'files' as const, browseRoot: null, editPath: null };
+const blankPanel = { open: false, widthPx: 480, source: null, tab: 'files' as const, browseRoot: null, editPath: null, editRemote: null };
 
 describe('file browser store', () => {
   beforeEach(() => {
@@ -120,5 +120,58 @@ describe('file browser store', () => {
     expect(p.tab).toBe('preview');
     expect(p.editPath).toBe(null);
     expect(p.source).toEqual({ kind: 'markdown', target: '/tmp/a.md', resolved: true });
+  });
+});
+
+// ---- Remote-Workspaces (B3): Files-Tab zeigt den Server-Projektbaum --------
+
+describe('file browser store – remote workspaces', () => {
+  beforeEach(() => {
+    useStore.setState({
+      previewPanel: { ...blankPanel },
+      workspaces: [{
+        id: 'wr1', name: 'Projekt X', cwd: '~', layout: null,
+        kind: 'remote', remote: { serverId: 'srv1', scope: 'project', projectId: 'proj1' }
+      }],
+      activeWorkspaceId: 'wr1',
+      focusedPaneId: 'p1',
+      paneCwd: { p1: '/workspace/src' } // Container-Pfad der Remote-Shell
+    });
+  });
+
+  it('openFiles startet im Projektroot statt im (Container-)Pane-cwd', () => {
+    useStore.getState().openFiles();
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/');
+  });
+
+  it('togglePreview synchronisiert den Root eines Remote-Workspace auf /', () => {
+    useStore.setState({ previewPanel: { ...blankPanel, browseRoot: '/tmp/woanders' } });
+    useStore.getState().togglePreview();
+    expect(useStore.getState().previewPanel.browseRoot).toBe('/');
+  });
+
+  it('openInEditor trägt die Remote-Herkunft und clearEditor räumt sie ab', () => {
+    useStore.getState().openInEditor('/docs/a.md', { serverId: 'srv1', projectId: 'proj1' });
+    let p = useStore.getState().previewPanel;
+    expect(p.editPath).toBe('/docs/a.md');
+    expect(p.editRemote).toEqual({ serverId: 'srv1', projectId: 'proj1' });
+
+    useStore.getState().clearEditor();
+    p = useStore.getState().previewPanel;
+    expect(p.editPath).toBeNull();
+    expect(p.editRemote).toBeNull();
+  });
+
+  it('openInEditor ohne Herkunft bleibt lokal (editRemote null)', () => {
+    useStore.getState().openInEditor('/tmp/a.txt');
+    expect(useStore.getState().previewPanel.editRemote).toBeNull();
+  });
+
+  it('setBrowseRoot verwirft eine offene Remote-Editor-Herkunft mit', () => {
+    useStore.getState().openInEditor('/docs/a.md', { serverId: 'srv1', projectId: 'proj1' });
+    useStore.getState().setBrowseRoot('/src');
+    const p = useStore.getState().previewPanel;
+    expect(p.editPath).toBeNull();
+    expect(p.editRemote).toBeNull();
   });
 });

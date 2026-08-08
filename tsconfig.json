@@ -10,7 +10,15 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["node", "react", "react-dom", "vite/client"]
+    "types": ["node", "react", "react-dom", "vite/client"],
+    // Löst die @dmw/*-Imports des gevendorten Client-Codes (Sync-Skript
+    // scripts/sync-dmw-client.mjs) auf den Vendor-Ordner auf — keine
+    // Quelltext-Rewrites in den kopierten Dateien. Relativ zur tsconfig
+    // (ohne das deprecatete baseUrl).
+    "paths": {
+      "@dmw/shared": ["./src/main/remote/vendor/dmw-shared/index.ts"],
+      "@dmw/client": ["./src/main/remote/vendor/dmw-client/index.ts"]
+    }
   },
   "include": ["src", "tests", "e2e"]
 }

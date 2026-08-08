@@ -6,12 +6,17 @@ import { app } from 'electron';
 import { join } from 'path';
 import { bashPromptCommand, shellArgs, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
 import { promptNonce } from './prompt-nonce';
+import type { TerminalBackend, TerminalDataListener, TerminalExitListener } from './terminal-backend';
+import type { SpawnTarget } from '../shared/types';
 
 export interface SpawnOptions {
   cwd: string;
   cols: number;
   rows: number;
   shell?: string;
+  // Ausgewertet vom BackendRouter (terminal-backend.ts), nicht vom PtyManager:
+  // der ist immer das lokale Backend und ignoriert das Feld.
+  target?: SpawnTarget;
 }
 
 function defaultShell(): string {
@@ -82,16 +87,16 @@ function cwdHookEnv(shell: string): Record<string, string> {
   return base;
 }
 
-type DataListener = (paneId: string, data: string) => void;
-type ExitListener = (paneId: string, exitCode: number) => void;
-
-export class PtyManager {
+// Das lokale Prozess-Backend: spawnt echte PTYs auf dieser Maschine. Die
+// Oberfläche ist als TerminalBackend extrahiert (terminal-backend.ts), damit
+// B2 ein Remote-Backend mit identischer Schnittstelle daneben stellen kann.
+export class PtyManager implements TerminalBackend {
   private procs = new Map<string, pty.IPty>();
-  private dataListeners: DataListener[] = [];
-  private exitListeners: ExitListener[] = [];
+  private dataListeners: TerminalDataListener[] = [];
+  private exitListeners: TerminalExitListener[] = [];
 
-  onData(cb: DataListener): void { this.dataListeners.push(cb); }
-  onExit(cb: ExitListener): void { this.exitListeners.push(cb); }
+  onData(cb: TerminalDataListener): void { this.dataListeners.push(cb); }
+  onExit(cb: TerminalExitListener): void { this.exitListeners.push(cb); }
 
   spawn(paneId: string, opts: SpawnOptions): void {
     if (this.procs.has(paneId)) return;
