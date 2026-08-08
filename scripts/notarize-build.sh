@@ -87,7 +87,13 @@ fi
 
 DMG="$(ls dist/*.dmg 2>/dev/null | head -1 || true)"
 if [[ -n "${DMG:-}" ]]; then
+  # Das .dmg selbst signieren, notarisieren und stapeln — plus Blockmap und
+  # latest-mac.yml nachziehen. Gemeinsames Skript, damit die CI (die
+  # electron-builder direkt aufruft) denselben Schritt fahren kann.
+  bash "$ROOT/scripts/staple-dmg.sh"
+
   echo "== stapler (dmg) ==";   xcrun stapler validate "$DMG" || true
+  echo "== spctl (dmg) ==";     spctl -a -t open --context context:primary-signature -v "$DMG" || true
   echo ""
   echo "✓ Done: $DMG"
 else
