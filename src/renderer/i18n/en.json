@@ -526,6 +526,7 @@
   "remote": {
     "dialogTitle": "New remote workspace",
     "noServers": "No servers configured. Add one in Settings → Account & servers first.",
+    "notSignedIn": "Not signed in yet. Sign in under Settings → Account & servers and your projects will appear here.",
     "chooseServer": "Server",
     "chooseProject": "Project",
     "loadingProjects": "Loading projects…",

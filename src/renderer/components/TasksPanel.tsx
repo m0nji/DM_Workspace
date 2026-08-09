@@ -9,6 +9,7 @@ import {
   type ScheduleTemplateId
 } from '../task-schedule';
 import { describeTaskError } from '../task-error';
+import { formatDateTime } from '../task-datetime';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -19,10 +20,6 @@ import { ConfirmDialog } from './ConfirmDialog';
 // tasksAvailable() aus dem Store — siehe dort für die drei Stufen.
 
 interface TaskScope { serverId: string; scopeKey: string; }
-
-function fmtDateTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : '—';
-}
 
 type TaskState = 'active' | 'paused' | 'running';
 
@@ -146,7 +143,7 @@ interface TasksListProps {
 }
 
 function TasksList({ scope, entry, canRun, onReload, onOpenDetail, onOpenForm }: TasksListProps): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tasks = entry?.tasks ?? [];
   const canManage = entry?.access?.canManage ?? false;
   // canRun (Starten) ist eine eigene, vom Server berechnete Berechtigung
@@ -239,10 +236,10 @@ function TasksList({ scope, entry, canRun, onReload, onOpenDetail, onOpenForm }:
               </div>
               <div className="tasks-row-meta">
                 <span>{formatTaskSchedule(task, t)}</span>
-                <span>{t('tasks.scheduled.list.nextRun')}: {task.enabled ? fmtDateTime(task.nextRunAt) : t('tasks.scheduled.list.noNextRun')}</span>
+                <span>{t('tasks.scheduled.list.nextRun')}: {task.enabled ? formatDateTime(task.nextRunAt, i18n.language) : t('tasks.scheduled.list.noNextRun')}</span>
                 <span>
                   {t('tasks.scheduled.list.lastRun')}: {task.lastRun
-                    ? `${t(`tasks.scheduled.runStatus.${task.lastRun.status}`)} · ${fmtDateTime(task.lastRun.startedAt)}`
+                    ? `${t(`tasks.scheduled.runStatus.${task.lastRun.status}`)} · ${formatDateTime(task.lastRun.startedAt, i18n.language)}`
                     : t('tasks.scheduled.list.lastRunNone')}
                 </span>
                 <span>{t('tasks.scheduled.list.owner')}: {task.ownerId ?? t('tasks.scheduled.list.ownerNone')}</span>
@@ -300,7 +297,7 @@ function TasksList({ scope, entry, canRun, onReload, onOpenDetail, onOpenForm }:
 // ---- Verlauf + Live-Protokoll ------------------------------------------------
 
 function TaskDetail({ scope, task, canRun }: { scope: TaskScope; task: RemoteTask; canRun: boolean }): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [runs, setRuns] = useState<RemoteTaskRun[] | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -360,7 +357,7 @@ function TaskDetail({ scope, task, canRun }: { scope: TaskScope; task: RemoteTas
               onClick={() => setSelectedRunId(r.id)}
             >
               <span className={`tasks-run-status tasks-run-status-${r.status}`}>{t(`tasks.scheduled.runStatus.${r.status}`)}</span>
-              <span>{fmtDateTime(r.startedAt)}</span>
+              <span>{formatDateTime(r.startedAt, i18n.language)}</span>
               <span>{t(`tasks.scheduled.detail.trigger.${r.trigger}`)}</span>
             </button>
           ))}
@@ -374,7 +371,7 @@ function TaskDetail({ scope, task, canRun }: { scope: TaskScope; task: RemoteTas
 
 // Protokoll eines einzelnen Laufs: Basistext per REST, danach live per Push.
 function RunLogView({ scope, run, canRun }: { scope: TaskScope; run: RemoteTaskRun; canRun: boolean }): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [baseLog, setBaseLog] = useState<string | null>(null); // null = noch nicht geladen
   const [loadError, setLoadError] = useState<string | null>(null);
   const [follow, setFollow] = useState(true);
@@ -446,7 +443,7 @@ function RunLogView({ scope, run, canRun }: { scope: TaskScope; run: RemoteTaskR
     <div className="tasks-log-panel">
       <div className="tasks-log-toolbar">
         <span>
-          {fmtDateTime(run.startedAt)} → {run.finishedAt ? fmtDateTime(run.finishedAt) : t('tasks.scheduled.detail.stillRunning')}
+          {formatDateTime(run.startedAt, i18n.language)} → {run.finishedAt ? formatDateTime(run.finishedAt, i18n.language) : t('tasks.scheduled.detail.stillRunning')}
           {run.exitCode !== null && ` · ${t('tasks.scheduled.detail.exitCode', { code: run.exitCode })}`}
         </span>
         <label className="tasks-log-follow">

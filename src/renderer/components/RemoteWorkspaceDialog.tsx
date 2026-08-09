@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
+import { describeIpcError } from '../ipc-error';
 import { Icon } from './Icon';
 import { USER_SCOPE_KEY } from '../../shared/remote-pane-key';
 import type { RemoteProject, RemoteUserRuntimeState, ServerConfig } from '../../shared/types';
@@ -29,6 +30,9 @@ export function RemoteWorkspaceDialog(): React.JSX.Element | null {
   // (älterer Stand ohne /api/runtimes/user) — dann erscheint der Eintrag nicht.
   const [userRuntime, setUserRuntime] = useState<RemoteUserRuntimeState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Eigener Zustand statt einer Fehlermeldung: fehlende Anmeldung ist der
+  // Normalzustand beim ersten Öffnen und verlangt einen Hinweis, kein Rot.
+  const [needsLogin, setNeedsLogin] = useState(false);
   // scopeKey des gerade verbindenden Ziels: Projekt-UUID oder 'user'.
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
@@ -43,9 +47,21 @@ export function RemoteWorkspaceDialog(): React.JSX.Element | null {
     setProjects(null);
     setUserRuntime(null);
     setError(null);
+    setNeedsLogin(false);
     window.api.remoteProjects(effectiveServerId).then(
       (list) => { if (!cancelled) setProjects(list); },
-      (err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); }
+      async (err: unknown) => {
+        if (cancelled) return;
+        // „Noch nicht angemeldet" ist kein Fehler, sondern der Normalzustand
+        // beim ersten Öffnen — und es war das Erste, was ein neuer Nutzer
+        // überhaupt zu sehen bekam, in Gestalt der rohen IPC-Ausnahme. Der
+        // Grund wird deshalb erfragt, statt ihn aus dem (deutschen, in einer
+        // englischen Oberfläche falschen) Text der Ausnahme zu raten.
+        const status = await window.api.authStatus(effectiveServerId).catch(() => null);
+        if (cancelled) return;
+        if (status && !status.loggedIn) { setNeedsLogin(true); return; }
+        setError(describeIpcError(err));
+      }
     );
     // Fehler hier bewusst still (nur der Eintrag fehlt): ein älterer Server
     // ohne User-Runtimes soll die Projektauswahl nicht blockieren.
@@ -57,7 +73,7 @@ export function RemoteWorkspaceDialog(): React.JSX.Element | null {
   }, [open, effectiveServerId]);
 
   useEffect(() => {
-    if (!open) { setServerId(null); setProjects(null); setUserRuntime(null); setError(null); setBusyKey(null); }
+    if (!open) { setServerId(null); setProjects(null); setUserRuntime(null); setError(null); setNeedsLogin(false); setBusyKey(null); }
   }, [open]);
 
   if (!open) return null;
@@ -110,6 +126,7 @@ export function RemoteWorkspaceDialog(): React.JSX.Element | null {
               ))}
             </div>
 
+            {needsLogin && <p className="modal-hint">{t('remote.notSignedIn')}</p>}
             {error && <div className="setting-error">{error}</div>}
 
             {userRuntime !== null && (
@@ -134,7 +151,7 @@ export function RemoteWorkspaceDialog(): React.JSX.Element | null {
             )}
 
             <div className="modal-section-label">{t('remote.chooseProject')}</div>
-            {!error && projects === null && <p className="modal-hint">{t('remote.loadingProjects')}</p>}
+            {!error && !needsLogin && projects === null && <p className="modal-hint">{t('remote.loadingProjects')}</p>}
             {projects !== null && projects.length === 0 && (
               <p className="modal-hint">{t('remote.noProjects')}</p>
             )}
