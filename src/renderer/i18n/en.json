@@ -176,7 +176,8 @@
     },
     "cmd": {
       "newWorkspace": "New workspace",
-      "newRemoteTerminal": "New terminal in this project",
+      "newRemoteTerminalRight": "New terminal in this project, to the right",
+      "newRemoteTerminalBelow": "New terminal in this project, below",
       "splitHorizontal": "Split focused pane left and right",
       "splitVertical": "Split focused pane top and bottom",
       "toggleMaximize": "Toggle focused pane maximize",
@@ -190,7 +191,8 @@
       "switchToWorkspace": "Switch to workspace: {{name}}",
       "newFromTemplate": "New workspace from template: {{name}}",
       "editTemplate": "Edit template: {{name}}",
-      "deleteTemplate": "Delete template: {{name}}"
+      "deleteTemplate": "Delete template: {{name}}",
+      "openTasks": "Open scheduled tasks"
     }
   },
   "welcome": {
@@ -215,7 +217,8 @@
     "togglePreview": "Toggle preview / browser",
     "view": "View",
     "terminals": "Terminals",
-    "tasks": "Tasks"
+    "tasks": "Tasks",
+    "scheduledTasks": "Scheduled Tasks"
   },
   "update": {
     "availableTitle": "Update{{version}} available",
@@ -332,7 +335,8 @@
     "closeTitle": "Close window?",
     "closeMessage": "This window and its running terminal process will be closed.",
     "closeConfirm": "Close window",
-    "newRemoteTerminal": "New terminal in this project",
+    "newRemoteTerminalRight": "New terminal in this project (to the right)",
+    "newRemoteTerminalBelow": "New terminal in this project (below)",
     "remoteBlocked": {
       "offline": "Not connected",
       "viewer": "Read-only access",
@@ -370,7 +374,145 @@
     "newPane": "＋ new pane",
     "noCommand": "— no command —",
     "paneNamed": "Terminal {{pos}}",
-    "paneDefault": "Terminal"
+    "paneDefault": "Terminal",
+    "scheduled": {
+      "panel": {
+        "title": "Scheduled Tasks",
+        "newTask": "New Task",
+        "backToList": "Back to list",
+        "empty": "No scheduled tasks yet.",
+        "loading": "Loading scheduled tasks…",
+        "retry": "Try again"
+      },
+      "list": {
+        "agent": "Agent",
+        "schedule": "Schedule",
+        "nextRun": "Next run",
+        "lastRun": "Last run",
+        "lastRunNone": "none yet",
+        "owner": "Owner",
+        "ownerNone": "—",
+        "noNextRun": "—"
+      },
+      "state": {
+        "active": "active",
+        "paused": "paused",
+        "running": "running"
+      },
+      "action": {
+        "start": "Start",
+        "edit": "Edit",
+        "pause": "Pause",
+        "resume": "Resume",
+        "delete": "Delete",
+        "viewHistory": "History"
+      },
+      "blocked": {
+        "manage": "No permission to manage this task",
+        "run": "No permission to start tasks",
+        "cancel": "No permission to cancel",
+        "assign": "Only the project owner can change the assignment",
+        "alreadyRunning": "A run is already active in this project"
+      },
+      "confirm": {
+        "deleteTitle": "Delete task?",
+        "deleteMessage": "\"{{name}}\" will be permanently deleted."
+      },
+      "error": {
+        "notLoggedIn": "Not logged in",
+        "forbidden": "No permission for this action",
+        "notFound": "No longer available",
+        "conflict": "A run is already active in this project",
+        "invalid": "Invalid input",
+        "network": "Server unreachable",
+        "server": "Server error"
+      },
+      "agent": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "opencode": "OpenCode"
+      },
+      "schedule": {
+        "manual": "Manual only",
+        "hourly": "Hourly",
+        "dailyAt": "Daily {{time}}",
+        "weeklyAt": "{{weekday}} {{time}}",
+        "everyMinutes": "Every {{count}} minutes",
+        "everyHour": "Every hour",
+        "everyHours": "Every {{count}} hours",
+        "everyDay": "Every day",
+        "everyDays": "Every {{count}} days",
+        "customCronFallback": "Custom schedule",
+        "weekday": {
+          "sun": "Sundays",
+          "mon": "Mondays",
+          "tue": "Tuesdays",
+          "wed": "Wednesdays",
+          "thu": "Thursdays",
+          "fri": "Fridays",
+          "sat": "Saturdays"
+        },
+        "template": {
+          "hourly": "Hourly",
+          "dailyAt3": "Daily 03:00",
+          "weeklyMonAt3": "Weekly, Monday 03:00",
+          "interval": "Interval",
+          "customCron": "Custom cron expression",
+          "manual": "Manual only"
+        },
+        "intervalLabel": "Minutes",
+        "intervalPlaceholder": "e.g. 15",
+        "customCronLabel": "Cron expression",
+        "customCronPlaceholder": "e.g. 0 3 * * 1"
+      },
+      "form": {
+        "createTitle": "New scheduled task",
+        "editTitle": "Edit task: {{name}}",
+        "name": "Name",
+        "namePlaceholder": "Task name",
+        "agent": "Agent",
+        "prompt": "Prompt",
+        "promptPlaceholder": "What should the agent do?",
+        "workdir": "Working directory",
+        "workdirHint": "Relative to the project, e.g. \".\" or \"src\"",
+        "schedule": "Schedule",
+        "timeout": "Timeout (minutes)",
+        "enabled": "Scheduling active",
+        "enabledHint": "Paused tasks don't start automatically",
+        "owner": "Owner",
+        "ownerPlaceholder": "User ID",
+        "ownerHint": "Only the project owner can change this assignment",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "detail": {
+        "title": "History: {{name}}",
+        "runsTitle": "Runs",
+        "noRuns": "No runs yet.",
+        "loadingRuns": "Loading runs…",
+        "noRunSelected": "No run selected.",
+        "loadingLog": "Loading log…",
+        "emptyLog": "(no log)",
+        "follow": "Follow",
+        "cancel": "Cancel",
+        "exitCode": "Exit code {{code}}",
+        "stillRunning": "running …",
+        "logTruncated": "… [truncated — beginning cut off; reopen the run to load the full log] …",
+        "trigger": {
+          "schedule": "schedule",
+          "manual": "manual"
+        }
+      },
+      "runStatus": {
+        "running": "running",
+        "success": "success",
+        "failed": "failed",
+        "timeout": "timed out",
+        "cancelled": "cancelled",
+        "skipped": "skipped",
+        "interrupted": "interrupted"
+      }
+    }
   },
   "terminal": {
     "processExited": "Process exited — code {{code}}",

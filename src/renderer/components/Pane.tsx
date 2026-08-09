@@ -70,17 +70,6 @@ function Close(): React.JSX.Element {
   );
 }
 
-// Remote-Pendant zum Split: legt ein neues Terminal IM PROJEKT an statt lokal
-// zu splitten.
-function Plus(): React.JSX.Element {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
-      <line x1="8" y1="3.5" x2="8" y2="12.5" />
-      <line x1="3.5" y1="8" x2="12.5" y2="8" />
-    </svg>
-  );
-}
-
 function Label(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
@@ -185,14 +174,24 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
           onClick={() => setEditingLabel(true)}
         ><Label /></button>
         {/* Lokal: Splitten. Remote: ein neues Terminal IM PROJEKT — ein Split
-            würde eine lokale Shell in den Remote-Workspace mischen. */}
+            würde eine lokale Shell in den Remote-Workspace mischen. Die Wahl
+            der Seite gibt es trotzdem auf beiden Wegen: remote entscheidet sie,
+            wo die vom Server gemeldete Pane im lokalen Layout landet. */}
         {isRemote ? (
-          <button
-            className="pane-btn"
-            disabled={!!createBlock}
-            title={withReason(t('pane.newRemoteTerminal'), createBlock)}
-            onClick={() => createRemotePane(paneId)}
-          ><Plus /></button>
+          <>
+            <button
+              className="pane-btn"
+              disabled={!!createBlock}
+              title={withReason(t('pane.newRemoteTerminalRight'), createBlock)}
+              onClick={() => createRemotePane(paneId, 'h')}
+            ><SplitLeftRight /></button>
+            <button
+              className="pane-btn"
+              disabled={!!createBlock}
+              title={withReason(t('pane.newRemoteTerminalBelow'), createBlock)}
+              onClick={() => createRemotePane(paneId, 'v')}
+            ><SplitTopBottom /></button>
+          </>
         ) : (
           <>
             <button className="pane-btn" title={t('pane.splitHorizontal')}

@@ -176,7 +176,8 @@
     },
     "cmd": {
       "newWorkspace": "Neuer Workspace",
-      "newRemoteTerminal": "Neues Terminal in diesem Projekt",
+      "newRemoteTerminalRight": "Neues Terminal in diesem Projekt, rechts daneben",
+      "newRemoteTerminalBelow": "Neues Terminal in diesem Projekt, darunter",
       "splitHorizontal": "Fokussierten Bereich links und rechts teilen",
       "splitVertical": "Fokussierten Bereich oben und unten teilen",
       "toggleMaximize": "Fokussierten Bereich maximieren umschalten",
@@ -190,7 +191,8 @@
       "switchToWorkspace": "Wechseln zu Workspace: {{name}}",
       "newFromTemplate": "Neuer Workspace aus Vorlage: {{name}}",
       "editTemplate": "Vorlage bearbeiten: {{name}}",
-      "deleteTemplate": "Vorlage löschen: {{name}}"
+      "deleteTemplate": "Vorlage löschen: {{name}}",
+      "openTasks": "Geplante Tasks öffnen"
     }
   },
   "welcome": {
@@ -215,7 +217,8 @@
     "togglePreview": "Vorschau / Browser umschalten",
     "view": "Ansicht",
     "terminals": "Terminals",
-    "tasks": "Tasks"
+    "tasks": "Tasks",
+    "scheduledTasks": "Geplante Tasks"
   },
   "update": {
     "availableTitle": "Update{{version}} verfügbar",
@@ -332,7 +335,8 @@
     "closeTitle": "Fenster schließen?",
     "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
     "closeConfirm": "Fenster schließen",
-    "newRemoteTerminal": "Neues Terminal in diesem Projekt",
+    "newRemoteTerminalRight": "Neues Terminal im Projekt (rechts daneben)",
+    "newRemoteTerminalBelow": "Neues Terminal im Projekt (darunter)",
     "remoteBlocked": {
       "offline": "Nicht verbunden",
       "viewer": "Nur Lesezugriff",
@@ -370,7 +374,145 @@
     "newPane": "＋ neues Pane",
     "noCommand": "— kein Befehl —",
     "paneNamed": "Terminal {{pos}}",
-    "paneDefault": "Terminal"
+    "paneDefault": "Terminal",
+    "scheduled": {
+      "panel": {
+        "title": "Geplante Tasks",
+        "newTask": "Neuer Task",
+        "backToList": "Zurück zur Liste",
+        "empty": "Noch keine geplanten Tasks.",
+        "loading": "Lade geplante Tasks…",
+        "retry": "Erneut versuchen"
+      },
+      "list": {
+        "agent": "Agent",
+        "schedule": "Zeitplan",
+        "nextRun": "Nächste Fälligkeit",
+        "lastRun": "Letzter Lauf",
+        "lastRunNone": "noch keiner",
+        "owner": "Verantwortlich",
+        "ownerNone": "—",
+        "noNextRun": "—"
+      },
+      "state": {
+        "active": "aktiv",
+        "paused": "pausiert",
+        "running": "läuft"
+      },
+      "action": {
+        "start": "Starten",
+        "edit": "Bearbeiten",
+        "pause": "Pausieren",
+        "resume": "Fortsetzen",
+        "delete": "Löschen",
+        "viewHistory": "Verlauf"
+      },
+      "blocked": {
+        "manage": "Keine Berechtigung, diesen Task zu verwalten",
+        "run": "Keine Berechtigung zum Starten",
+        "cancel": "Keine Berechtigung zum Abbrechen",
+        "assign": "Nur die Projektleitung kann die Zuständigkeit ändern",
+        "alreadyRunning": "Im Projekt läuft bereits ein Lauf"
+      },
+      "confirm": {
+        "deleteTitle": "Task löschen?",
+        "deleteMessage": "„{{name}}“ wird endgültig gelöscht."
+      },
+      "error": {
+        "notLoggedIn": "Nicht angemeldet",
+        "forbidden": "Keine Berechtigung für diese Aktion",
+        "notFound": "Nicht mehr vorhanden",
+        "conflict": "Im Projekt läuft bereits ein Lauf",
+        "invalid": "Ungültige Eingabe",
+        "network": "Server nicht erreichbar",
+        "server": "Serverfehler"
+      },
+      "agent": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "opencode": "OpenCode"
+      },
+      "schedule": {
+        "manual": "Nur manuell",
+        "hourly": "Stündlich",
+        "dailyAt": "Täglich {{time}}",
+        "weeklyAt": "{{weekday}} {{time}}",
+        "everyMinutes": "Alle {{count}} Minuten",
+        "everyHour": "Jede Stunde",
+        "everyHours": "Alle {{count}} Stunden",
+        "everyDay": "Jeden Tag",
+        "everyDays": "Alle {{count}} Tage",
+        "customCronFallback": "Eigener Zeitplan",
+        "weekday": {
+          "sun": "Sonntags",
+          "mon": "Montags",
+          "tue": "Dienstags",
+          "wed": "Mittwochs",
+          "thu": "Donnerstags",
+          "fri": "Freitags",
+          "sat": "Samstags"
+        },
+        "template": {
+          "hourly": "Stündlich",
+          "dailyAt3": "Täglich 03:00",
+          "weeklyMonAt3": "Wöchentlich, montags 03:00",
+          "interval": "Intervall",
+          "customCron": "Eigener Cron-Ausdruck",
+          "manual": "Nur manuell"
+        },
+        "intervalLabel": "Minuten",
+        "intervalPlaceholder": "z. B. 15",
+        "customCronLabel": "Cron-Ausdruck",
+        "customCronPlaceholder": "z. B. 0 3 * * 1"
+      },
+      "form": {
+        "createTitle": "Neuer geplanter Task",
+        "editTitle": "Task bearbeiten: {{name}}",
+        "name": "Name",
+        "namePlaceholder": "Name des Tasks",
+        "agent": "Agent",
+        "prompt": "Auftrag",
+        "promptPlaceholder": "Was soll der Agent tun?",
+        "workdir": "Arbeitsverzeichnis",
+        "workdirHint": "Relativ zum Projekt, z. B. „.“ oder „src“",
+        "schedule": "Zeitplan",
+        "timeout": "Zeitlimit (Minuten)",
+        "enabled": "Zeitgesteuert aktiv",
+        "enabledHint": "Pausierte Tasks starten nicht automatisch",
+        "owner": "Verantwortlich",
+        "ownerPlaceholder": "Nutzer-ID",
+        "ownerHint": "Nur die Projektleitung kann diese Zuweisung ändern",
+        "save": "Speichern",
+        "cancel": "Abbrechen"
+      },
+      "detail": {
+        "title": "Verlauf: {{name}}",
+        "runsTitle": "Läufe",
+        "noRuns": "Noch keine Läufe.",
+        "loadingRuns": "Lade Läufe…",
+        "noRunSelected": "Kein Lauf ausgewählt.",
+        "loadingLog": "Lade Protokoll…",
+        "emptyLog": "(kein Protokoll)",
+        "follow": "Folgen",
+        "cancel": "Abbrechen",
+        "exitCode": "Exit-Code {{code}}",
+        "stillRunning": "läuft …",
+        "logTruncated": "… [gekürzt — Anfang abgeschnitten; vollständiges Protokoll per Neuöffnen des Laufs laden] …",
+        "trigger": {
+          "schedule": "Zeitplan",
+          "manual": "manuell"
+        }
+      },
+      "runStatus": {
+        "running": "läuft",
+        "success": "erfolgreich",
+        "failed": "fehlgeschlagen",
+        "timeout": "Zeitüberschreitung",
+        "cancelled": "abgebrochen",
+        "skipped": "übersprungen",
+        "interrupted": "unterbrochen"
+      }
+    }
   },
   "terminal": {
     "processExited": "Prozess beendet — Code {{code}}",

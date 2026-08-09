@@ -20,8 +20,9 @@ import { isTrustedSender } from './ipc-sender';
 import {
   isNonEmptyString, parseAgentDone, parseLoginLocal, parsePtyInput, parsePtyResize, parsePtySpawn,
   parseRemoteDriverDecision, parseRemoteFsFile, parseRemoteFsList, parseRemoteFsRename,
-  parseRemoteFsWrite, parseRemotePaneRef, parseRemoteScopeRef, parseScrollbackSave,
-  parseServerConfig, parseServerRef, parseTasksSave
+  parseRemoteFsWrite, parseRemotePaneRef, parseRemoteRef, parseRemoteRunRef, parseRemoteScopeRef,
+  parseRemoteTaskCreate, parseRemoteTaskLogRef, parseRemoteTaskRef, parseRemoteTaskUpdate,
+  parseScrollbackSave, parseServerConfig, parseServerRef, parseTasksSave
 } from './ipc-validate';
 import { AuthManager } from './remote/auth-manager';
 import { RemoteManager } from './remote/remote-manager';
@@ -418,6 +419,64 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     const req = parseRemoteFsRename(raw);
     if (!req) { rejectPayload('remoteFs:rename', raw); return invalidFsPayload; }
     return remote.files.rename(req.serverId, req.projectId, req.from, req.to);
+  });
+
+  // --- Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 2) -------------------
+  // Wie bei remoteFs kommen Fehler als ok:false-Ergebnis zurück (RemoteTaskError),
+  // damit die UI 401/403/409 gezielt behandeln kann. Live-Ereignisse (Änderung,
+  // Läufe, Protokollzeilen) kommen NICHT hierüber, sondern als remote:task-Push
+  // (RemoteManager.handleServerMessage) — die REST-Aufrufe hier liefern nur den
+  // Erstzustand bzw. das Ergebnis der jeweiligen Aktion.
+  const invalidTaskPayload = { ok: false as const, code: 'invalid' as const };
+  handle('remoteTasks:list', (_e, raw: unknown) => {
+    const req = parseRemoteRef(raw);
+    if (!req) { rejectPayload('remoteTasks:list', raw); return invalidTaskPayload; }
+    return remote.tasks.list(req.serverId, req.projectId);
+  });
+  handle('remoteTasks:create', (_e, raw: unknown) => {
+    const req = parseRemoteTaskCreate(raw);
+    if (!req) { rejectPayload('remoteTasks:create', raw); return invalidTaskPayload; }
+    return remote.tasks.create(req.serverId, req.projectId, req.body);
+  });
+  handle('remoteTasks:update', (_e, raw: unknown) => {
+    const req = parseRemoteTaskUpdate(raw);
+    if (!req) { rejectPayload('remoteTasks:update', raw); return invalidTaskPayload; }
+    return remote.tasks.update(req.serverId, req.projectId, req.taskId, req.body);
+  });
+  handle('remoteTasks:remove', (_e, raw: unknown) => {
+    const req = parseRemoteTaskRef(raw);
+    if (!req) { rejectPayload('remoteTasks:remove', raw); return invalidTaskPayload; }
+    return remote.tasks.remove(req.serverId, req.projectId, req.taskId);
+  });
+  handle('remoteTasks:run', (_e, raw: unknown) => {
+    const req = parseRemoteTaskRef(raw);
+    if (!req) { rejectPayload('remoteTasks:run', raw); return invalidTaskPayload; }
+    return remote.tasks.run(req.serverId, req.projectId, req.taskId);
+  });
+  handle('remoteTasks:cancel', (_e, raw: unknown) => {
+    const req = parseRemoteRunRef(raw);
+    if (!req) { rejectPayload('remoteTasks:cancel', raw); return invalidTaskPayload; }
+    return remote.tasks.cancel(req.serverId, req.projectId, req.runId);
+  });
+  handle('remoteTasks:listRuns', (_e, raw: unknown) => {
+    const req = parseRemoteTaskRef(raw);
+    if (!req) { rejectPayload('remoteTasks:listRuns', raw); return invalidTaskPayload; }
+    return remote.tasks.listRuns(req.serverId, req.projectId, req.taskId);
+  });
+  handle('remoteTasks:getRun', (_e, raw: unknown) => {
+    const req = parseRemoteRunRef(raw);
+    if (!req) { rejectPayload('remoteTasks:getRun', raw); return invalidTaskPayload; }
+    return remote.tasks.getRun(req.serverId, req.projectId, req.runId);
+  });
+  on('remoteTasks:logSubscribe', (_e, raw: unknown) => {
+    const req = parseRemoteTaskLogRef(raw);
+    if (!req) { rejectPayload('remoteTasks:logSubscribe', raw); return; }
+    remote.backend.taskLogSubscribe(req.serverId, req.scopeKey, req.runId);
+  });
+  on('remoteTasks:logUnsubscribe', (_e, raw: unknown) => {
+    const req = parseRemoteTaskLogRef(raw);
+    if (!req) { rejectPayload('remoteTasks:logUnsubscribe', raw); return; }
+    remote.backend.taskLogUnsubscribe(req.serverId, req.scopeKey, req.runId);
   });
 
   handle('state:load', (): AppState => loadStateFromFile(STATE_FILE()));

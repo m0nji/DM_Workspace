@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import { resolveShortcuts, formatShortcut, type ShortcutAction } from '../shared/shortcuts';
 import { isRemotePaneKey } from '../shared/remote-pane-key';
 import {
-  REMOTE_MAX_PANES, remotePaneCloseBlock, remotePaneCreateBlock,
+  REMOTE_MAX_PANES, remotePaneCloseBlock, remotePaneCreateBlock, tasksAvailable,
   type RemoteBlockReason, type RemoteConnectionState, type StoreState
 } from './store';
 import type { Workspace, WorkspaceTemplate } from '../shared/types';
@@ -55,6 +55,18 @@ export function buildCommandList({
 
   const list: CommandItem[] = [];
 
+  // Tasks gibt es nur, wenn ein Server konfiguriert ist, der aktive Workspace
+  // remote ist und der Server sie kann – dieselbe Funktion wie Panel und
+  // Titelleiste, damit die drei nie auseinanderlaufen.
+  if (tasksAvailable(s)) {
+    list.push({
+      id: 'tasks-open',
+      title: t('palette.cmd.openTasks'),
+      category: catActions,
+      run: act(() => s.setTasksPanelOpen(true)),
+    });
+  }
+
   list.push({ id: 'new-workspace', title: t('palette.cmd.newWorkspace'), category: catActions, hint: hint('newWorkspace'), run: act(() => s.addWorkspace()) });
 
   if (focusedPaneId) {
@@ -69,13 +81,28 @@ export function buildCommandList({
     const reason = (blocked: RemoteBlockReason | null): string | undefined =>
       blocked ? t(`pane.remoteBlocked.${blocked}`, { max: REMOTE_MAX_PANES }) : undefined;
     if (remotePane) {
-      list.push({
-        id: 'new-remote-terminal',
-        title: t('palette.cmd.newRemoteTerminal'),
-        subtitle: reason(remotePaneCreateBlock(remote, focusedPaneId)),
-        category: catActions,
-        run: act(() => s.createRemotePane(focusedPaneId))
-      });
+      // Zwei Einträge statt einem: die Richtung entscheidet, wo die neue
+      // Server-Pane im lokalen Layout einsortiert wird — dieselbe Wahl wie beim
+      // lokalen Split, deshalb auch dieselben Tastenkürzel.
+      const createReason = reason(remotePaneCreateBlock(remote, focusedPaneId));
+      list.push(
+        {
+          id: 'new-remote-terminal-right',
+          title: t('palette.cmd.newRemoteTerminalRight'),
+          subtitle: createReason,
+          category: catActions,
+          hint: hint('splitHorizontal'),
+          run: act(() => s.createRemotePane(focusedPaneId, 'h'))
+        },
+        {
+          id: 'new-remote-terminal-below',
+          title: t('palette.cmd.newRemoteTerminalBelow'),
+          subtitle: createReason,
+          category: catActions,
+          hint: hint('splitVertical'),
+          run: act(() => s.createRemotePane(focusedPaneId, 'v'))
+        }
+      );
     } else {
       list.push(
         { id: 'split-h', title: t('palette.cmd.splitHorizontal'), category: catActions, hint: hint('splitHorizontal'), run: act(() => s.splitActivePane(focusedPaneId, 'h')) },

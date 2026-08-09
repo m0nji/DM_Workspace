@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { FakeServer, waitFor } from './helpers/fake-remote-server';
 import { RemoteManager, type RemoteManagerDeps } from '../src/main/remote/remote-manager';
 import { AuthManager, type SafeStorageLike } from '../src/main/remote/auth-manager';
-import type { RemoteDriverEvent, RemotePresenceEvent, RemoteStatusEvent } from '../src/shared/types';
+import type { RemoteDriverEvent, RemotePresenceEvent, RemoteStatusEvent, RemoteTaskEvent } from '../src/shared/types';
 
 // Deckt genau die Lücke ab, die die Store-Tests nicht sehen können: die
 // Verdrahtung backend.onX(...) -> deps.send('remote:status'|'driver'|'presence', ...)
@@ -54,7 +54,7 @@ describe('RemoteManager: backend-Ereignisse -> remote:status/driver/presence-Pus
   let server: FakeServer;
   let dir: string;
   let manager: RemoteManager;
-  let sent: Array<{ channel: string; payload: RemoteStatusEvent | RemoteDriverEvent | RemotePresenceEvent }>;
+  let sent: Array<{ channel: string; payload: RemoteStatusEvent | RemoteDriverEvent | RemotePresenceEvent | RemoteTaskEvent }>;
 
   beforeEach(async () => {
     server = new FakeServer();
@@ -129,6 +129,21 @@ describe('RemoteManager: backend-Ereignisse -> remote:status/driver/presence-Pus
     // Panes laufen wie 'connection'/'error' über remote:status — Leck-Check,
     // dass der panes-Push nicht stattdessen auf remote:driver/-presence landet.
     expect(sent.every((m) => m.channel === 'remote:status')).toBe(true);
+  });
+
+  // Nachtrag: serverInfo.features aus dem welcome muss bis zum remote:status/
+  // kind:panes-Push durchkommen — das ist der einzige Weg, über den der
+  // Renderer-Store (RemoteConnectionState.serverFeatures) sie je erreicht.
+  it('leitet serverInfo.features aus dem welcome im remote:status/kind:panes-Push weiter', async () => {
+    server.features = ['tasks'];
+    spawnDefaultPane(manager);
+    const isPanes = (m: (typeof sent)[number]): boolean =>
+      m.channel === 'remote:status' && 'kind' in m.payload && m.payload.kind === 'panes';
+    await waitFor(() => sent.some(isPanes));
+
+    const matches = sent.filter(isPanes);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].payload).toMatchObject({ kind: 'panes', features: ['tasks'] });
   });
 
   it('leitet driver.changed als remote:driver weiter, mit eigener clientId zum Selbstvergleich', async () => {

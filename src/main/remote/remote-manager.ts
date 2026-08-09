@@ -5,18 +5,22 @@
 // dasselbe Muster wie der tasks:changed-Push in ipc.ts.
 
 import { AuthManager } from './auth-manager';
-import { RemotePtyBackend, type RemoteBackendDeps } from './remote-backend';
+import { RemotePtyBackend, type RemoteBackendDeps, type TaskServerMessage } from './remote-backend';
 import { RemoteFiles } from './remote-files';
+import { RemoteTasks } from './remote-tasks';
 import type {
   RemoteAuthStatus, RemoteDriverEvent, RemoteLoginResult, DevicePairingResult,
-  RemotePresenceEvent, RemoteProject, RemoteStatusEvent, RemoteUserRuntimeResult,
+  RemotePresenceEvent, RemoteProject, RemoteStatusEvent, RemoteTaskEvent, RemoteUserRuntimeResult,
   RemoteUserRuntimeStopResult, RemoteWorkspaceInfo, ServerConfig
 } from '../../shared/types';
 
 export interface RemoteManagerDeps {
   auth: AuthManager;
   /** Push an den Renderer (webContents.send); null-sicher verdrahtet in ipc.ts. */
-  send: (channel: 'remote:status' | 'remote:driver' | 'remote:presence', payload: RemoteStatusEvent | RemoteDriverEvent | RemotePresenceEvent) => void;
+  send: (
+    channel: 'remote:status' | 'remote:driver' | 'remote:presence' | 'remote:task',
+    payload: RemoteStatusEvent | RemoteDriverEvent | RemotePresenceEvent | RemoteTaskEvent
+  ) => void;
   /** Beim Start bekannte Server (aus state.json — settings.servers). */
   initialServers: ServerConfig[];
   fetchFn?: typeof fetch;
@@ -29,6 +33,8 @@ export class RemoteManager {
   readonly backend: RemotePtyBackend;
   // REST-Client der Datei-API (B3); nutzt dieselbe Serverliste + Session.
   readonly files: RemoteFiles;
+  // REST-Client der Task-API (Arbeitspaket B, Aufgabe 1); dieselbe Serverliste + Session.
+  readonly tasks: RemoteTasks;
   private readonly servers = new Map<string, ServerConfig>();
   // Presence-Name je Server: der angemeldete Nutzer (gefüllt bei Login/Status).
   private readonly displayNames = new Map<string, string>();
@@ -36,6 +42,14 @@ export class RemoteManager {
   constructor(private readonly deps: RemoteManagerDeps) {
     for (const server of deps.initialServers) this.servers.set(server.id, server);
     this.files = new RemoteFiles({
+      resolve: (serverId) => {
+        const server = this.servers.get(serverId);
+        if (!server) return null;
+        return { baseUrl: server.baseUrl, cookie: this.deps.auth.cookieHeader(serverId) };
+      },
+      fetchFn: deps.fetchFn
+    });
+    this.tasks = new RemoteTasks({
       resolve: (serverId) => {
         const server = this.servers.get(serverId);
         if (!server) return null;
@@ -59,8 +73,8 @@ export class RemoteManager {
     this.backend.onStatus((serverId, scopeKey, status) => {
       this.deps.send('remote:status', { serverId, scopeKey, kind: 'connection', status });
     });
-    this.backend.onPanes((serverId, scopeKey, panes, clientId, role) => {
-      this.deps.send('remote:status', { serverId, scopeKey, kind: 'panes', panes, clientId, role });
+    this.backend.onPanes((serverId, scopeKey, panes, clientId, role, features) => {
+      this.deps.send('remote:status', { serverId, scopeKey, kind: 'panes', panes, clientId, role, features });
     });
     this.backend.onDriver((serverId, scopeKey, paneId, driver, driverQueue, queueDeadline, clientId, denied) => {
       const event: RemoteDriverEvent = { serverId, scopeKey, paneId, driver, driverQueue, queueDeadline, clientId };
@@ -79,6 +93,53 @@ export class RemoteManager {
     this.backend.onError((serverId, scopeKey, code, paneId) => {
       this.deps.send('remote:status', { serverId, scopeKey, kind: 'error', code, paneId });
     });
+    // Task-Nachrichten kommen roh vom Backend (siehe TaskServerMessage) und
+    // werden hier in RemoteTaskEvent übersetzt — dieselbe Stelle wie bei
+    // Status/Driver/Presence oben, nur dass die Übersetzung fünf Server- auf
+    // vier Ereignis-Arten abbildet statt 1:1 durchzureichen.
+    this.backend.onTask((serverId, scopeKey, msg) => this.handleServerMessage(serverId, scopeKey, msg));
+  }
+
+  /**
+   * Übersetzt eine der fünf Task-Nachrichten des WebSocket-Protokolls
+   * (protocol.ts) in ein RemoteTaskEvent und pusht es an den Renderer.
+   * task.run.started und task.run.finished landen beide als kind 'run' — der
+   * Renderer unterscheidet den Zustand am run.status, ein eigener Ereignis-Typ
+   * für „gestartet" vs. „beendet" brächte keinen zusätzlichen Nutzen.
+   *
+   * Unbekannte Nachrichtentypen (älterer/neuerer Server als dieser Desktop)
+   * werden im default-Zweig still verworfen: kein Throw, kein Ereignis. Der
+   * Parametertyp deckt zwar nur die fünf bekannten Varianten ab, der
+   * default-Zweig bleibt trotzdem als Verteidigungslinie stehen, falls ein
+   * Server einen inzwischen entfernten oder noch unbekannten Typ schickt.
+   */
+  handleServerMessage(serverId: string, scopeKey: string, msg: TaskServerMessage): void {
+    switch (msg.type) {
+      case 'task.changed':
+        // TaskInfo (Live-Nachricht) hat dieselben Felder wie RemoteTask bis
+        // auf lastRun, das die schlankere Live-Nachricht nicht mitschickt.
+        // Das Feld wird hier NICHT ergänzt: der Manager übersetzt zustandslos
+        // je Nachricht und weiß nichts vom zuletzt bekannten Lauf. Ein
+        // `lastRun: null` wäre keine Information, sondern eine Erfindung — es
+        // ist im Store nicht von „hat noch nie gelaufen" zu unterscheiden.
+        // Das Zusammenführen macht der Store, der die Liste hält.
+        this.deps.send('remote:task', { serverId, scopeKey, kind: 'changed', task: msg.task });
+        break;
+      case 'task.removed':
+        this.deps.send('remote:task', { serverId, scopeKey, kind: 'removed', taskId: msg.taskId });
+        break;
+      case 'task.run.started':
+      case 'task.run.finished':
+        this.deps.send('remote:task', { serverId, scopeKey, kind: 'run', run: msg.run });
+        break;
+      case 'task.run.log':
+        // protocol.ts nennt das Feld `data`, nicht `chunk` — im Web-Client ist
+        // an dieser Stelle schon einmal ein Name auseinandergelaufen.
+        this.deps.send('remote:task', { serverId, scopeKey, kind: 'log', runId: msg.runId, chunk: msg.data });
+        break;
+      default:
+        break;
+    }
   }
 
   private get fetchFn(): typeof fetch {

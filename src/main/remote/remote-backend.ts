@@ -102,6 +102,16 @@ interface Connection {
   /** Anzeigename aus dem welcome (Projektname bzw. „Meine Umgebung"). */
   projectName: string;
   role: 'owner' | 'editor' | 'viewer';
+  // Vom Server im welcome gemeldete Fähigkeiten (serverInfo.features, z. B.
+  // 'tasks'). undefined UNTERSCHEIDET SICH bewusst von einem leeren Array:
+  // undefined heißt „serverInfo fehlt (Protokoll v1, zu alter Server) ODER
+  // noch kein welcome erhalten"; [] heißt „Server meldet serverInfo, aber
+  // explizit keine Fähigkeiten". Nur die erste Bedeutung ist „zu alt" — ein
+  // Server, der aktiv ein leeres features sendet, ist ein moderner Server
+  // ohne (aktivierte) Zusatzfunktionen. Der Store (RemoteConnectionState.
+  // serverFeatures) behandelt beide heute gleich, die Unterscheidung bleibt
+  // aber erhalten, statt sie hier schon einzuebnen.
+  features: string[] | undefined;
   panes: Map<string, PaneInfo>;
   /** lokale paneId je abonnierter Remote-Pane */
   localByRemote: Map<string, string>;
@@ -109,8 +119,19 @@ interface Connection {
   disposers: Array<() => void>;
 }
 
+// Die fünf Task-Nachrichten des Servers (protocol.ts) — aus dem ServerMessage-
+// Bund herausgezogen, damit der RemoteManager (Übersetzung in RemoteTaskEvent)
+// nicht das gesamte Protokoll importieren muss.
+export type TaskServerMessage = Extract<
+  ServerMessage,
+  { type: 'task.changed' | 'task.removed' | 'task.run.started' | 'task.run.log' | 'task.run.finished' }
+>;
+
 export type RemoteStatusListener = (serverId: string, scopeKey: string, status: ConnectionStatus) => void;
-export type RemotePanesListener = (serverId: string, scopeKey: string, panes: RemotePaneInfo[], clientId: string | null, role: RemoteRole) => void;
+export type RemotePanesListener = (
+  serverId: string, scopeKey: string, panes: RemotePaneInfo[], clientId: string | null, role: RemoteRole,
+  features: string[] | undefined
+) => void;
 export type RemoteDriverListener = (
   serverId: string, scopeKey: string, paneId: string,
   driver: string | null, driverQueue: string[], queueDeadline: number | null,
@@ -120,6 +141,10 @@ export type RemotePresenceListener = (serverId: string, scopeKey: string, users:
 // Vom Server abgelehnte Aktion (z. B. forbidden) — kein Verbindungsabbruch,
 // nur eine Rückmeldung, die bis in die UI durchgereicht wird.
 export type RemoteErrorListener = (serverId: string, scopeKey: string, code: string, paneId: string | null) => void;
+// Task-Nachrichten werden roh durchgereicht (keine Übersetzung hier) — die
+// Übersetzung in RemoteTaskEvent gehört dem RemoteManager, wie beim Rest
+// dieser Klasse: das Backend routet Socket-Nachrichten, es übersetzt sie nicht.
+export type RemoteTaskListener = (serverId: string, scopeKey: string, msg: TaskServerMessage) => void;
 
 const connKey = (serverId: string, scopeKey: string): string => `${serverId}\u0000${scopeKey}`;
 
@@ -134,6 +159,7 @@ export class RemotePtyBackend implements TerminalBackend {
   private readonly driverListeners: RemoteDriverListener[] = [];
   private readonly presenceListeners: RemotePresenceListener[] = [];
   private readonly errorListeners: RemoteErrorListener[] = [];
+  private readonly taskListeners: RemoteTaskListener[] = [];
 
   constructor(private readonly deps: RemoteBackendDeps) {}
 
@@ -144,6 +170,7 @@ export class RemotePtyBackend implements TerminalBackend {
   onDriver(cb: RemoteDriverListener): void { this.driverListeners.push(cb); }
   onPresence(cb: RemotePresenceListener): void { this.presenceListeners.push(cb); }
   onError(cb: RemoteErrorListener): void { this.errorListeners.push(cb); }
+  onTask(cb: RemoteTaskListener): void { this.taskListeners.push(cb); }
 
   // ---- TerminalBackend ----------------------------------------------------
 
@@ -260,14 +287,17 @@ export class RemotePtyBackend implements TerminalBackend {
     }
   }
 
-  connectionInfo(serverId: string, scopeKey: string): { status: ConnectionStatus; clientId: string | null; role: RemoteRole; panes: RemotePaneInfo[] } | null {
+  connectionInfo(
+    serverId: string, scopeKey: string
+  ): { status: ConnectionStatus; clientId: string | null; role: RemoteRole; panes: RemotePaneInfo[]; features: string[] | undefined } | null {
     const conn = this.connections.get(connKey(serverId, scopeKey));
     if (!conn) return null;
     return {
       status: conn.status,
       clientId: conn.clientId,
       role: conn.role,
-      panes: [...conn.panes.values()].map(toRemotePaneInfo)
+      panes: [...conn.panes.values()].map(toRemotePaneInfo),
+      features: conn.features
     };
   }
 
@@ -298,6 +328,17 @@ export class RemotePtyBackend implements TerminalBackend {
     this.connections.get(connKey(serverId, scopeKey))?.client.closePane(paneId);
   }
 
+  // Live-Protokoll eines laufenden Task-Runs an-/abmelden (lesend, auch für
+  // Viewer). Nutzt die vorhandenen Client-Methoden statt selbst Nachrichten
+  // zu bauen (dieselbe Regel wie beim Rest dieser Klasse).
+  taskLogSubscribe(serverId: string, scopeKey: string, runId: string): void {
+    this.connections.get(connKey(serverId, scopeKey))?.client.subscribeTaskLog(runId);
+  }
+
+  taskLogUnsubscribe(serverId: string, scopeKey: string, runId: string): void {
+    this.connections.get(connKey(serverId, scopeKey))?.client.unsubscribeTaskLog(runId);
+  }
+
   // ---- intern -------------------------------------------------------------
 
   private ensureConnectionInternal(serverId: string, scopeKey: string): Connection {
@@ -326,6 +367,7 @@ export class RemotePtyBackend implements TerminalBackend {
       clientId: null,
       projectName: '',
       role: 'viewer',
+      features: undefined,
       panes: new Map(),
       localByRemote: new Map(),
       welcomeWaiters: [],
@@ -361,13 +403,14 @@ export class RemotePtyBackend implements TerminalBackend {
       projectName: conn.projectName,
       role: conn.role,
       clientId: conn.clientId ?? '',
-      panes: [...conn.panes.values()].map(toRemotePaneInfo)
+      panes: [...conn.panes.values()].map(toRemotePaneInfo),
+      features: conn.features
     };
   }
 
   private emitPanes(conn: Connection): void {
     const panes = [...conn.panes.values()].map(toRemotePaneInfo);
-    for (const l of this.panesListeners) l(conn.serverId, conn.scopeKey, panes, conn.clientId, conn.role);
+    for (const l of this.panesListeners) l(conn.serverId, conn.scopeKey, panes, conn.clientId, conn.role, conn.features);
   }
 
   private emitDriver(conn: Connection, pane: PaneInfo, denied: boolean): void {
@@ -382,6 +425,10 @@ export class RemotePtyBackend implements TerminalBackend {
         conn.clientId = msg.clientId;
         conn.projectName = msg.projectName;
         conn.role = msg.role;
+        // serverInfo ist erst ab Protokoll v2 vorhanden; ein Server, der es
+        // gar nicht schickt, lässt features bei undefined statt bei einem
+        // irreführenden leeren Array (siehe Kommentar an Connection.features).
+        conn.features = msg.serverInfo?.features;
         conn.panes = new Map(msg.panes.map((p) => [p.paneId, p]));
         this.emitPanes(conn);
         const waiters = conn.welcomeWaiters.splice(0);
@@ -458,6 +505,13 @@ export class RemotePtyBackend implements TerminalBackend {
         // paneId als '' statt es wegzulassen — beides heißt "kein Pane-Bezug",
         // der Typ kennt nur null dafür.
         for (const l of this.errorListeners) l(conn.serverId, conn.scopeKey, msg.code, msg.paneId || null);
+        break;
+      case 'task.changed':
+      case 'task.removed':
+      case 'task.run.started':
+      case 'task.run.log':
+      case 'task.run.finished':
+        for (const l of this.taskListeners) l(conn.serverId, conn.scopeKey, msg);
         break;
     }
   }

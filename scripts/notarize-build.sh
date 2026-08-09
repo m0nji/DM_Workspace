@@ -85,7 +85,11 @@ else
   echo "  (no .app found under dist/ — check the build output above)"
 fi
 
-DMG="$(ls dist/*.dmg 2>/dev/null | head -1 || true)"
+# Auch hier die Version festnageln statt „irgendein .dmg in dist/": sonst prüft
+# die Nachkontrolle am Ende ein Altartefakt und meldet Erfolg für die falsche
+# Datei (siehe Kommentar in staple-dmg.sh).
+VERSION="$(node -p 'require("./package.json").version')"
+DMG="$(ls dist/*-"$VERSION"-*.dmg 2>/dev/null | head -1 || true)"
 if [[ -n "${DMG:-}" ]]; then
   # Das .dmg selbst signieren, notarisieren und stapeln — plus Blockmap und
   # latest-mac.yml nachziehen. Gemeinsames Skript, damit die CI (die

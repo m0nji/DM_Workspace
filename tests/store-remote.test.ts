@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useStore, isPaneWritable, remoteConnKey } from '../src/renderer/store';
+import { useStore, isPaneWritable, remoteConnKey, REMOTE_PLACEMENT_TTL_MS } from '../src/renderer/store';
 import { collectPaneIds } from '../src/shared/layout-tree';
 import { remotePaneKey } from '../src/shared/remote-pane-key';
-import type { RemoteConnectionStatus, RemotePaneInfo, RemoteRole, Workspace } from '../src/shared/types';
+import type {
+  LayoutNode, RemoteConnectionStatus, RemotePaneInfo, RemoteRole, Workspace
+} from '../src/shared/types';
 
 const SRV = 'srv1';
 const PROJ = 'proj1';
@@ -101,6 +103,31 @@ describe('remote workspace store actions', () => {
     expect(s.remote[remoteConnKey(SRV, 'user')]).toMatchObject({ status: 'connected', clientId: 'c1', role: 'owner' });
   });
 
+  // Nachtrag: serverInfo.features aus dem welcome (RemoteWorkspaceInfo.features)
+  // muss bis in RemoteConnectionState.serverFeatures ankommen — sonst bleibt
+  // die dritte Tasks-Sichtbarkeitsstufe (tasksBlockedReason) dauerhaft bei
+  // 'server-too-old', selbst gegen einen Server, der Tasks beherrscht.
+  it('addRemoteWorkspace übernimmt serverInfo.features aus dem welcome als serverFeatures', async () => {
+    remoteConnectWorkspace.mockResolvedValue({
+      projectName: 'Projekt X', role: 'editor', clientId: 'c1',
+      panes: [paneInfo('p1')], features: ['tasks']
+    });
+    await useStore.getState().addRemoteWorkspace(SRV, { kind: 'project', projectId: PROJ });
+    expect(useStore.getState().remote[KEY].serverFeatures).toEqual(['tasks']);
+  });
+
+  // Ein fehlendes features-Feld (älterer Server ohne serverInfo, oder Server
+  // ohne serverInfo.features) darf NICHT als leeres Array ankommen — sonst
+  // wäre „Server zu alt" und „Server meldet aktiv keine Fähigkeiten" im Store
+  // nicht mehr zu unterscheiden.
+  it('addRemoteWorkspace ohne features im welcome lässt serverFeatures undefined', async () => {
+    remoteConnectWorkspace.mockResolvedValue({
+      projectName: 'Projekt X', role: 'editor', clientId: 'c1', panes: [paneInfo('p1')]
+    });
+    await useStore.getState().addRemoteWorkspace(SRV, { kind: 'project', projectId: PROJ });
+    expect(useStore.getState().remote[KEY].serverFeatures).toBeUndefined();
+  });
+
   it('addRemoteWorkspace aktiviert einen bestehenden Workspace desselben Projekts statt zu doppeln', async () => {
     useStore.setState({ workspaces: [...useStore.getState().workspaces, remoteWorkspace(['p1'])] });
     remoteConnectWorkspace.mockResolvedValue({
@@ -124,6 +151,35 @@ describe('remote workspace store actions', () => {
     const ws = useStore.getState().workspaces[0];
     expect(collectPaneIds(ws.layout).sort()).toEqual([rp('p1'), rp('p3')].sort());
     expect(saveState).toHaveBeenCalled();
+  });
+
+  it('panes-Push übernimmt mitgesendete serverFeatures und behält den vorigen Wert, wenn sie fehlen', () => {
+    useStore.setState({
+      workspaces: [remoteWorkspace(['p1'])],
+      activeWorkspaceId: 'wr1',
+      remote: {
+        [KEY]: {
+          status: 'connected', clientId: 'c1', role: 'editor' as const, panes: [paneInfo('p1')],
+          presence: [], deniedPaneId: null, lastError: null, serverFeatures: ['tasks']
+        }
+      }
+    });
+
+    // Ein Push OHNE features (z. B. weil nur eine Pane hinzukam) darf den
+    // zuvor vom welcome gemeldeten Stand nicht auf undefined zurücksetzen.
+    useStore.getState().applyRemoteStatus({
+      serverId: SRV, scopeKey: PROJ, kind: 'panes', clientId: 'c1', role: 'editor',
+      panes: [paneInfo('p1'), paneInfo('p2')]
+    });
+    expect(useStore.getState().remote[KEY].serverFeatures).toEqual(['tasks']);
+
+    // Ein Push MIT features (z. B. nach einem Reconnect mit neuem welcome)
+    // ersetzt den Stand.
+    useStore.getState().applyRemoteStatus({
+      serverId: SRV, scopeKey: PROJ, kind: 'panes', clientId: 'c1', role: 'editor',
+      panes: [paneInfo('p1'), paneInfo('p2')], features: []
+    });
+    expect(useStore.getState().remote[KEY].serverFeatures).toEqual([]);
   });
 
   it('connection-Push aktualisiert nur den Status', () => {
@@ -171,6 +227,7 @@ describe('remote workspace store actions', () => {
       activeWorkspaceId: 'wr1',
       remote: { [KEY]: { status: 'connected', clientId: 'c1', role: 'editor' as const, panes: [], presence: [], deniedPaneId: null, lastError: null } }
     });
+    useStore.setState({ remoteTasks: { [KEY]: { tasks: [], loading: false, error: null, access: null } } });
     useStore.getState().deleteWorkspace('wr1');
 
     // kill der Remote-Panes ist die Unsubscribe-Semantik des BackendRouters …
@@ -179,6 +236,8 @@ describe('remote workspace store actions', () => {
     // … und die Verbindung wird explizit getrennt.
     expect(remoteDisconnect).toHaveBeenCalledWith(SRV, PROJ);
     expect(useStore.getState().remote[KEY]).toBeUndefined();
+    // Die Task-Liste hängt an derselben Verbindung und geht mit ihr.
+    expect(useStore.getState().remoteTasks[KEY]).toBeUndefined();
   });
 
   it('removeServer entfernt Server, zugehörige Workspaces und die Main-Registrierung', () => {
@@ -187,12 +246,14 @@ describe('remote workspace store actions', () => {
       workspaces: [{ id: 'w1', name: 'Lokal', cwd: '/tmp', layout: null }, remoteWorkspace(['p1'])],
       remote: { [KEY]: { status: 'connected', clientId: 'c1', role: 'editor' as const, panes: [], presence: [], deniedPaneId: null, lastError: null } }
     });
+    useStore.setState({ remoteTasks: { [KEY]: { tasks: [], loading: false, error: null, access: null } } });
     useStore.getState().removeServer(SRV);
 
     const s = useStore.getState();
     expect(s.settings.servers).toBeUndefined();
     expect(s.workspaces.map((w) => w.id)).toEqual(['w1']);
     expect(s.remote[KEY]).toBeUndefined();
+    expect(s.remoteTasks[KEY]).toBeUndefined();
     expect(kill).toHaveBeenCalledWith(rp('p1'));
     expect(serverRemove).toHaveBeenCalledWith(SRV);
   });
@@ -377,6 +438,83 @@ describe('remote workspace store actions', () => {
       statusHandler({ serverId: SRV, scopeKey: PROJ, kind: 'error', code: 'rate_limited', paneId: null });
       useStore.getState().clearRemoteError(SRV, PROJ);
       expect(useStore.getState().remote[KEY].lastError).toBeNull();
+    });
+
+    // Der Server kennt keine Anordnung — die Wahl „rechts daneben" bzw.
+    // „darunter" ist deshalb ein Wunsch, den der Klick hinterlegt und der
+    // naechste panes-Push einloest.
+    describe('Richtung der neuen Remote-Pane', () => {
+      // Der Teilbaum, in dem die neue Pane sitzt: [Richtung, Geschwister].
+      const placementOf = (newPane: string): [string, string[]] | null => {
+        const walk = (node: LayoutNode | null): [string, string[]] | null => {
+          if (!node || node.type === 'pane') return null;
+          const ids = node.children.map((c) => collectPaneIds(c));
+          if (ids.some((group) => group.length === 1 && group[0] === newPane)) {
+            return [node.direction, ids.flat()];
+          }
+          return walk(node.children[0]) ?? walk(node.children[1]);
+        };
+        return walk(useStore.getState().workspaces[0].layout);
+      };
+      const pushPanes = (ids: string[]): void => statusHandler({
+        serverId: SRV, scopeKey: PROJ, kind: 'panes',
+        clientId: 'c1', role: 'editor', panes: ids.map((id) => paneInfo(id))
+      });
+
+      it('setzt die neue Pane rechts neben die angeklickte', () => {
+        connected('owner');
+        useStore.getState().createRemotePane(rp('p1'), 'h');
+        pushPanes(['p1', 'p2', 'p3']);
+        expect(placementOf(rp('p3'))).toEqual(['h', [rp('p1'), rp('p3')]]);
+      });
+
+      it('setzt die neue Pane unter die angeklickte und fokussiert sie', () => {
+        connected('owner');
+        useStore.getState().createRemotePane(rp('p1'), 'v');
+        pushPanes(['p1', 'p2', 'p3']);
+        expect(placementOf(rp('p3'))).toEqual(['v', [rp('p1'), rp('p3')]]);
+        expect(useStore.getState().focusedPaneId).toBe(rp('p3'));
+        // Eingeloest heisst verbraucht: die naechste Pane haengt wieder hinten an.
+        expect(useStore.getState().remote[KEY].pendingPlacement).toBeNull();
+      });
+
+      // Tastenkuerzel und Palette laufen ueber splitActivePane — auch im
+      // Remote-Workspace, sonst waere „oben/unten teilen" dort wirkungslos.
+      it('nimmt die Richtung auch ueber splitActivePane entgegen', () => {
+        connected('owner');
+        useStore.getState().splitActivePane(rp('p2'), 'v');
+        expect(remotePaneCreate).toHaveBeenCalledWith(SRV, PROJ);
+        pushPanes(['p1', 'p2', 'p3']);
+        expect(placementOf(rp('p3'))).toEqual(['v', [rp('p2'), rp('p3')]]);
+      });
+
+      // Eine fremde Pane (Browser, anderer Client) hat keinen Wunsch hinterlegt
+      // und haengt weiterhin rechts an — und sie zieht den Fokus nicht weg.
+      it('haengt eine fremde Pane ohne Wunsch rechts an', () => {
+        connected('owner');
+        useStore.setState({ focusedPaneId: rp('p1') });
+        pushPanes(['p1', 'p2', 'p3']);
+        expect(placementOf(rp('p3'))).toEqual(['h', [rp('p2'), rp('p3')]]);
+        expect(useStore.getState().focusedPaneId).toBe(rp('p1'));
+      });
+
+      // Bleibt der eigene pane.added aus (verworfen, Verbindungswechsel), darf
+      // der alte Wunsch nicht die naechste fremde Pane an sich reissen.
+      it('verfaellt nach Ablauf der Frist', () => {
+        connected('owner');
+        useStore.getState().createRemotePane(rp('p1'), 'v');
+        const conn = useStore.getState().remote[KEY];
+        useStore.setState({
+          remote: {
+            [KEY]: {
+              ...conn,
+              pendingPlacement: { ...conn.pendingPlacement!, at: Date.now() - REMOTE_PLACEMENT_TTL_MS - 1 }
+            }
+          }
+        });
+        pushPanes(['p1', 'p2', 'p3']);
+        expect(placementOf(rp('p3'))).toEqual(['h', [rp('p2'), rp('p3')]]);
+      });
     });
   });
 });

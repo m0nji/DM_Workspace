@@ -82,6 +82,27 @@ describe('RemotePtyBackend (gegen echten ws-Server)', () => {
     expect(server.upgradeUrls[0]).toBe('/ws?scope=user');
   });
 
+  // Nachtrag: serverInfo.features (welcome) muss bis in ensureConnection und
+  // connectionInfo ankommen — ohne das bleibt die dritte Tasks-Sichtbarkeits-
+  // stufe im Renderer-Store dauerhaft bei 'server-too-old' hängen, selbst
+  // gegen einen Server, der Tasks beherrscht.
+  it('welcome mit serverInfo.features liefert die Fähigkeiten in ensureConnection und connectionInfo', async () => {
+    server.features = ['tasks'];
+    const info = await backend.ensureConnection('srv1', 'p-1');
+    expect(info.features).toEqual(['tasks']);
+    expect(backend.connectionInfo('srv1', 'p-1')?.features).toEqual(['tasks']);
+  });
+
+  // Ein fehlendes serverInfo.features (Server kennt zwar serverInfo, meldet
+  // aber keine Fähigkeiten — oder ein noch älterer Server ohne serverInfo)
+  // darf NICHT als leeres Array durchgehen: das würde „Server ist zu alt"
+  // und „Server meldet aktiv keine Fähigkeiten" ununterscheidbar machen.
+  it('fehlendes serverInfo.features bleibt undefined, nicht ein leeres Array', async () => {
+    const info = await backend.ensureConnection('srv1', 'p-1');
+    expect(info.features).toBeUndefined();
+    expect(backend.connectionInfo('srv1', 'p-1')?.features).toBeUndefined();
+  });
+
   it('write sendet input; kill sendet unsubscribe (nie pane.close)', async () => {
     backend.spawn('r:srv1:p-1:rp1', spawnOpts());
     await waitFor(() => server.ofType('subscribe').length >= 1);

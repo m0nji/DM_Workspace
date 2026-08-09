@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCommandList, type CommandItem, type Translate } from '../src/renderer/command-list';
-import { useStore } from '../src/renderer/store';
+import { useStore, remoteConnKey } from '../src/renderer/store';
 import { remotePaneKey } from '../src/shared/remote-pane-key';
 import type { RemotePaneInfo, RemoteRole, Workspace } from '../src/shared/types';
 
@@ -67,6 +67,23 @@ function connectRemote(role: RemoteRole, panes: RemotePaneInfo[] = [paneInfo('p1
   });
 }
 
+// Setzt einen konfigurierten Server, einen aktiven Remote-Workspace und eine
+// verbundene Verbindung mit den gegebenen serverFeatures — dieselbe
+// Voraussetzung, die tasksAvailable() prüft (siehe store.ts).
+function connectRemoteWithFeatures(features: string[]): void {
+  useStore.setState({
+    settings: { themeId: 'default', terminalOpacity: 0.95, servers: [{ id: SRV, name: 'Dev', baseUrl: 'https://x' }] },
+    workspaces: [remoteWorkspace()],
+    activeWorkspaceId: 'wr1',
+    remote: {
+      [KEY]: {
+        status: 'connected', clientId: 'c1', role: 'editor', panes: [], presence: [],
+        deniedPaneId: null, lastError: null, serverFeatures: features
+      }
+    }
+  });
+}
+
 describe('buildCommandList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,14 +105,25 @@ describe('buildCommandList', () => {
 
   it('bietet im lokalen Workspace beide Split-Befehle und kein Remote-Terminal', () => {
     expect(ids()).toEqual(expect.arrayContaining(['split-h', 'split-v', 'close-pane']));
-    expect(ids()).not.toContain('new-remote-terminal');
+    expect(ids()).not.toContain('new-remote-terminal-right');
   });
 
-  it('bietet im Remote-Workspace das Remote-Terminal und keinen Split', () => {
+  // Remote gibt es beide Richtungen ebenfalls — nur heissen sie „neues
+  // Terminal rechts/darunter" statt „teilen", weil der Server das Terminal
+  // anlegt und nur die Einsortierung lokal ist.
+  it('bietet im Remote-Workspace beide Richtungen und keinen Split', () => {
     connectRemote('editor');
-    expect(ids()).toContain('new-remote-terminal');
+    expect(ids()).toEqual(expect.arrayContaining(['new-remote-terminal-right', 'new-remote-terminal-below']));
     expect(ids()).not.toContain('split-h');
     expect(ids()).not.toContain('split-v');
+  });
+
+  it('legt ueber die Palette in der gewaehlten Richtung an', () => {
+    connectRemote('owner');
+    build().find((c) => c.id === 'new-remote-terminal-below')!.run();
+    expect(remotePaneCreate).toHaveBeenCalledWith(SRV, PROJ);
+    expect(useStore.getState().remote[remoteConnKey(SRV, PROJ)].pendingPlacement)
+      .toMatchObject({ anchorPaneId: rp('p1'), direction: 'v' });
   });
 
   it('ohne fokussiertes Pane gibt es weder Split noch Schliessen', () => {
@@ -123,14 +151,14 @@ describe('buildCommandList', () => {
 
   it('nennt bei Rolle viewer den Grund am Remote-Terminal-Eintrag', () => {
     connectRemote('viewer');
-    const entry = build().find((c) => c.id === 'new-remote-terminal');
+    const entry = build().find((c) => c.id === 'new-remote-terminal-right');
     expect(entry?.subtitle).toBe('pane.remoteBlocked.viewer');
     expect(build().find((c) => c.id === 'close-pane')?.subtitle).toBe('pane.remoteBlocked.viewer');
   });
 
   it('nennt am Pane-Limit den Grund und legt nichts an', () => {
     connectRemote('owner', ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map(paneInfo));
-    const entry = build().find((c) => c.id === 'new-remote-terminal');
+    const entry = build().find((c) => c.id === 'new-remote-terminal-below');
     expect(entry?.subtitle).toBe('pane.remoteBlocked.paneLimit');
     entry!.run();
     expect(remotePaneCreate).not.toHaveBeenCalled();
@@ -138,7 +166,22 @@ describe('buildCommandList', () => {
 
   it('nennt ohne Sperre keinen Grund', () => {
     connectRemote('owner');
-    expect(build().find((c) => c.id === 'new-remote-terminal')?.subtitle).toBeUndefined();
+    expect(build().find((c) => c.id === 'new-remote-terminal-right')?.subtitle).toBeUndefined();
     expect(build().find((c) => c.id === 'close-pane')?.subtitle).toBeUndefined();
+  });
+
+  it('ohne konfigurierten Server enthält die Palette keinen einzigen Task-Befehl', () => {
+    // Der Alltag der meisten Nutzer: rein lokale App, kein Server.
+    expect(ids().filter((id) => id.startsWith('tasks-'))).toEqual([]);
+  });
+
+  it('im Remote-Workspace mit tasks-Fähigkeit erscheint der Bereichs-Befehl', () => {
+    connectRemoteWithFeatures(['tasks']);
+    expect(ids()).toContain('tasks-open');
+  });
+
+  it('meldet der Server keine tasks-Fähigkeit, bleibt der Befehl weg', () => {
+    connectRemoteWithFeatures([]);
+    expect(ids()).not.toContain('tasks-open');
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../store';
+import { tasksAvailable, useStore } from '../store';
 import { Icon } from './Icon';
 import { UpdateBadge } from './UpdateBadge';
 
@@ -15,6 +15,11 @@ export function TitlebarActions(): React.JSX.Element {
   const closeTaskView = useStore((s) => s.closeTaskView);
   // The board toggle only exists when the active workspace has tasks enabled.
   const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
+  // Geplante Agenten-Tasks: dieselbe Prüfung wie Panel und Palette
+  // (tasksAvailable), damit die drei nie auseinanderlaufen (siehe store.ts).
+  const scheduledTasksAvailable = useStore(tasksAvailable);
+  const tasksPanelOpen = useStore((s) => s.tasksPanelOpen);
+  const setTasksPanelOpen = useStore((s) => s.setTasksPanelOpen);
 
   return (
     <div className="titlebar-actions">
@@ -28,6 +33,15 @@ export function TitlebarActions(): React.JSX.Element {
                   className={`view-toggle-btn ${taskView ? 'active' : ''}`}
                   onClick={() => void openTaskView()}>{t('titlebar.tasks')}</button>
         </div>
+      )}
+      {/* Umschalter, nicht nur „öffnen": aria-pressed und die active-Klasse
+          versprechen genau das, und der Nachbar (Vorschau) macht es ebenso —
+          ein Klick auf den gedrückten Knopf schließt das Panel wieder. */}
+      {scheduledTasksAvailable && (
+        <button type="button" className={`icon-btn ${tasksPanelOpen ? 'active' : ''}`} title={t('titlebar.scheduledTasks')}
+                aria-pressed={tasksPanelOpen} onClick={() => setTasksPanelOpen(!tasksPanelOpen)}>
+          <Icon name="clock" />
+        </button>
       )}
       <button type="button" className="icon-btn" title={t('titlebar.commandPalette')} onClick={() => setCommandPaletteOpen(true)}>
         <Icon name="command-palette" />

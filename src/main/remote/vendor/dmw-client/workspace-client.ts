@@ -1,4 +1,4 @@
-// AUTO-GENERIERT aus dm_workspace_web@880d025 — nicht editieren, npm run sync:dmw-client
+// AUTO-GENERIERT aus dm_workspace_web@05bf9ad — nicht editieren, npm run sync:dmw-client
 
 import {
   PROTOCOL_VERSION,
@@ -102,7 +102,9 @@ function cancelSchedule(handle: unknown): void {
  * WebSocket-Transport mit automatischem Reconnect und Scrollback-Resume:
  * Pro Pane wird die letzte gesehene Sequenznummer gemerkt; nach einem
  * Reconnect abonniert der Client alle Panes erneut ab dieser Nummer, so dass
- * kein Output verloren geht und der laufende Prozess erhalten bleibt.
+ * kein Output verloren geht und der laufende Prozess erhalten bleibt. Ebenso
+ * werden die aktiven Task-Protokoll-Abos erneut geschickt – auch sie hängen
+ * serverseitig an der Verbindung.
  *
  * Close-Codes: 4403 (Rechteentzug/Logout) und 4205 (Runtime gestoppt) beenden
  * den Auto-Reconnect; alle anderen Codes – auch 4408 (Backpressure) – führen
@@ -122,6 +124,12 @@ export class WorkspaceClient {
   private reconnectTimer: unknown = null
   private readonly lastSeq = new Map<PaneId, number>()
   private readonly subscriptions = new Set<PaneId>()
+  /**
+   * Aktive Protokoll-Abos (Task-Läufe). Serverseitig hängen sie wie die
+   * Pane-Abos an der Verbindung und sterben mit ihr – also müssen sie nach
+   * einem Reconnect genauso erneut geschickt werden.
+   */
+  private readonly taskLogSubscriptions = new Set<string>()
   private readonly messageListeners = new Set<MessageListener>()
   private readonly statusListeners = new Set<StatusListener>()
 
@@ -189,6 +197,15 @@ export class WorkspaceClient {
         // Nach Reconnect: alle Panes ab letzter Sequenznummer wieder abonnieren.
         for (const paneId of this.subscriptions) {
           this.send({ type: 'subscribe', paneId, sinceSeq: this.lastSeq.get(paneId) ?? 0 })
+        }
+        // Dasselbe für die Protokoll-Abos: Ohne das steht ein geöffnetes
+        // Protokollfenster nach jedem Abriss still, ohne jeden Hinweis –
+        // besonders heikel, weil gerade ein gesprächiger Protokollstrom die
+        // Trennung wegen zu vollem Puffer (4408) selbst auslösen kann.
+        // Anders als beim Scrollback gibt es keine Sequenznummer zum Aufsetzen;
+        // die Lücke während der Trennung holt der Aufrufer per REST-Schnappschuss.
+        for (const runId of this.taskLogSubscriptions) {
+          this.send({ type: 'task.log.subscribe', runId })
         }
       } else if (msg.type === 'output' || msg.type === 'scrollback') {
         this.lastSeq.set(msg.paneId, msg.seq)
@@ -286,6 +303,18 @@ export class WorkspaceClient {
     this.subscriptions.delete(paneId)
     this.lastSeq.delete(paneId)
     this.send({ type: 'pane.close', paneId })
+  }
+
+  /** Live-Protokollzeilen eines Task-Runs abonnieren (auch für Viewer erlaubt). */
+  subscribeTaskLog(runId: string): void {
+    this.taskLogSubscriptions.add(runId)
+    this.send({ type: 'task.log.subscribe', runId })
+  }
+
+  /** Abonnement der Protokollzeilen eines Task-Runs wieder aufheben. */
+  unsubscribeTaskLog(runId: string): void {
+    this.taskLogSubscriptions.delete(runId)
+    this.send({ type: 'task.log.unsubscribe', runId })
   }
 
   private send(msg: ClientMessage): void {

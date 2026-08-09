@@ -22,12 +22,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# NUR die .dmg der Version, die gerade gebaut wurde. `dist/*.dmg` nahm alles,
+# was je in dist/ liegen geblieben war: beim 0.11.0-Release lief die Schleife
+# zuerst über eine 0.10.0-Datei von vorher, notarisierte sie ein zweites Mal
+# (Minuten bei Apple), scheiterte dann daran, dass latest-mac.yml diese alte
+# Version nicht kennt — und `set -e` brach ab, BEVOR die eigentliche 0.11.0-DMG
+# an der Reihe war. Ergebnis war ein Release mit unsignierter, ungestapelter
+# .dmg, das erst die Nachkontrolle auffliegen ließ.
+VERSION="$(node -p 'require("./package.json").version')"
 shopt -s nullglob
-DMGS=( dist/*.dmg )
+DMGS=( dist/*-"$VERSION"-*.dmg )
 if [ ${#DMGS[@]} -eq 0 ]; then
-  echo "  (kein .dmg unter dist/ — nichts zu tun)"
-  exit 0
+  echo "::error::kein .dmg für Version $VERSION unter dist/ — wurde der Build ausgeführt?"
+  exit 1
 fi
+echo "→ Version $VERSION: ${#DMGS[@]} .dmg zu verarbeiten"
 
 : "${APPLE_API_KEY:?APPLE_API_KEY (Pfad zur .p8) fehlt}"
 : "${APPLE_API_KEY_ID:?APPLE_API_KEY_ID fehlt}"

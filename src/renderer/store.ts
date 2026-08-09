@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection,
   LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
-  RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope
+  RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope,
+  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent
 } from '../shared/types';
 import type { RemoteFilesContext } from './files-api';
 import {
@@ -14,6 +15,11 @@ import { DEFAULT_THEME_ID } from '../shared/themes';
 import { USER_SCOPE_KEY, isRemotePaneKey, parseRemotePaneKey, remotePaneKey, remoteScopeKey } from '../shared/remote-pane-key';
 import type { ShortcutAction } from '../shared/shortcuts';
 import type { PreviewSource } from '../shared/link-detect';
+// Der Store hält fast nur Codes und lässt die Oberfläche übersetzen (siehe
+// pane.remoteBlocked.<reason>). Eine Ausnahme braucht die i18n-Instanz direkt:
+// der Kürzungsvermerk wandert in den gespeicherten Protokolltext hinein und
+// muss deshalb schon beim Kürzen übersetzt vorliegen.
+import i18n from './i18n';
 import { focusTerminal, refreshTerminalLayoutAfterCommit, trackTerminalInput } from './terminal-registry';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -65,11 +71,29 @@ export interface RemoteConnectionState {
   // Meldung verschwindet nach REMOTE_ERROR_TTL_MS wieder von selbst, sonst
   // bliebe eine einzelne Ablehnung dauerhaft rot stehen (siehe RemotePaneBar).
   lastError: { code: string; paneId: string | null; at: number } | null;
+  // Wohin die nächste neue Pane dieser Verbindung soll. Das Layout entsteht erst
+  // beim panes-Push (der Server kennt keine Anordnung), der Wunsch „rechts von
+  // dieser Pane" aber schon beim Klick — hier wird er zwischengeparkt und beim
+  // nächsten pane.added eingelöst. `at` begrenzt die Gültigkeit: legt jemand
+  // anderes vorher eine Pane an, soll sie nicht an unserem Anker landen.
+  pendingPlacement?: { anchorPaneId: string; direction: Direction; at: number } | null;
+  // Vom Server im `welcome` gemeldete Fähigkeiten (serverInfo.features, z. B.
+  // 'tasks') — bestimmt die dritte Sichtbarkeitsstufe des Tasks-Bereichs
+  // (siehe tasksBlockedReason). undefined heißt „noch kein welcome ODER
+  // Server zu alt für serverInfo"; ein leeres Array hieße „Server meldet
+  // serverInfo, aber keine Fähigkeiten" — tasksBlockedReason behandelt beide
+  // heute gleich (`server-too-old`), die Unterscheidung bleibt aber bis
+  // hierher erhalten (siehe RemoteServerFeatures in shared/types.ts).
+  serverFeatures?: string[];
 }
 
 // Wie lange eine abgelehnte Aktion angezeigt wird. Lang genug zum Lesen, kurz
 // genug, dass sie nicht als Dauerzustand missverstanden wird.
 export const REMOTE_ERROR_TTL_MS = 8000;
+
+// Wie lange ein Platzierungswunsch auf seine Pane wartet. Eine Server-Runde
+// dauert Millisekunden; verstreicht mehr, war es nicht mehr unser pane.added.
+export const REMOTE_PLACEMENT_TTL_MS = 10000;
 
 // Spiegelt MAX_PANES aus dem Server-Repo (DM_Workspace_Web,
 // server/src/session/hub.ts). Der Server antwortet inzwischen mit `pane_limit`,
@@ -180,6 +204,60 @@ function withoutRemoteError(
 // scopeKey des persistierten Remote-Verweises eines Workspace.
 export function workspaceScopeKey(ref: RemoteWorkspaceRef): string {
   return ref.scope === 'user' ? USER_SCOPE_KEY : ref.projectId;
+}
+
+/**
+ * Gibt es den Tasks-Bereich überhaupt? Vier Stufen, und die erste ist die
+ * wichtigste: sehr viele Nutzer betreiben DM Workspace rein lokal. Für sie
+ * darf die Funktion NIRGENDS auftauchen – kein Schalter, kein Palettenbefehl,
+ * kein Tastenkürzel. Eine Funktion, die man nicht nutzen kann, ist kein
+ * Hinweis auf Möglichkeiten, sondern Ballast.
+ *
+ * Die Regel steht bewusst an EINER Stelle: Panel, Titelleiste und Palette
+ * fragen dieselbe Funktion. Sonst entstehen genau die Zustände, in denen der
+ * Palettenbefehl noch existiert, während der Knopf längst weg ist.
+ */
+export function tasksBlockedReason(
+  s: Pick<StoreState, 'settings' | 'workspaces' | 'activeWorkspaceId' | 'remote'>
+): 'no-server' | 'local-workspace' | 'user-runtime' | 'server-too-old' | null {
+  if (!s.settings.servers?.length) return 'no-server';
+  const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+  if (!ws || ws.kind !== 'remote' || !ws.remote) return 'local-workspace';
+  // Geplante Tasks hängen serverseitig ausschließlich am Projekt: die gesamte
+  // Task-API liegt unter /api/projects/:projectId/... (tasks/routes.ts). Ein
+  // Remote-Workspace kann aber auch die persönliche User-Runtime sein; dort
+  // liefert workspaceScopeKey() den reservierten Bezeichner 'user', den der
+  // REST-Client als Projekt-Id in die URL setzen würde — der Server sucht
+  // dann eine Projekt-UUID namens 'user' und antwortet mit einem Fehler.
+  // Die dritte Stufe unten fängt das nicht ab: der Server meldet
+  // features: ['tasks'] verbindungsweit, unabhängig vom Scope. Dieselbe
+  // Unterscheidung zieht PreviewPanel.tsx für die Datei-API.
+  if (ws.remote.scope === 'user') return 'user-runtime';
+  const conn = s.remote[remoteConnKey(ws.remote.serverId, workspaceScopeKey(ws.remote))];
+  if (!conn?.serverFeatures?.includes('tasks')) return 'server-too-old';
+  return null;
+}
+
+export function tasksAvailable(
+  s: Pick<StoreState, 'settings' | 'workspaces' | 'activeWorkspaceId' | 'remote'>
+): boolean {
+  return tasksBlockedReason(s) === null;
+}
+
+// Löst die Id einer Remote-Pane ODER eines Remote-Workspace zu dessen
+// (Server, Scope) auf. Das Panel kennt mal die fokussierte Pane, mal nur den
+// Workspace — beide Wege sollen auf denselben remoteTasks-Eintrag treffen.
+function remoteTaskScope(
+  workspaces: Workspace[],
+  paneOrWorkspaceId: string
+): { serverId: string; scopeKey: string } | null {
+  const paneRef = parseRemotePaneKey(paneOrWorkspaceId);
+  if (paneRef) return { serverId: paneRef.serverId, scopeKey: paneRef.scopeKey };
+  const ws = workspaces.find((w) => w.id === paneOrWorkspaceId);
+  if (ws?.kind === 'remote' && ws.remote) {
+    return { serverId: ws.remote.serverId, scopeKey: workspaceScopeKey(ws.remote) };
+  }
+  return null;
 }
 
 const EMPTY_REMOTE_CONNECTION: RemoteConnectionState = {
@@ -359,9 +437,62 @@ export interface StoreState extends AppState {
   applyRemoteStatus: (e: RemoteStatusEvent) => void;
   applyRemoteDriver: (e: RemoteDriverEvent) => void;
   applyRemotePresence: (e: RemotePresenceEvent) => void;
-  createRemotePane: (paneId: string) => void;
+  createRemotePane: (paneId: string, direction?: Direction) => void;
   closeRemotePane: (paneId: string) => void;
   clearRemoteError: (serverId: string, scopeKey: string) => void;
+  // geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 3)
+  remoteTasks: Record<string, RemoteTasksState>; // Schlüssel: remoteConnKey()
+  taskLogs: Record<string, string>; // runId -> bisher empfangenes Protokoll
+  tasksPanelOpen: boolean;
+  loadRemoteTasks: (paneOrWorkspaceId: string) => Promise<void>;
+  applyRemoteTask: (e: RemoteTaskEvent) => void;
+  setTasksPanelOpen: (open: boolean) => void;
+  clearTaskLog: (runId: string) => void;
+}
+
+// Task-Zustand einer (Server, Scope)-Verbindung. `access` übernimmt GET
+// .../tasks 1:1 vom Server (Rolle, task_manage_role, Zuweisung) — der Client
+// baut die Rechteregel NICHT nach, sonst driften Oberfläche und Server beim
+// nächsten Regelwechsel auseinander (siehe RemoteTaskAccess).
+export interface RemoteTasksState {
+  tasks: RemoteTask[];
+  loading: boolean;
+  // Der vollständige Fehler, nicht nur sein Code: die Servermeldung ist
+  // ausgerechnet hier — wo die Liste leer bleibt — die einzige Begründung, die
+  // der Nutzer bekommt. Zeilen- und Formularfehler zeigen sie längst
+  // (describeTaskError im Panel), der Ladefehler warf sie bisher weg.
+  error: RemoteTaskError | null;
+  access: RemoteTaskAccess | null;
+}
+
+// Obergrenze je Lauf-Protokoll (Fließtext, nicht Bytes — reicht für dieses
+// Maß). Gespiegelt an der serverseitigen Grenze (256 KB, dort Kopf+Fuß mit
+// Kürzungsvermerk dazwischen). Der Desktop braucht nur den Fuß: wer den
+// Anfang eines langen Laufs sehen will, öffnet ihn erneut — RunLogView lädt
+// dann den vollständigen Text per REST vom Server (remoteTasksGetRun), diese
+// Store-Kopie bekommt nur die live nachlaufenden Zeilen.
+export const TASK_LOG_MAX_CHARS = 256 * 1024;
+
+// Der Kürzungsvermerk ist ein Nutzertext und steht deshalb in beiden
+// Sprachkatalogen. Er wird beim Kürzen in den gespeicherten Text eingesetzt,
+// also in der Sprache, die zu diesem Zeitpunkt gilt — ein späterer
+// Sprachwechsel schreibt bereits gekürzte Protokolle nicht um. Vertretbar:
+// der Text ist eine Fußnote in einem laufenden Protokoll, und ein Neuöffnen
+// des Laufs (das der Vermerk gerade empfiehlt) lädt ohnehin frisch.
+function taskLogTruncationNotice(): string {
+  return `\n${i18n.t('tasks.scheduled.detail.logTruncated')}\n`;
+}
+
+// Hängt einen Protokoll-Chunk an und kürzt danach auf TASK_LOG_MAX_CHARS: nur
+// der Fuß bleibt, mit sichtbarem Kürzungsvermerk davor. Wird bei jedem Chunk
+// erneut angewandt (nicht erst am Ende), damit der Speicher während eines
+// langen, geschwätzigen Laufs nie über die Grenze hinauswächst.
+function appendTaskLogChunk(prev: string, chunk: string): string {
+  const next = prev + chunk;
+  if (next.length <= TASK_LOG_MAX_CHARS) return next;
+  const notice = taskLogTruncationNotice();
+  const keep = TASK_LOG_MAX_CHARS - notice.length;
+  return notice + next.slice(next.length - keep);
 }
 
 // Remove a pane-keyed entry from an optional string map, returning undefined when
@@ -452,6 +583,9 @@ export const useStore = create<StoreState>((set, get) => ({
   update: { status: 'idle' },
   remote: {},
   remoteWorkspaceDialogOpen: false,
+  remoteTasks: {},
+  taskLogs: {},
+  tasksPanelOpen: false,
   previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null, editRemote: null },
 
   hydrate: async () => {
@@ -594,18 +728,23 @@ export const useStore = create<StoreState>((set, get) => ({
       releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     const remote = { ...s.remote };
+    const remoteTasks = { ...s.remoteTasks };
     if (ws?.kind === 'remote' && ws.remote) {
       // Remote-Workspace schließen = Verbindung trennen, NICHT Prozesse killen —
       // das Projekt bzw. die User-Runtime (und ihre Panes) lebt auf dem Server weiter.
       const scopeKey = workspaceScopeKey(ws.remote);
       window.api.remoteDisconnect(ws.remote.serverId, scopeKey);
-      delete remote[remoteConnKey(ws.remote.serverId, scopeKey)];
+      const connKey = remoteConnKey(ws.remote.serverId, scopeKey);
+      delete remote[connKey];
+      // Die Task-Liste hängt an derselben Verbindung und geht mit ihr (siehe
+      // removeServer) — sonst bliebe sie als Restmüll im Zustand liegen.
+      delete remoteTasks[connKey];
     }
     const workspaces = s.workspaces.filter((w) => w.id !== id);
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, remoteTasks, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -634,26 +773,32 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  splitActivePane: (paneId, direction) => set((s) => {
-    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
-    if (!ws?.layout || !collectPaneIds(ws.layout).includes(paneId)) return s;
+  splitActivePane: (paneId, direction) => {
+    const current = get();
+    const active = current.workspaces.find((w) => w.id === current.activeWorkspaceId);
+    if (!active?.layout || !collectPaneIds(active.layout).includes(paneId)) return;
     // Remote-Panes kommen vom Server; ein Split würde eine lokale Shell in den
     // Remote-Workspace mischen. Das Remote-Gegenstück ist ein weiteres Terminal
-    // im Projekt (createRemotePane), keine Aufteilung des vorhandenen Panes.
-    if (ws.kind === 'remote') return s;
-    const newPaneId = nextPaneId();
-    const workspaces = s.workspaces.map((w) =>
-      w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
-    // The old terminal changes width. Force one final atomic fit/PTY resize and
-    // repaint after React has committed the split instead of relying solely on
-    // ResizeObserver timing.
-    refreshTerminalLayoutAfterCommit(paneId);
-    // The new pane takes over: store focus plus DOM focus once it has mounted.
-    requestAnimationFrame(() => focusTerminal(newPaneId));
-    const next = { ...s, workspaces, focusedPaneId: newPaneId };
-    persist(next);
-    return next;
-  }),
+    // im Projekt — mit derselben Richtung, damit „rechts"/„darunter" auf jedem
+    // Weg (Knopf, Tastenkürzel, Palette) dasselbe bedeutet.
+    if (active.kind === 'remote') { current.createRemotePane(paneId, direction); return; }
+    set((s) => {
+      const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+      if (!ws?.layout) return s;
+      const newPaneId = nextPaneId();
+      const workspaces = s.workspaces.map((w) =>
+        w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
+      // The old terminal changes width. Force one final atomic fit/PTY resize and
+      // repaint after React has committed the split instead of relying solely on
+      // ResizeObserver timing.
+      refreshTerminalLayoutAfterCommit(paneId);
+      // The new pane takes over: store focus plus DOM focus once it has mounted.
+      requestAnimationFrame(() => focusTerminal(newPaneId));
+      const next = { ...s, workspaces, focusedPaneId: newPaneId };
+      persist(next);
+      return next;
+    });
+  },
 
   // Einziger Einstieg in die Rückfrage — Kopf-Knopf, Kontextmenü, Palette und
   // Tastenkürzel laufen alle hierher, damit keiner von ihnen ohne Rückfrage
@@ -1137,12 +1282,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     const remote = { ...s.remote };
+    // remoteTasks hängt an derselben (Server, Scope)-Verbindung wie remote und
+    // wird hier mit abgeräumt — sonst bliebe die Task-Liste eines entfernten
+    // Servers als Restmüll im Zustand liegen.
+    const remoteTasks = { ...s.remoteTasks };
     const workspaces = s.workspaces.filter((w) => {
       if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
       collectPaneIds(w.layout).forEach((pid) => {
         releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
       });
-      delete remote[remoteConnKey(serverId, workspaceScopeKey(w.remote))];
+      const connKey = remoteConnKey(serverId, workspaceScopeKey(w.remote));
+      delete remote[connKey];
+      delete remoteTasks[connKey];
       return false;
     });
     void window.api.serverRemove(serverId).catch((err: unknown) => console.error('server:remove failed:', err));
@@ -1152,7 +1303,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = workspaces.some((w) => w.id === s.activeWorkspaceId)
       ? s.activeWorkspaceId
       : (workspaces[0]?.id ?? null);
-    const next = { ...s, workspaces, settings, remote, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
+    const next = { ...s, workspaces, settings, remote, remoteTasks, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
     persist(next);
     return next;
   }),
@@ -1172,7 +1323,8 @@ export const useStore = create<StoreState>((set, get) => ({
           status: 'connected' as const,
           clientId: info.clientId || null,
           role: info.role,
-          panes: info.panes
+          panes: info.panes,
+          serverFeatures: info.features
         }
       };
       const existing = s.workspaces.find(
@@ -1256,6 +1408,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...s.remote,
       [key]: {
         ...prev, clientId: e.clientId ?? prev.clientId, role: e.role ?? prev.role, panes: e.panes,
+        serverFeatures: e.features ?? prev.serverFeatures,
         lastError: null
       }
     };
@@ -1270,19 +1423,38 @@ export const useStore = create<StoreState>((set, get) => ({
         layout = layout ? closePane(layout, pid) : null;
       }
     }
+    // Ein eigener Klick auf „rechts"/„darunter" hat einen Anker und eine
+    // Richtung hinterlegt (createRemotePane). Sie gelten für die ERSTE neue Pane
+    // dieses Pushes — danach fällt die Platzierung wieder auf den Anhang rechts
+    // zurück, damit fremde pane.added nicht ebenfalls dorthin springen.
+    let placement = prev.pendingPlacement ?? null;
+    if (placement && Date.now() - placement.at > REMOTE_PLACEMENT_TTL_MS) placement = null;
+    let placedPaneId: string | null = null;
     for (const pid of wanted) {
-      if (!collectPaneIds(layout).includes(pid)) {
-        if (!layout) {
-          layout = { type: 'pane', id: pid };
-        } else {
-          const ids = collectPaneIds(layout);
-          layout = splitPane(layout, ids[ids.length - 1], 'h', pid, nextSplitId());
-        }
+      if (collectPaneIds(layout).includes(pid)) continue;
+      if (!layout) {
+        layout = { type: 'pane', id: pid };
+      } else {
+        const ids = collectPaneIds(layout);
+        const anchor = placement && ids.includes(placement.anchorPaneId)
+          ? placement.anchorPaneId
+          : ids[ids.length - 1];
+        const direction = placement && ids.includes(placement.anchorPaneId) ? placement.direction : 'h';
+        layout = splitPane(layout, anchor, direction, pid, nextSplitId());
       }
+      if (placement) { placedPaneId = pid; placement = null; }
     }
+    if (prev.pendingPlacement) remote[key] = { ...remote[key], pendingPlacement: null };
     if (layout === ws.layout) return { ...s, remote };
     const workspaces = s.workspaces.map((w) => (w.id === ws.id ? { ...w, layout } : w));
-    const next = { ...s, remote, workspaces };
+    // Wie beim lokalen Split übernimmt die neue Pane — aber nur, wenn sie aus
+    // dem eigenen Klick stammt; sonst risse eine fremde Pane den Fokus weg.
+    const focusPaneId = placedPaneId;
+    if (focusPaneId) requestAnimationFrame(() => focusTerminal(focusPaneId));
+    const next = {
+      ...s, remote, workspaces,
+      focusedPaneId: placedPaneId ?? s.focusedPaneId
+    };
     persist(next);
     return next;
   }),
@@ -1313,12 +1485,24 @@ export const useStore = create<StoreState>((set, get) => ({
   // Server pane.added bzw. pane.removed schickt — genau ein Pfad, egal ob
   // Desktop oder Browser ausgelöst hat. Gesetzt wird hier nur der Fehlerslot,
   // damit eine blockierte Aktion nicht still endet.
-  createRemotePane: (paneId) => {
+  createRemotePane: (paneId, direction = 'h') => {
     const ref = parseRemotePaneKey(paneId);
     if (!ref) return;
     const blocked = remotePaneCreateBlock(get().remote, paneId);
     if (blocked) { set((s) => ({ remote: withRemoteError(s.remote, paneId, blocked) })); return; }
-    set((s) => ({ remote: withoutRemoteError(s.remote, paneId) }));
+    // Der Wunsch „rechts" bzw. „darunter" wird hier hinterlegt und erst beim
+    // panes-Push eingelöst — das Layout ändert sich weiterhin nur auf einem Weg.
+    set((s) => {
+      const key = remoteConnKey(ref.serverId, ref.scopeKey);
+      const conn = withoutRemoteError(s.remote, paneId)[key];
+      if (!conn) return { remote: withoutRemoteError(s.remote, paneId) };
+      return {
+        remote: {
+          ...withoutRemoteError(s.remote, paneId),
+          [key]: { ...conn, pendingPlacement: { anchorPaneId: paneId, direction, at: Date.now() } }
+        }
+      };
+    });
     window.api.remotePaneCreate(ref.serverId, ref.scopeKey);
   },
 
@@ -1338,5 +1522,91 @@ export const useStore = create<StoreState>((set, get) => ({
     const conn = s.remote[key];
     if (!conn?.lastError) return s;
     return { remote: { ...s.remote, [key]: { ...conn, lastError: null } } };
+  }),
+
+  // ---- Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 3) --------------------
+
+  loadRemoteTasks: async (paneOrWorkspaceId) => {
+    const ref = remoteTaskScope(get().workspaces, paneOrWorkspaceId);
+    if (!ref) return;
+    const key = remoteConnKey(ref.serverId, ref.scopeKey);
+    set((s) => {
+      const prev = s.remoteTasks[key];
+      return {
+        remoteTasks: {
+          ...s.remoteTasks,
+          [key]: { tasks: prev?.tasks ?? [], access: prev?.access ?? null, loading: true, error: null }
+        }
+      };
+    });
+    const result = await window.api.remoteTasksList(ref.serverId, ref.scopeKey);
+    set((s) => {
+      const prev = s.remoteTasks[key];
+      return {
+        remoteTasks: {
+          ...s.remoteTasks,
+          [key]: result.ok
+            ? { tasks: result.tasks, access: result.access, loading: false, error: null }
+            // Ein Fehlversuch verwirft nicht die zuletzt bekannte Liste — das Panel
+            // zeigt weiterhin die alten Tasks samt Fehlermeldung, statt leerzulaufen.
+            : { tasks: prev?.tasks ?? [], access: prev?.access ?? null, loading: false, error: result }
+        }
+      };
+    });
+  },
+
+  // Verarbeitet die vier Ereignis-Arten von remote:task (siehe RemoteTaskEvent).
+  // Ereignisse einer nicht (mehr) bekannten Verbindung werden ignoriert — sonst
+  // legt ein spätes oder verirrtes Push einen leeren Eintrag an, den niemand
+  // mehr abräumt (kein Anlegen leerer Einträge).
+  applyRemoteTask: (e) => set((s) => {
+    const key = remoteConnKey(e.serverId, e.scopeKey);
+    if (!s.remote[key]) return s;
+
+    if (e.kind === 'log') {
+      const taskLogs = { ...s.taskLogs, [e.runId]: appendTaskLogChunk(s.taskLogs[e.runId] ?? '', e.chunk) };
+      return { ...s, taskLogs };
+    }
+
+    const entry = s.remoteTasks[key] ?? { tasks: [], loading: false, error: null, access: null };
+    let tasks = entry.tasks;
+    if (e.kind === 'changed') {
+      // Die Live-Nachricht führt kein lastRun (siehe RemoteTaskEvent). Der
+      // zuletzt bekannte Lauf des vorhandenen Tasks bleibt deshalb stehen —
+      // sonst verlöre z. B. ein Pausieren während eines Laufs die Anzeige
+      // „Letzter Lauf", und weil danach kein Task mehr als laufend gilt,
+      // wären alle Starten-Knöpfe wieder frei; der nächste Klick liefe in
+      // einen 409. Genau so führt der Web-Client zusammen (TasksPanel.tsx).
+      // Neu hinzukommende Tasks haben noch keinen Lauf: null.
+      const idx = tasks.findIndex((t) => t.id === e.task.id);
+      tasks = idx >= 0
+        ? tasks.map((t, i) => (i === idx ? { ...e.task, lastRun: t.lastRun } : t))
+        : [...tasks, { ...e.task, lastRun: null }];
+    } else if (e.kind === 'removed') {
+      tasks = tasks.filter((t) => t.id !== e.taskId);
+    } else {
+      // kind === 'run': gestartete/abgeschlossene Läufe spiegeln sich im
+      // lastRun des betroffenen Tasks, ohne die Liste neu zu laden.
+      tasks = tasks.map((t) => (t.id === e.run.taskId ? { ...t, lastRun: e.run } : t));
+    }
+    return { ...s, remoteTasks: { ...s.remoteTasks, [key]: { ...entry, tasks } } };
+  }),
+
+  setTasksPanelOpen: (open) => set({ tasksPanelOpen: open }),
+
+  // Räumt das gespeicherte Protokoll eines einzelnen Laufs ab. Naheliegender
+  // Aufrufzeitpunkt ist das Abmelden vom Live-Protokoll: RunLogView meldet
+  // sich beim Verlassen eines Laufs über window.api.remoteTaskLogUnsubscribe
+  // ab, aber das läuft direkt am IPC vorbei am Store — der Store erfährt
+  // davon heute nicht von selbst (kein Aufruf einer Store-Aktion an dieser
+  // Stelle). Diese Aktion ist die Store-seitige Hälfte dafür, im selben
+  // Muster wie clearRemoteError: der Store bietet das Aufräumen an, die
+  // aufrufende Stelle (RunLogView) entscheidet den Zeitpunkt — dort fehlt
+  // noch der Aufruf, siehe Fix-Runde-1-Bericht.
+  clearTaskLog: (runId) => set((s) => {
+    if (!(runId in s.taskLogs)) return s;
+    const taskLogs = { ...s.taskLogs };
+    delete taskLogs[runId];
+    return { taskLogs };
   })
 }));

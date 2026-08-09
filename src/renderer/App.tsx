@@ -12,6 +12,7 @@ import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmD
 import { TaskBoard } from './components/TaskBoard';
 import { ClosePaneConfirmDialog } from './components/ClosePaneConfirmDialog';
 import { RemoteWorkspaceDialog } from './components/RemoteWorkspaceDialog';
+import { TasksPanel } from './components/TasksPanel';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export function App(): React.JSX.Element {
@@ -76,13 +77,18 @@ export function App(): React.JSX.Element {
   useEffect(() => window.api.onTasksChanged(applyTasksChanged), [applyTasksChanged]);
 
   // Remote-Workspaces: Verbindungs-, Driver- und Presence-Pushes aus dem
-  // Main-Prozess in den Store spiegeln (Muster: tasks:changed oben).
+  // Main-Prozess in den Store spiegeln (Muster: tasks:changed oben). Die
+  // Task-Ereignisse (geplante Agenten-Tasks, Arbeitspaket B) laufen über
+  // denselben Kanal-Ansatz — global abonniert, nicht erst wenn das
+  // Tasks-Panel geöffnet ist, damit Liste und Protokoll auch im Hintergrund
+  // aktuell bleiben (siehe applyRemoteTask in store.ts).
   useEffect(() => {
     const s = useStore.getState();
     const offs = [
       window.api.onRemoteStatus(s.applyRemoteStatus),
       window.api.onRemoteDriver(s.applyRemoteDriver),
-      window.api.onRemotePresence(s.applyRemotePresence)
+      window.api.onRemotePresence(s.applyRemotePresence),
+      window.api.onRemoteTask(s.applyRemoteTask)
     ];
     return () => { offs.forEach((off) => off()); };
   }, []);
@@ -143,6 +149,7 @@ export function App(): React.JSX.Element {
         />
       )}
       <RemoteWorkspaceDialog />
+      <TasksPanel />
     </div>
   );
 }

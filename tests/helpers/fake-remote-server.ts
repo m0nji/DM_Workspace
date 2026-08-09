@@ -20,6 +20,13 @@ export class FakeServer {
   /** pro Verbindung vergebene clientIds (Reihenfolge des Verbindens) */
   clientCounter = 0;
   driver: string | null = null;
+  // Vom Test gesetzt, um serverInfo.features im welcome zu simulieren
+  // (Nachtrag: serverInfo.features -> RemoteConnectionState.serverFeatures).
+  // undefined (Default) heißt „serverInfo trägt gar kein features-Feld" —
+  // wie bei einem Server, der die Fähigkeit noch nicht meldet; ein leeres
+  // Array wird als solches gesendet (JSON.stringify lässt nur `undefined`-
+  // Werte weg, ein echtes `[]` bleibt erhalten).
+  features: string[] | undefined = undefined;
   port = 0;
   lastUpgradeHeaders: Record<string, string | string[] | undefined> = {};
   /** Upgrade-URLs in Verbindungsreihenfolge (?project=… bzw. ?scope=user). */
@@ -64,7 +71,10 @@ export class FakeServer {
           projectName: isUserScope ? 'Meine Umgebung' : 'Projekt X',
           role: isUserScope ? 'owner' : 'editor',
           panes: [this.paneInfo()],
-          serverInfo: { version: 'test', protocolVersion: 2 },
+          serverInfo: {
+            version: 'test', protocolVersion: 2,
+            ...(this.features !== undefined ? { features: this.features } : {})
+          },
           scope: isUserScope ? { kind: 'user' } : { kind: 'project', projectId: 'p-1' }
         });
         break;

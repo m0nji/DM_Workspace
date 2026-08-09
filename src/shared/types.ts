@@ -197,6 +197,18 @@ export type RemoteUserRuntimeStopResult = { ok: true } | { ok: false; error: str
 // Projektrolle des angemeldeten Nutzers (Server-Vokabular).
 export type RemoteRole = 'owner' | 'editor' | 'viewer';
 
+// Vom Server im `welcome` gemeldete Fähigkeiten (serverInfo.features, z. B.
+// 'tasks' — vendor/dmw-shared/protocol.ts: ServerInfo.features). undefined
+// ist NICHT dasselbe wie ein leeres Array: undefined heißt „der Server (oder
+// die noch nicht abgeschlossene Verbindung) hat gar kein serverInfo
+// geschickt" (Protokoll v1, zu alter Server), ein leeres Array heißt „Server
+// meldet serverInfo, aber explizit keine Fähigkeiten". Nur Ersteres ist „zu
+// alt" im Sinne der Tasks-Sichtbarkeitsstufen (siehe renderer/store.ts:
+// tasksBlockedReason). Die Unterscheidung bleibt bis in den Store erhalten,
+// auch wenn dessen heutige Logik (`!features?.includes('tasks')`) beide
+// Fälle noch gleich behandelt.
+export type RemoteServerFeatures = string[] | undefined;
+
 // Antwort von remote:panes — der aktuelle Verbindungs- und Pane-Stand einer
 // (Server, Scope)-Verbindung; null, wenn keine Verbindung existiert.
 export interface RemoteConnectionInfo {
@@ -204,6 +216,9 @@ export interface RemoteConnectionInfo {
   clientId: string | null;
   role: RemoteRole;
   panes: RemotePaneInfo[];
+  // Optional (statt required-aber-undefined), damit bestehende Testliterale
+  // ohne dieses Feld gültig bleiben; der Main-Prozess liefert es immer mit.
+  features?: RemoteServerFeatures;
 }
 
 // Antwort von remote:connectWorkspace — der Stand aus dem welcome.
@@ -212,6 +227,7 @@ export interface RemoteWorkspaceInfo {
   role: 'owner' | 'editor' | 'viewer';
   clientId: string;
   panes: RemotePaneInfo[];
+  features?: RemoteServerFeatures;
 }
 
 // Push-Events Main -> Renderer. scopeKey identifiziert die Verbindung
@@ -220,7 +236,10 @@ export interface RemoteWorkspaceInfo {
 // shared/remote-pane-key.ts (USER_SCOPE_KEY).
 export type RemoteStatusEvent =
   | { serverId: string; scopeKey: string; kind: 'connection'; status: RemoteConnectionStatus }
-  | { serverId: string; scopeKey: string; kind: 'panes'; panes: RemotePaneInfo[]; clientId: string | null; role: RemoteRole }
+  | {
+      serverId: string; scopeKey: string; kind: 'panes'; panes: RemotePaneInfo[]; clientId: string | null;
+      role: RemoteRole; features?: RemoteServerFeatures;
+    }
   // Der Server hat eine Aktion abgelehnt (z. B. forbidden bei Rolle 'viewer').
   // Kein Verbindungsabbruch — nur eine Rückmeldung an die auslösende Stelle.
   | { serverId: string; scopeKey: string; kind: 'error'; code: string; paneId: string | null };
@@ -281,6 +300,105 @@ export type RemoteFsListResult = { ok: true; entries: RemoteFsEntry[] } | Remote
 export type RemoteFsReadResult = { ok: true; content: string; mtime: number; size: number } | RemoteFsError;
 export type RemoteFsWriteResult = { ok: true; mtime: number } | RemoteFsError;
 export type RemoteFsOkResult = { ok: true } | RemoteFsError;
+
+// ---- Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 1) --------------------
+//
+// Dünner REST-Client gegen die Task-API des Workspace-Servers
+// (tasks/routes.ts in dm_workspace_web). Die Felder sind gegen die
+// tatsächliche REST-Antwort geprüft (toTaskInfo/toRunInfo dort) und stimmen
+// mit den WebSocket-Typen TaskInfo/TaskRunInfo im vendorierten
+// protocol.ts überein, u. a. bei RemoteTask.projectId und
+// RemoteTaskRun.startedBy — beide Felder führen REST und WS gleichermaßen.
+
+export type RemoteTaskRunStatus =
+  | 'running' | 'success' | 'failed' | 'timeout' | 'cancelled' | 'skipped' | 'interrupted';
+
+export interface RemoteTaskRun {
+  id: string;
+  taskId: string;
+  status: RemoteTaskRunStatus;
+  trigger: 'schedule' | 'manual';
+  startedBy: string | null; // userId, der den Lauf ausgelöst hat; null bei geplanten Läufen
+  startedAt: string;        // ISO-8601
+  finishedAt: string | null; // ISO-8601
+  exitCode: number | null;
+}
+
+export interface RemoteTask {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  ownerId: string | null;
+  agent: 'claude' | 'codex' | 'opencode';
+  prompt: string;
+  workdir: string;
+  scheduleKind: 'cron' | 'interval' | 'manual';
+  scheduleExpr: string;
+  timezone: string;
+  timeoutMs: number;
+  enabled: boolean;
+  nextRunAt: string | null; // ISO-8601
+  lastRun: RemoteTaskRun | null;
+}
+
+// Effektive Rechte des aufrufenden Nutzers für GET .../tasks. Der Client baut
+// die Regel (Rolle, task_manage_role-Einstellung, Zuweisung) NICHT nach,
+// sondern übernimmt dieses vom Server schon berechnete Ergebnis 1:1 — sonst
+// driften Oberfläche und Server beim nächsten Regelwechsel auseinander.
+// canRun (Starten/Abbrechen) ist KEIN Alias für "Rolle ungleich viewer" —
+// dieselbe Formel clientseitig nachzubauen ist genau das Muster, an dem der
+// Bearbeiten-Pfad im Web-Client schon einmal zerbrochen ist (siehe
+// server/src/tasks/routes.ts::taskAccess im dmw_workspace_web-Repo).
+export interface RemoteTaskAccess {
+  canManage: boolean;
+  canRun: boolean;
+  canAssign: boolean;
+}
+
+export type RemoteTaskErrorCode =
+  | 'not-logged-in'  // 401 bzw. kein gespeichertes Session-Token
+  | 'forbidden'       // 403 (kein Mitglied / keine Verwaltungsberechtigung)
+  | 'not-found'        // 404
+  | 'conflict'          // 409: läuft bereits ein Lauf im Projekt / Task hat einen laufenden Lauf
+  | 'invalid'            // 400: ungültige Eingabe
+  | 'network'             // Server nicht erreichbar
+  | 'server';              // alles Übrige (5xx, unerwartete Antwort)
+
+export interface RemoteTaskError {
+  ok: false;
+  code: RemoteTaskErrorCode;
+  // Servermeldung (1:1 anzeigbar), falls vorhanden — und AUSSCHLIESSLICH die:
+  // gefüllt wird das Feld nur aus dem `error`-Feld einer Serverantwort
+  // (remote-tasks.ts). Der Client schreibt hier nichts Eigenes hinein, weil
+  // die Oberfläche den Inhalt wörtlich anzeigt und nur bei fehlendem Feld auf
+  // den übersetzten Katalogtext ausweicht. Eine fetch-Ausnahme oder ein lokal
+  // formulierter Satz stünden sonst unübersetzt vor dem Nutzer.
+  message?: string;
+}
+
+export type RemoteTaskListResult = { ok: true; tasks: RemoteTask[]; access: RemoteTaskAccess } | RemoteTaskError;
+export type RemoteTaskResult = { ok: true; task: RemoteTask } | RemoteTaskError;
+export type RemoteTaskOkResult = { ok: true } | RemoteTaskError;
+export type RemoteTaskRunsResult = { ok: true; runs: RemoteTaskRun[] } | RemoteTaskError;
+export type RemoteRunResult = { ok: true; run: RemoteTaskRun & { log: string } } | RemoteTaskError;
+
+// Push-Events Main -> Renderer für Task-Ereignisse (Arbeitspaket B, Aufgabe 2).
+// Bildet die fünf Server-Nachrichtentypen des WebSocket-Protokolls
+// (vendor/dmw-shared/protocol.ts: task.changed, task.removed,
+// task.run.started, task.run.log, task.run.finished) auf vier Ereignis-Arten
+// ab — started/finished teilen sich 'run', der Renderer unterscheidet den
+// Zustand am run.status.
+// `changed` trägt bewusst KEIN lastRun: die Live-Nachricht des Servers
+// (TaskInfo) führt das Feld nicht, und der Main-Prozess kennt den zuletzt
+// bekannten Lauf nicht. Ein erfundenes `lastRun: null` sähe im Store aus wie
+// die Aussage „dieser Task hat noch nie gelaufen" und würde den laufenden Lauf
+// löschen. Zusammenführen kann das nur der Store, der die Liste hält.
+export type RemoteTaskEvent =
+  | { serverId: string; scopeKey: string; kind: 'changed'; task: Omit<RemoteTask, 'lastRun'> }
+  | { serverId: string; scopeKey: string; kind: 'removed'; taskId: string }
+  | { serverId: string; scopeKey: string; kind: 'run'; run: RemoteTaskRun }
+  | { serverId: string; scopeKey: string; kind: 'log'; runId: string; chunk: string };
 
 // ---- IPC payloads ----
 
@@ -426,6 +544,23 @@ export interface RendererApi {
   remoteFsMkdir(serverId: string, projectId: string, path: string): Promise<RemoteFsOkResult>;
   remoteFsDelete(serverId: string, projectId: string, path: string): Promise<RemoteFsOkResult>;
   remoteFsRename(serverId: string, projectId: string, from: string, to: string): Promise<RemoteFsOkResult>;
+  // Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 2): dünne REST-Aufrufe wie
+  // remoteFs* oben, Push-Ereignisse über onRemoteTask. body bleibt bewusst
+  // ungeprüft durchgereicht — die serverseitige Validierung (parseTaskBody in
+  // tasks/routes.ts) ist die Quelle der Wahrheit, das IPC nur ein Transport.
+  remoteTasksList(serverId: string, projectId: string): Promise<RemoteTaskListResult>;
+  remoteTasksCreate(serverId: string, projectId: string, body: Record<string, unknown>): Promise<RemoteTaskResult>;
+  remoteTasksUpdate(serverId: string, projectId: string, taskId: string, body: Record<string, unknown>): Promise<RemoteTaskResult>;
+  remoteTasksRemove(serverId: string, projectId: string, taskId: string): Promise<RemoteTaskOkResult>;
+  remoteTasksRun(serverId: string, projectId: string, taskId: string): Promise<RemoteTaskOkResult>;
+  remoteTasksCancel(serverId: string, projectId: string, runId: string): Promise<RemoteTaskOkResult>;
+  remoteTasksListRuns(serverId: string, projectId: string, taskId: string): Promise<RemoteTaskRunsResult>;
+  remoteTasksGetRun(serverId: string, projectId: string, runId: string): Promise<RemoteRunResult>;
+  // Live-Protokoll eines laufenden Runs; scopeKey wie bei remoteConnectWorkspace
+  // (Projekt-UUID oder 'user').
+  remoteTaskLogSubscribe(serverId: string, scopeKey: string, runId: string): void;
+  remoteTaskLogUnsubscribe(serverId: string, scopeKey: string, runId: string): void;
+  onRemoteTask(cb: (e: RemoteTaskEvent) => void): () => void;
 }
 
 declare global {

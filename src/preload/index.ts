@@ -7,7 +7,8 @@ import type {
   RemoteUserRuntimeResult, RemoteUserRuntimeStopResult,
   RemoteWorkspaceInfo, RemoteConnectionInfo, RemoteStatusEvent, RemoteDriverEvent,
   RemotePresenceEvent, RemoteFsListResult, RemoteFsReadResult, RemoteFsWriteResult,
-  RemoteFsOkResult, ServerConfig
+  RemoteFsOkResult, ServerConfig, RemoteTaskEvent, RemoteTaskListResult, RemoteTaskResult,
+  RemoteTaskOkResult, RemoteTaskRunsResult, RemoteRunResult
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -163,7 +164,33 @@ const api: RendererApi = {
   remoteFsDelete: (serverId: string, projectId: string, path: string) =>
     ipcRenderer.invoke('remoteFs:delete', { serverId, projectId, path }) as Promise<RemoteFsOkResult>,
   remoteFsRename: (serverId: string, projectId: string, from: string, to: string) =>
-    ipcRenderer.invoke('remoteFs:rename', { serverId, projectId, from, to }) as Promise<RemoteFsOkResult>
+    ipcRenderer.invoke('remoteFs:rename', { serverId, projectId, from, to }) as Promise<RemoteFsOkResult>,
+  // ---- Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 2) ----
+  remoteTasksList: (serverId: string, projectId: string) =>
+    ipcRenderer.invoke('remoteTasks:list', { serverId, projectId }) as Promise<RemoteTaskListResult>,
+  remoteTasksCreate: (serverId: string, projectId: string, body: Record<string, unknown>) =>
+    ipcRenderer.invoke('remoteTasks:create', { serverId, projectId, body }) as Promise<RemoteTaskResult>,
+  remoteTasksUpdate: (serverId: string, projectId: string, taskId: string, body: Record<string, unknown>) =>
+    ipcRenderer.invoke('remoteTasks:update', { serverId, projectId, taskId, body }) as Promise<RemoteTaskResult>,
+  remoteTasksRemove: (serverId: string, projectId: string, taskId: string) =>
+    ipcRenderer.invoke('remoteTasks:remove', { serverId, projectId, taskId }) as Promise<RemoteTaskOkResult>,
+  remoteTasksRun: (serverId: string, projectId: string, taskId: string) =>
+    ipcRenderer.invoke('remoteTasks:run', { serverId, projectId, taskId }) as Promise<RemoteTaskOkResult>,
+  remoteTasksCancel: (serverId: string, projectId: string, runId: string) =>
+    ipcRenderer.invoke('remoteTasks:cancel', { serverId, projectId, runId }) as Promise<RemoteTaskOkResult>,
+  remoteTasksListRuns: (serverId: string, projectId: string, taskId: string) =>
+    ipcRenderer.invoke('remoteTasks:listRuns', { serverId, projectId, taskId }) as Promise<RemoteTaskRunsResult>,
+  remoteTasksGetRun: (serverId: string, projectId: string, runId: string) =>
+    ipcRenderer.invoke('remoteTasks:getRun', { serverId, projectId, runId }) as Promise<RemoteRunResult>,
+  remoteTaskLogSubscribe: (serverId: string, scopeKey: string, runId: string) =>
+    ipcRenderer.send('remoteTasks:logSubscribe', { serverId, scopeKey, runId }),
+  remoteTaskLogUnsubscribe: (serverId: string, scopeKey: string, runId: string) =>
+    ipcRenderer.send('remoteTasks:logUnsubscribe', { serverId, scopeKey, runId }),
+  onRemoteTask: (cb: (e: RemoteTaskEvent) => void) => {
+    const handler = (_e: unknown, payload: RemoteTaskEvent) => cb(payload);
+    ipcRenderer.on('remote:task', handler);
+    return () => ipcRenderer.removeListener('remote:task', handler);
+  }
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -1,4 +1,4 @@
-// AUTO-GENERIERT aus dm_workspace_web@880d025 — nicht editieren, npm run sync:dmw-client
+// AUTO-GENERIERT aus dm_workspace_web@05bf9ad — nicht editieren, npm run sync:dmw-client
 
 /**
  * WebSocket-Protokoll zwischen Browser und DM Workspace Web Server.
@@ -55,6 +55,39 @@ export interface PaneInfo {
   /** Zeitpunkt (Epoch ms), zu dem die vorderste Anfrage automatisch übergeben wird. */
   queueDeadline: number | null
   running: boolean
+}
+
+/**
+ * Stammdaten eines geplanten Agenten-Tasks (ohne Laufhistorie). Zeitangaben
+ * sind ISO-8601-Strings, damit sie ohne Zusatzlogik JSON-serialisierbar sind.
+ */
+export interface TaskInfo {
+  id: string
+  projectId: string
+  name: string
+  description: string
+  ownerId: string | null
+  agent: 'claude' | 'codex' | 'opencode'
+  prompt: string
+  workdir: string
+  scheduleKind: 'cron' | 'interval' | 'manual'
+  scheduleExpr: string
+  timezone: string
+  timeoutMs: number
+  enabled: boolean
+  nextRunAt: string | null
+}
+
+/** Ein einzelner Lauf eines Tasks. */
+export interface TaskRunInfo {
+  id: string
+  taskId: string
+  status: 'running' | 'success' | 'failed' | 'timeout' | 'cancelled' | 'skipped' | 'interrupted'
+  trigger: 'schedule' | 'manual'
+  startedBy: string | null
+  startedAt: string
+  finishedAt: string | null
+  exitCode: number | null
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +167,18 @@ export interface PaneCloseMessage {
   paneId: PaneId
 }
 
+/** Live-Protokollzeilen eines laufenden Task-Runs abonnieren (lesend, auch für Viewer). */
+export interface TaskLogSubscribeMessage {
+  type: 'task.log.subscribe'
+  runId: string
+}
+
+/** Abonnement der Protokollzeilen eines Task-Runs wieder aufheben. */
+export interface TaskLogUnsubscribeMessage {
+  type: 'task.log.unsubscribe'
+  runId: string
+}
+
 export type ClientMessage =
   | HelloMessage
   | SubscribeMessage
@@ -147,6 +192,8 @@ export type ClientMessage =
   | FocusMessage
   | PaneCreateMessage
   | PaneCloseMessage
+  | TaskLogSubscribeMessage
+  | TaskLogUnsubscribeMessage
 
 // ---------------------------------------------------------------------------
 // Server → Client
@@ -160,6 +207,12 @@ export interface ServerInfo {
   version: string
   /** Höchste vom Server unterstützte Protokollversion. */
   protocolVersion: number
+  /**
+   * Zusätzliche Fähigkeiten dieses Servers, z. B. 'tasks' für geplante
+   * Agenten-Tasks. Additiv: Clients, die einen Wert nicht kennen, ignorieren
+   * ihn; ältere Server senden das Feld gar nicht. PROTOCOL_VERSION bleibt 2.
+   */
+  features?: string[]
 }
 
 /**
@@ -262,8 +315,41 @@ export interface ErrorMessage {
     | 'rate_limited'
     | 'protocol_mismatch'
     | 'forbidden'
+    | 'pane_limit'
+    | 'last_pane'
   message: string
   paneId?: PaneId
+}
+
+/** Ein Task wurde angelegt oder geändert (Stammdaten, kein Lauf). */
+export interface TaskChangedMessage {
+  type: 'task.changed'
+  task: TaskInfo
+}
+
+/** Ein Task wurde gelöscht. */
+export interface TaskRemovedMessage {
+  type: 'task.removed'
+  taskId: string
+}
+
+/** Ein Lauf wurde gestartet (manuell oder per Zeitplan). */
+export interface TaskRunStartedMessage {
+  type: 'task.run.started'
+  run: TaskRunInfo
+}
+
+/** Eine Protokollzeile eines laufenden Runs (nur für abonnierte Clients). */
+export interface TaskRunLogMessage {
+  type: 'task.run.log'
+  runId: string
+  data: string
+}
+
+/** Ein Lauf ist abgeschlossen (Erfolg, Fehler, Timeout, Abbruch, …). */
+export interface TaskRunFinishedMessage {
+  type: 'task.run.finished'
+  run: TaskRunInfo
 }
 
 export type ServerMessage =
@@ -278,6 +364,11 @@ export type ServerMessage =
   | PaneRemovedMessage
   | ExitMessage
   | ErrorMessage
+  | TaskChangedMessage
+  | TaskRemovedMessage
+  | TaskRunStartedMessage
+  | TaskRunLogMessage
+  | TaskRunFinishedMessage
 
 // ---------------------------------------------------------------------------
 // Validierung
@@ -296,6 +387,8 @@ const CLIENT_TYPES = new Set([
   'focus',
   'pane.create',
   'pane.close',
+  'task.log.subscribe',
+  'task.log.unsubscribe',
 ])
 
 function isNonEmptyString(v: unknown, max = 256): v is string {
@@ -359,6 +452,9 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case 'focus':
       if (m.paneId !== null && !isNonEmptyString(m.paneId)) return null
       return m as unknown as FocusMessage
+    case 'task.log.subscribe':
+    case 'task.log.unsubscribe':
+      return isNonEmptyString(m.runId) ? (m as unknown as ClientMessage) : null
     default:
       return null
   }

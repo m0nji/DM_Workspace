@@ -217,6 +217,52 @@ export function parseRemoteFsRename(
   return { ...base, from: raw.from, to: raw.to };
 }
 
+// ---- Geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 2) --------------------
+//
+// body (create/update) wird nur auf „ist ein Objekt" geprüft und sonst
+// ungeprüft durchgereicht: die serverseitige Validierung (parseTaskBody in
+// tasks/routes.ts) ist die Quelle der Wahrheit, das IPC nur ein Transport —
+// wie beim Board-Content der Tasks-Kanäle oben, nur ohne die dort nötige
+// Normalisierung (die Task-API persistiert nicht lokal, ein kaputtes Feld
+// scheitert einfach serverseitig mit 'invalid').
+
+export function parseRemoteTaskCreate(
+  raw: unknown
+): { serverId: string; projectId: string; body: Record<string, unknown> } | null {
+  const base = parseRemoteRef(raw);
+  if (!base || !isRecord(raw) || !isRecord(raw.body)) return null;
+  return { ...base, body: raw.body };
+}
+
+export function parseRemoteTaskUpdate(
+  raw: unknown
+): { serverId: string; projectId: string; taskId: string; body: Record<string, unknown> } | null {
+  const base = parseRemoteRef(raw);
+  if (!base || !isRecord(raw) || !isNonEmptyString(raw.taskId) || !isRecord(raw.body)) return null;
+  return { ...base, taskId: raw.taskId, body: raw.body };
+}
+
+export function parseRemoteTaskRef(raw: unknown): { serverId: string; projectId: string; taskId: string } | null {
+  const base = parseRemoteRef(raw);
+  if (!base || !isRecord(raw) || !isNonEmptyString(raw.taskId)) return null;
+  return { ...base, taskId: raw.taskId };
+}
+
+export function parseRemoteRunRef(raw: unknown): { serverId: string; projectId: string; runId: string } | null {
+  const base = parseRemoteRef(raw);
+  if (!base || !isRecord(raw) || !isNonEmptyString(raw.runId)) return null;
+  return { ...base, runId: raw.runId };
+}
+
+// task.log.subscribe/unsubscribe laufen über die (Server, Scope)-Verbindung
+// wie remote:driverRequest — nicht über projectId, eine Live-Verbindung kann
+// auch im User-Scope stehen.
+export function parseRemoteTaskLogRef(raw: unknown): { serverId: string; scopeKey: string; runId: string } | null {
+  const base = parseRemoteScopeRef(raw);
+  if (!base || !isRecord(raw) || !isNonEmptyString(raw.runId)) return null;
+  return { ...base, runId: raw.runId };
+}
+
 // password bewusst nur als string geprüft (auch leer wäre strukturell gültig,
 // der Server lehnt es fachlich ab) — und wie bei pty:input gilt: den Payload
 // dieses Kanals NIEMALS loggen.
