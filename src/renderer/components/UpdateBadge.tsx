@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { ChangelogModal } from './ChangelogModal';
-import { parseChangelog, type ChangelogVersion } from '../../shared/changelog';
+import { parseChangelog, versionsSince, type ChangelogVersion } from '../../shared/changelog';
 
 function DownloadIcon(): React.JSX.Element {
   return (
@@ -37,7 +37,19 @@ export function UpdateBadge(): React.JSX.Element | null {
     setNotes(null); // show the loading hint until the fetch resolves
     if (version) {
       void window.api.fetchUpdateNotes(version).then((body) => {
-        setNotes({ versions: body ? parseChangelog(body) : [], raw: body });
+        // The notes cover the whole changelog, so show every version between the
+        // one running here and the one on offer — skipping a release shouldn't
+        // hide what it brought. If the span comes out empty (notes that only
+        // carry the offered version, or a version we can't place), fall back to
+        // the newest section rather than an empty dialog.
+        const all = body ? parseChangelog(body) : [];
+        const span = versionsSince(all, __APP_VERSION__, version);
+        setNotes({
+          versions: span.length ? span : all.slice(0, 1),
+          // Raw text is only useful as a fallback if nothing parsed at all —
+          // otherwise it would dump the entire changelog file into the dialog.
+          raw: all.length ? null : body
+        });
       }).catch(() => {
         // Failed fetch (offline, GitHub down): show the error text instead of
         // an eternal "loading…" hint — the update itself stays available.

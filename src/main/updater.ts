@@ -8,20 +8,37 @@ const { autoUpdater } = electronUpdater;
 // the release notes shown in the update dialog.
 const RELEASES_REPO = 'm0nji/DM_Workspace';
 
-// Fetch the GitHub release body for a version tag (public repo — no auth). Returns
-// the markdown body, or null if offline / not found / malformed.
-async function fetchReleaseNotes(version: string): Promise<string | null> {
-  const tag = version.startsWith('v') ? version : `v${version}`;
+async function get(url: string, accept: string): Promise<Response | null> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases/tags/${tag}`, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'DM-Workspace' }
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { body?: unknown };
-    return typeof data.body === 'string' && data.body.trim() ? data.body : null;
+    const res = await fetch(url, { headers: { Accept: accept, 'User-Agent': 'DM-Workspace' } });
+    return res.ok ? res : null;
   } catch {
-    return null;
+    return null; // offline, DNS, TLS — the update itself stays available
   }
+}
+
+// CHANGELOG.md as it stands at the release's tag (public repo — no auth). It
+// lists EVERY version, which is what lets the dialog show the whole span an
+// upgrade covers: someone on 0.10.0 who skipped 0.11.0 should see that version's
+// changes too. Which sections to show is decided in the renderer, which knows the
+// installed version.
+async function fetchTaggedChangelog(tag: string): Promise<string | null> {
+  const res = await get(`https://raw.githubusercontent.com/${RELEASES_REPO}/${tag}/CHANGELOG.md`, 'text/plain');
+  const body = await res?.text().catch(() => null);
+  return body?.trim() ? body : null;
+}
+
+// Fallback: the GitHub release body, which only ever holds its own version's
+// section (publish-release.sh cuts it out of CHANGELOG.md).
+async function fetchReleaseBody(tag: string): Promise<string | null> {
+  const res = await get(`https://api.github.com/repos/${RELEASES_REPO}/releases/tags/${tag}`, 'application/vnd.github+json');
+  const data = (await res?.json().catch(() => null)) as { body?: unknown } | null;
+  return typeof data?.body === 'string' && data.body.trim() ? data.body : null;
+}
+
+async function fetchUpdateNotes(version: string): Promise<string | null> {
+  const tag = version.startsWith('v') ? version : `v${version}`;
+  return (await fetchTaggedChangelog(tag)) ?? (await fetchReleaseBody(tag));
 }
 
 /**
@@ -62,5 +79,5 @@ export function registerUpdater(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('updates:install', () => {
     if (enabled) autoUpdater.quitAndInstall();
   });
-  ipcMain.handle('updates:notes', (_e, version: string) => fetchReleaseNotes(version));
+  ipcMain.handle('updates:notes', (_e, version: string) => fetchUpdateNotes(version));
 }

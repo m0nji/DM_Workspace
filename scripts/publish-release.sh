@@ -18,6 +18,50 @@ set -euo pipefail
 VERSION="$(node -p "require('./package.json').version")"
 TAG="v${VERSION}"
 
+# ---- --go-live: den Entwurf veröffentlichen, aber erst wenn er vollständig ist
+#
+# Warum das hier sitzt und nicht als Handgriff bleibt: Ein Entwurf legt den Tag
+# NOCH NICHT an — der entsteht erst beim Veröffentlichen, und genau das stößt
+# die Plattform-Builds an. Wer den Entwurf freigibt, bevor ein Tag-Push die
+# Builds durchlaufen ließ, macht deshalb ein Release öffentlich, das nur die
+# Artefakte der eigenen Maschine enthält. Bei 0.11.0 und 0.11.1 war das
+# Release dadurch je rund zehn Minuten lang ohne Windows und Linux sichtbar;
+# der Auto-Updater dieser Plattformen fand in dem Fenster keine latest*.yml.
+#
+# Die Prüfung schaut deshalb nach, dass für JEDE Plattform ein Installer UND
+# die zugehörige Updater-Datei am Release hängen.
+if [ "${1:-}" = '--go-live' ]; then
+  echo "→ $TAG: Vollständigkeit prüfen, bevor der Entwurf öffentlich wird"
+  ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+  if [ -z "$ASSETS" ]; then
+    echo "::error::$TAG hat keine Assets (oder existiert nicht)"; exit 1
+  fi
+
+  MISSING=()
+  # Je Plattform: ein Muster für den Installer, eines für die Updater-Datei.
+  check() { # <Bezeichnung> <Installer-Muster> <yml>
+    printf '%s\n' "$ASSETS" | grep -q -- "$2" || MISSING+=( "$1: Installer ($2)" )
+    printf '%s\n' "$ASSETS" | grep -qx -- "$3" || MISSING+=( "$1: $3" )
+  }
+  check 'macOS'   '\.dmg$'      'latest-mac.yml'
+  check 'Windows' '\.exe$'      'latest.yml'
+  check 'Linux'   '\.AppImage$' 'latest-linux.yml'
+
+  if [ "${#MISSING[@]}" -gt 0 ]; then
+    echo "::error::$TAG ist unvollständig — nicht veröffentlicht:"
+    printf '  fehlt: %s\n' "${MISSING[@]}"
+    echo
+    echo "  Laufen die Plattform-Jobs noch?  gh run list --workflow=release.yml"
+    echo "  Bewusst unvollständig freigeben:  gh release edit $TAG --draft=false"
+    exit 1
+  fi
+
+  echo "✓ Artefakte für macOS, Windows und Linux liegen vor."
+  gh release edit "$TAG" --draft=false
+  echo "✓ $TAG ist öffentlich."
+  exit 0
+fi
+
 # Collect the top-level release artifacts only (installers + blockmaps + the
 # electron-updater metadata). Top-level globs skip the unpacked app dirs, and
 # nullglob drops patterns that match nothing on a given platform. Plain globbing

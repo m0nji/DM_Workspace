@@ -4,6 +4,9 @@ All notable changes to DM Workspace. Newest version first. Always written in Eng
 
 ## Unreleased
 
+## 0.11.2 – 2026-08-10
+- fix: The update dialog covers every version between the one you run and the one on offer. It only ever showed the offered version's own changes, so skipping a release meant never reading what it brought — on 0.10.0 you were offered 0.11.1 and saw two bugfixes, with the whole of 0.11.0 silently passing by. Each version now appears as its own dated section, newest first
+
 ## 0.11.1 – 2026-08-10
 - fix: Opening "New remote workspace" before signing in greeted you with an internal error message — the name of an internal method and a German sentence, in an English interface. Not being signed in yet is the normal state the first time you open that dialog, so it now says so plainly and points at the place to sign in. Genuine failures still show, without the internal wrapping around them
 - fix: Dates and times in the Scheduled Tasks panel follow the language set in the app. They were taken from the operating system instead, so a German interface on an English Mac showed "8/9/2026, 11:23:31 PM" next to German labels
