@@ -392,6 +392,7 @@
         "lastRunNone": "noch keiner",
         "owner": "Verantwortlich",
         "ownerNone": "—",
+        "ownerUnknown": "unbekannt",
         "noNextRun": "—"
       },
       "state": {
@@ -435,6 +436,7 @@
       "schedule": {
         "manual": "Nur manuell",
         "hourly": "Stündlich",
+        "hourlyAt": "Stündlich zur Minute {{minute}}",
         "dailyAt": "Täglich {{time}}",
         "weeklyAt": "{{weekday}} {{time}}",
         "everyMinutes": "Alle {{count}} Minuten",
@@ -452,14 +454,17 @@
           "fri": "Freitags",
           "sat": "Samstags"
         },
-        "template": {
+        "frequency": {
           "hourly": "Stündlich",
-          "dailyAt3": "Täglich 03:00",
-          "weeklyMonAt3": "Wöchentlich, montags 03:00",
+          "daily": "Täglich",
+          "weekly": "Wöchentlich",
           "interval": "Intervall",
-          "customCron": "Eigener Cron-Ausdruck",
-          "manual": "Nur manuell"
+          "manual": "Nur manuell",
+          "customCron": "Eigener Cron-Ausdruck"
         },
+        "minuteLabel": "Minute",
+        "timeLabel": "Uhrzeit",
+        "weekdayLabel": "Wochentag",
         "intervalLabel": "Minuten",
         "intervalPlaceholder": "z. B. 15",
         "customCronLabel": "Cron-Ausdruck",
@@ -474,16 +479,25 @@
         "prompt": "Auftrag",
         "promptPlaceholder": "Was soll der Agent tun?",
         "workdir": "Arbeitsverzeichnis",
-        "workdirHint": "Relativ zum Projekt, z. B. „.“ oder „src“",
+        "workdirBrowse": "Durchsuchen…",
         "schedule": "Zeitplan",
         "timeout": "Zeitlimit (Minuten)",
         "enabled": "Zeitgesteuert aktiv",
         "enabledHint": "Pausierte Tasks starten nicht automatisch",
         "owner": "Verantwortlich",
+        "ownerNone": "– niemand –",
         "ownerPlaceholder": "Nutzer-ID",
         "ownerHint": "Nur die Projektleitung kann diese Zuweisung ändern",
         "save": "Speichern",
         "cancel": "Abbrechen"
+      },
+      "picker": {
+        "title": "Ordner wählen",
+        "parent": "Übergeordneter Ordner",
+        "choose": "Diesen Ordner",
+        "loading": "Lade …",
+        "empty": "Keine Unterordner",
+        "error": "Ordner konnte nicht geöffnet werden"
       },
       "detail": {
         "title": "Verlauf: {{name}}",
@@ -511,7 +525,8 @@
         "cancelled": "abgebrochen",
         "skipped": "übersprungen",
         "interrupted": "unterbrochen"
-      }
+      },
+      "role": { "owner": "Projektleitung", "editor": "Bearbeiter", "viewer": "Leser" }
     }
   },
   "terminal": {

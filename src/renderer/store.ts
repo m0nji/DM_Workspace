@@ -3,7 +3,7 @@ import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection,
   LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
   RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope,
-  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent
+  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent, RemoteProjectMember
 } from '../shared/types';
 import type { RemoteFilesContext } from './files-api';
 import {
@@ -442,9 +442,11 @@ export interface StoreState extends AppState {
   clearRemoteError: (serverId: string, scopeKey: string) => void;
   // geplante Agenten-Tasks (Arbeitspaket B, Aufgabe 3)
   remoteTasks: Record<string, RemoteTasksState>; // Schlüssel: remoteConnKey()
+  remoteMembers: Record<string, RemoteMembersState>; // Schlüssel: remoteConnKey()
   taskLogs: Record<string, string>; // runId -> bisher empfangenes Protokoll
   tasksPanelOpen: boolean;
   loadRemoteTasks: (paneOrWorkspaceId: string) => Promise<void>;
+  loadRemoteMembers: (paneOrWorkspaceId: string) => Promise<void>;
   applyRemoteTask: (e: RemoteTaskEvent) => void;
   setTasksPanelOpen: (open: boolean) => void;
   clearTaskLog: (runId: string) => void;
@@ -463,6 +465,16 @@ export interface RemoteTasksState {
   // (describeTaskError im Panel), der Ladefehler warf sie bisher weg.
   error: RemoteTaskError | null;
   access: RemoteTaskAccess | null;
+}
+
+// Mitglieder einer (Server, Scope)-Verbindung — Grundlage der Zuweisung im
+// Task-Formular und des Anzeigenamens in der Liste. Ein Ladefehler ist hier
+// bewusst NICHT blockierend: Das Formular fällt dann auf das frühere
+// Textfeld zurück, statt wegen einer Nebeninformation unbenutzbar zu werden.
+export interface RemoteMembersState {
+  members: RemoteProjectMember[];
+  loading: boolean;
+  error: RemoteTaskError | null;
 }
 
 // Obergrenze je Lauf-Protokoll (Fließtext, nicht Bytes — reicht für dieses
@@ -584,6 +596,7 @@ export const useStore = create<StoreState>((set, get) => ({
   remote: {},
   remoteWorkspaceDialogOpen: false,
   remoteTasks: {},
+  remoteMembers: {},
   taskLogs: {},
   tasksPanelOpen: false,
   previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null, editRemote: null },
@@ -729,6 +742,7 @@ export const useStore = create<StoreState>((set, get) => ({
     });
     const remote = { ...s.remote };
     const remoteTasks = { ...s.remoteTasks };
+    const remoteMembers = { ...s.remoteMembers };
     if (ws?.kind === 'remote' && ws.remote) {
       // Remote-Workspace schließen = Verbindung trennen, NICHT Prozesse killen —
       // das Projekt bzw. die User-Runtime (und ihre Panes) lebt auf dem Server weiter.
@@ -736,15 +750,16 @@ export const useStore = create<StoreState>((set, get) => ({
       window.api.remoteDisconnect(ws.remote.serverId, scopeKey);
       const connKey = remoteConnKey(ws.remote.serverId, scopeKey);
       delete remote[connKey];
-      // Die Task-Liste hängt an derselben Verbindung und geht mit ihr (siehe
-      // removeServer) — sonst bliebe sie als Restmüll im Zustand liegen.
+      // Die Task- und Mitgliederliste hängen an derselben Verbindung und gehen
+      // mit ihr (siehe removeServer) — sonst blieben sie als Restmüll im Zustand liegen.
       delete remoteTasks[connKey];
+      delete remoteMembers[connKey];
     }
     const workspaces = s.workspaces.filter((w) => w.id !== id);
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, remoteTasks, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -1282,10 +1297,11 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     const remote = { ...s.remote };
-    // remoteTasks hängt an derselben (Server, Scope)-Verbindung wie remote und
-    // wird hier mit abgeräumt — sonst bliebe die Task-Liste eines entfernten
-    // Servers als Restmüll im Zustand liegen.
+    // remoteTasks/remoteMembers hängen an derselben (Server, Scope)-Verbindung
+    // wie remote und werden hier mit abgeräumt — sonst blieben Task- und
+    // Mitgliederliste eines entfernten Servers als Restmüll im Zustand liegen.
     const remoteTasks = { ...s.remoteTasks };
+    const remoteMembers = { ...s.remoteMembers };
     const workspaces = s.workspaces.filter((w) => {
       if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
       collectPaneIds(w.layout).forEach((pid) => {
@@ -1294,6 +1310,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const connKey = remoteConnKey(serverId, workspaceScopeKey(w.remote));
       delete remote[connKey];
       delete remoteTasks[connKey];
+      delete remoteMembers[connKey];
       return false;
     });
     void window.api.serverRemove(serverId).catch((err: unknown) => console.error('server:remove failed:', err));
@@ -1303,7 +1320,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = workspaces.some((w) => w.id === s.activeWorkspaceId)
       ? s.activeWorkspaceId
       : (workspaces[0]?.id ?? null);
-    const next = { ...s, workspaces, settings, remote, remoteTasks, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
+    const next = { ...s, workspaces, settings, remote, remoteTasks, remoteMembers, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
     persist(next);
     return next;
   }),
@@ -1553,6 +1570,29 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       };
     });
+  },
+
+  loadRemoteMembers: async (paneOrWorkspaceId) => {
+    const ref = remoteTaskScope(get().workspaces, paneOrWorkspaceId);
+    if (!ref) return;
+    const key = remoteConnKey(ref.serverId, ref.scopeKey);
+    set((s) => ({
+      remoteMembers: {
+        ...s.remoteMembers,
+        [key]: { members: s.remoteMembers[key]?.members ?? [], loading: true, error: null }
+      }
+    }));
+    const result = await window.api.remoteMembersList(ref.serverId, ref.scopeKey);
+    set((s) => ({
+      remoteMembers: {
+        ...s.remoteMembers,
+        [key]: result.ok
+          ? { members: result.members, loading: false, error: null }
+          // Wie bei den Tasks: ein Fehlversuch verwirft nicht die zuletzt
+          // bekannte Liste, sonst verlöre ein offenes Formular seine Auswahl.
+          : { members: s.remoteMembers[key]?.members ?? [], loading: false, error: result }
+      }
+    }));
   },
 
   // Verarbeitet die vier Ereignis-Arten von remote:task (siehe RemoteTaskEvent).

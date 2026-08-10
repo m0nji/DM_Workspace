@@ -19,8 +19,9 @@
 // Main-Prozesses (console.warn unten).
 
 import type {
-  RemoteRunResult, RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskErrorCode,
-  RemoteTaskListResult, RemoteTaskOkResult, RemoteTaskResult, RemoteTaskRun, RemoteTaskRunsResult
+  RemoteMembersResult, RemoteProjectMember, RemoteRunResult, RemoteTask, RemoteTaskAccess,
+  RemoteTaskError, RemoteTaskErrorCode, RemoteTaskListResult, RemoteTaskOkResult, RemoteTaskResult,
+  RemoteTaskRun, RemoteTaskRunsResult
 } from '../../shared/types';
 
 export interface RemoteTasksDeps {
@@ -167,5 +168,37 @@ export class RemoteTasks {
       return { ok: false, code: 'server' };
     }
     return { ok: true, run: run as unknown as RemoteTaskRun & { log: string } };
+  }
+
+  /**
+   * Projektmitglieder für die Zuweisung eines Tasks. Liegt hier statt beim
+   * RemoteManager, weil die Auswahl im Task-Formular sitzt und denselben
+   * Fehlerkatalog braucht wie die übrigen Task-Aufrufe — der Renderer
+   * übersetzt ihn mit describeTaskError bereits.
+   *
+   * Unvollständige Einträge werden aussortiert statt halb angezeigt: Ein
+   * Eintrag ohne userId wäre eine Auswahl ohne Wert, einer ohne displayName
+   * eine ohne Beschriftung.
+   */
+  async members(serverId: string, projectId: string): Promise<RemoteMembersResult> {
+    const res = await this.request(
+      serverId, 'GET', `/api/projects/${encodeURIComponent(projectId)}/members`
+    );
+    if (!res.ok) return res;
+    if (!Array.isArray(res.body.members)) return { ok: false, code: 'server' };
+    const members = res.body.members.flatMap((raw): RemoteProjectMember[] => {
+      if (typeof raw !== 'object' || raw === null) return [];
+      const m = raw as Record<string, unknown>;
+      if (typeof m.userId !== 'string' || !m.userId) return [];
+      if (typeof m.displayName !== 'string' || !m.displayName) return [];
+      const role = m.role === 'owner' || m.role === 'editor' ? m.role : 'viewer';
+      return [{
+        userId: m.userId,
+        username: typeof m.username === 'string' ? m.username : '',
+        displayName: m.displayName,
+        role
+      }];
+    });
+    return { ok: true, members };
   }
 }

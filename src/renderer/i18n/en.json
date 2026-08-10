@@ -392,6 +392,7 @@
         "lastRunNone": "none yet",
         "owner": "Owner",
         "ownerNone": "—",
+        "ownerUnknown": "unknown",
         "noNextRun": "—"
       },
       "state": {
@@ -435,6 +436,7 @@
       "schedule": {
         "manual": "Manual only",
         "hourly": "Hourly",
+        "hourlyAt": "Hourly at :{{minute}}",
         "dailyAt": "Daily {{time}}",
         "weeklyAt": "{{weekday}} {{time}}",
         "everyMinutes": "Every {{count}} minutes",
@@ -452,14 +454,17 @@
           "fri": "Fridays",
           "sat": "Saturdays"
         },
-        "template": {
+        "frequency": {
           "hourly": "Hourly",
-          "dailyAt3": "Daily 03:00",
-          "weeklyMonAt3": "Weekly, Monday 03:00",
+          "daily": "Daily",
+          "weekly": "Weekly",
           "interval": "Interval",
-          "customCron": "Custom cron expression",
-          "manual": "Manual only"
+          "manual": "Manual only",
+          "customCron": "Custom cron expression"
         },
+        "minuteLabel": "Minute",
+        "timeLabel": "Time",
+        "weekdayLabel": "Weekday",
         "intervalLabel": "Minutes",
         "intervalPlaceholder": "e.g. 15",
         "customCronLabel": "Cron expression",
@@ -474,16 +479,25 @@
         "prompt": "Prompt",
         "promptPlaceholder": "What should the agent do?",
         "workdir": "Working directory",
-        "workdirHint": "Relative to the project, e.g. \".\" or \"src\"",
+        "workdirBrowse": "Browse…",
         "schedule": "Schedule",
         "timeout": "Timeout (minutes)",
         "enabled": "Scheduling active",
         "enabledHint": "Paused tasks don't start automatically",
         "owner": "Owner",
+        "ownerNone": "– nobody –",
         "ownerPlaceholder": "User ID",
         "ownerHint": "Only the project owner can change this assignment",
         "save": "Save",
         "cancel": "Cancel"
+      },
+      "picker": {
+        "title": "Choose folder",
+        "parent": "Parent folder",
+        "choose": "Use this folder",
+        "loading": "Loading …",
+        "empty": "No subfolders",
+        "error": "Folder could not be opened"
       },
       "detail": {
         "title": "History: {{name}}",
@@ -511,7 +525,8 @@
         "cancelled": "cancelled",
         "skipped": "skipped",
         "interrupted": "interrupted"
-      }
+      },
+      "role": { "owner": "Owner", "editor": "Editor", "viewer": "Viewer" }
     }
   },
   "terminal": {

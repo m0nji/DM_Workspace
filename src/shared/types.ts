@@ -383,6 +383,22 @@ export type RemoteTaskOkResult = { ok: true } | RemoteTaskError;
 export type RemoteTaskRunsResult = { ok: true; runs: RemoteTaskRun[] } | RemoteTaskError;
 export type RemoteRunResult = { ok: true; run: RemoteTaskRun & { log: string } } | RemoteTaskError;
 
+/**
+ * Projektmitglied für die Auswahl „Verantwortlich" (GET /api/projects/:id/members).
+ * Zuweisbar sind serverseitig nur Rollen ab 'editor' (parseTaskBody in
+ * tasks/routes.ts) — 'viewer' wird trotzdem mitgeführt, weil eine bestehende
+ * Zuweisung sonst unbeschriftet bliebe, wenn die Person zwischenzeitlich
+ * zurückgestuft wurde.
+ */
+export interface RemoteProjectMember {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: 'owner' | 'editor' | 'viewer';
+}
+
+export type RemoteMembersResult = { ok: true; members: RemoteProjectMember[] } | RemoteTaskError;
+
 // Push-Events Main -> Renderer für Task-Ereignisse (Arbeitspaket B, Aufgabe 2).
 // Bildet die fünf Server-Nachrichtentypen des WebSocket-Protokolls
 // (vendor/dmw-shared/protocol.ts: task.changed, task.removed,
@@ -556,6 +572,8 @@ export interface RendererApi {
   remoteTasksCancel(serverId: string, projectId: string, runId: string): Promise<RemoteTaskOkResult>;
   remoteTasksListRuns(serverId: string, projectId: string, taskId: string): Promise<RemoteTaskRunsResult>;
   remoteTasksGetRun(serverId: string, projectId: string, runId: string): Promise<RemoteRunResult>;
+  /** Projektmitglieder für die Zuweisung eines Tasks (Auswahl statt roher Nutzer-ID). */
+  remoteMembersList(serverId: string, projectId: string): Promise<RemoteMembersResult>;
   // Live-Protokoll eines laufenden Runs; scopeKey wie bei remoteConnectWorkspace
   // (Projekt-UUID oder 'user').
   remoteTaskLogSubscribe(serverId: string, scopeKey: string, runId: string): void;

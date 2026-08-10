@@ -36,6 +36,12 @@ function formatCron(expr: string, t: Translate): string {
       if (minute === '0' && hour === '*' && dayOfWeek === '*') {
         return t('tasks.scheduled.schedule.hourly');
       }
+      // Eine abweichende Minute ist seit dem Frequenz-Editor erreichbar
+      // ("Stündlich, Minute 20"). Ohne diesen Zweig läse die Liste einen vom
+      // Formular selbst erzeugten Ausdruck als "Eigener Zeitplan".
+      if (hour === '*' && dayOfWeek === '*' && /^\d{1,2}$/.test(minute) && Number(minute) <= 59) {
+        return t('tasks.scheduled.schedule.hourlyAt', { minute: minute.padStart(2, '0') });
+      }
       if (/^\d+$/.test(minute) && /^\d+$/.test(hour)) {
         const time = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
         if (dayOfWeek === '*') return t('tasks.scheduled.schedule.dailyAt', { time });
@@ -73,46 +79,124 @@ export function formatTaskSchedule(task: Pick<RemoteTask, 'scheduleKind' | 'sche
   return formatCron(task.scheduleExpr, t);
 }
 
-// ---- Zeitplan-Vorlagen fürs Formular ---------------------------------------
+// ---- Zeitplan-Modell fürs Formular ------------------------------------------
+//
+// Das Formular führt nicht mehr feste Vorlagen ("Wöchentlich, montags 03:00"),
+// sondern eine Frequenz plus die dazugehörigen, frei anpassbaren Felder. Der
+// Cron-Ausdruck wird daraus erzeugt statt aus einer Tabelle gelesen — sonst
+// bliebe jede Abweichung von der Vorlage (Dienstag statt Montag) nur über den
+// rohen Ausdruck erreichbar, den die Oberfläche gerade vermeiden soll.
 
-export type ScheduleTemplateId = 'hourly' | 'dailyAt3' | 'weeklyMonAt3' | 'interval' | 'customCron' | 'manual';
+export type ScheduleFrequency = 'hourly' | 'daily' | 'weekly' | 'interval' | 'manual' | 'customCron';
 
-export interface ScheduleTemplateDef {
-  id: ScheduleTemplateId;
-  scheduleKind: RemoteTask['scheduleKind'];
-  // Fester Ausdruck bei den drei Cron-Vorlagen und bei "manual" (leer); bei
-  // Intervall/eigenem Cron gibt der Nutzer den Ausdruck selbst ein (null).
-  fixedExpr: string | null;
+/** Reihenfolge der <option>-Einträge im Formular. */
+export const SCHEDULE_FREQUENCIES: readonly ScheduleFrequency[] =
+  ['hourly', 'daily', 'weekly', 'interval', 'manual', 'customCron'] as const;
+
+export interface ScheduleParts {
+  frequency: ScheduleFrequency;
+  /** Minute bei 'hourly'. Text, weil es direkt am Eingabefeld hängt. */
+  minute: string;
+  /** 'HH:MM' bei 'daily' und 'weekly' — das Format von <input type="time">. */
+  time: string;
+  /** Cron-Wochentag bei 'weekly': 0 = Sonntag … 6 = Samstag. */
+  weekday: number;
+  /** Minuten bei 'interval'. */
+  intervalMinutes: string;
+  /** Roher Ausdruck bei 'customCron'. */
+  cronExpr: string;
 }
 
-const CRON_TEMPLATE_EXPR: Record<'hourly' | 'dailyAt3' | 'weeklyMonAt3', string> = {
-  hourly: '0 * * * *',
-  dailyAt3: '0 3 * * *',
-  weeklyMonAt3: '0 3 * * 1'
+// Vorgabe für einen neuen Task: täglich 03:00, wie bisher. Die übrigen Felder
+// sind sinnvolle Startwerte, sobald jemand die Frequenz wechselt — deshalb
+// trägt jedes Feld einen Wert, nicht nur das der Vorgabe-Frequenz.
+export const DEFAULT_SCHEDULE_PARTS: ScheduleParts = {
+  frequency: 'daily',
+  minute: '0',
+  time: '03:00',
+  weekday: 1,
+  intervalMinutes: '15',
+  cronExpr: '0 3 * * 1'
 };
 
-// Reihenfolge bestimmt die Reihenfolge der <option>-Einträge im Formular.
-export const SCHEDULE_TEMPLATES: ScheduleTemplateDef[] = [
-  { id: 'hourly', scheduleKind: 'cron', fixedExpr: CRON_TEMPLATE_EXPR.hourly },
-  { id: 'dailyAt3', scheduleKind: 'cron', fixedExpr: CRON_TEMPLATE_EXPR.dailyAt3 },
-  { id: 'weeklyMonAt3', scheduleKind: 'cron', fixedExpr: CRON_TEMPLATE_EXPR.weeklyMonAt3 },
-  { id: 'interval', scheduleKind: 'interval', fixedExpr: null },
-  { id: 'customCron', scheduleKind: 'cron', fixedExpr: null },
-  { id: 'manual', scheduleKind: 'manual', fixedExpr: '' }
-];
-
-export function scheduleTemplate(id: ScheduleTemplateId): ScheduleTemplateDef {
-  return SCHEDULE_TEMPLATES.find((tpl) => tpl.id === id)!;
+function clampInt(raw: string, min: number, max: number, fallback: number): number {
+  const n = Number(raw.trim());
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
-/** Welche Vorlage passt zu einem bestehenden Task — Grundlage fürs Vorbelegen beim Bearbeiten. */
-export function templateIdForTask(task: Pick<RemoteTask, 'scheduleKind' | 'scheduleExpr'>): ScheduleTemplateId {
-  if (task.scheduleKind === 'manual') return 'manual';
-  if (task.scheduleKind === 'interval') return 'interval';
+/** 'HH:MM' zerlegen; alles Unbrauchbare fällt auf 03:00 zurück (die Vorgabe). */
+function splitTime(time: string): { hour: number; minute: number } {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!m) return { hour: 3, minute: 0 };
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour > 23 || minute > 59) return { hour: 3, minute: 0 };
+  return { hour, minute };
+}
+
+function joinTime(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * Gespeicherten Zeitplan in die Formularfelder zerlegen.
+ *
+ * Erkannt wird genau das, was `formatCron` oben auch als Klartext liest:
+ * einzelne feste Werte, Tag-des-Monats und Monat auf '*'. Alles andere
+ * (Listen, Schritte, Bereiche, gesetzter Monatstag) landet WÖRTLICH in
+ * `cronExpr` unter der Frequenz 'customCron'. Ohne diesen Rückfall verlöre ein
+ * von Hand gepflegter Ausdruck beim bloßen Öffnen und Speichern des Formulars
+ * seine Bedeutung.
+ */
+export function parseSchedule(task: Pick<RemoteTask, 'scheduleKind' | 'scheduleExpr'>): ScheduleParts {
+  if (task.scheduleKind === 'manual') return { ...DEFAULT_SCHEDULE_PARTS, frequency: 'manual' };
+  if (task.scheduleKind === 'interval') {
+    return { ...DEFAULT_SCHEDULE_PARTS, frequency: 'interval', intervalMinutes: task.scheduleExpr.trim() };
+  }
   const expr = task.scheduleExpr.trim();
-  const fixed = (Object.keys(CRON_TEMPLATE_EXPR) as (keyof typeof CRON_TEMPLATE_EXPR)[])
-    .find((id) => CRON_TEMPLATE_EXPR[id] === expr);
-  return fixed ?? 'customCron';
+  const custom: ScheduleParts = { ...DEFAULT_SCHEDULE_PARTS, frequency: 'customCron', cronExpr: expr };
+  const parts = expr.split(/\s+/);
+  if (parts.length !== 5) return custom;
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts as [string, string, string, string, string];
+  if (dayOfMonth !== '*' || month !== '*') return custom;
+  if (!/^\d{1,2}$/.test(minute) || Number(minute) > 59) return custom;
+
+  if (hour === '*' && dayOfWeek === '*') {
+    return { ...DEFAULT_SCHEDULE_PARTS, frequency: 'hourly', minute: String(Number(minute)) };
+  }
+  if (!/^\d{1,2}$/.test(hour) || Number(hour) > 23) return custom;
+  const time = joinTime(Number(hour), Number(minute));
+  if (dayOfWeek === '*') return { ...DEFAULT_SCHEDULE_PARTS, frequency: 'daily', time };
+  if (!/^[0-7]$/.test(dayOfWeek)) return custom;
+  // Cron kennt den Sonntag als 0 und als 7; die Oberfläche führt ihn nur als 0
+  // (dieselbe Normalisierung wie in formatCron oben).
+  const weekday = dayOfWeek === '7' ? 0 : Number(dayOfWeek);
+  return { ...DEFAULT_SCHEDULE_PARTS, frequency: 'weekly', weekday, time };
+}
+
+/** Formularfelder in die beiden API-Felder umsetzen — Gegenstück zu parseSchedule. */
+export function buildSchedule(parts: ScheduleParts): { scheduleKind: RemoteTask['scheduleKind']; scheduleExpr: string } {
+  switch (parts.frequency) {
+    case 'hourly':
+      return { scheduleKind: 'cron', scheduleExpr: `${clampInt(parts.minute, 0, 59, 0)} * * * *` };
+    case 'daily': {
+      const { hour, minute } = splitTime(parts.time);
+      return { scheduleKind: 'cron', scheduleExpr: `${minute} ${hour} * * *` };
+    }
+    case 'weekly': {
+      const { hour, minute } = splitTime(parts.time);
+      const day = clampInt(String(parts.weekday), 0, 6, 1);
+      return { scheduleKind: 'cron', scheduleExpr: `${minute} ${hour} * * ${day}` };
+    }
+    case 'interval':
+      // Dieselben Grenzen wie das Eingabefeld (1 Minute bis 1 Woche).
+      return { scheduleKind: 'interval', scheduleExpr: String(clampInt(parts.intervalMinutes, 1, 10080, 15)) };
+    case 'manual':
+      return { scheduleKind: 'manual', scheduleExpr: '' };
+    default:
+      return { scheduleKind: 'cron', scheduleExpr: parts.cronExpr.trim() };
+  }
 }
 
 // ---- Anfrage-Body des Formulars ---------------------------------------------
@@ -123,9 +207,7 @@ export interface TaskFormValues {
   agent: RemoteTask['agent'];
   prompt: string;
   workdir: string;
-  templateId: ScheduleTemplateId;
-  intervalMinutes: string;
-  customCronExpr: string;
+  schedule: ScheduleParts;
   timeoutMinutes: string;
   enabled: boolean;
   ownerId: string;
@@ -151,17 +233,13 @@ export interface TaskFormValues {
  * überschrieben.
  */
 export function buildTaskBody(values: TaskFormValues, mode: 'create' | 'edit'): Record<string, unknown> {
-  const tpl = scheduleTemplate(values.templateId);
-  const scheduleExpr =
-    values.templateId === 'interval' ? values.intervalMinutes.trim()
-    : values.templateId === 'customCron' ? values.customCronExpr.trim()
-    : tpl.fixedExpr ?? '';
+  const { scheduleKind, scheduleExpr } = buildSchedule(values.schedule);
   const body: Record<string, unknown> = {
     name: values.name.trim(),
     agent: values.agent,
     prompt: values.prompt,
     workdir: values.workdir.trim() || '.',
-    scheduleKind: tpl.scheduleKind,
+    scheduleKind,
     scheduleExpr,
     timeoutMs: Math.max(1, Math.round(Number(values.timeoutMinutes) || 1)) * 60_000,
     enabled: values.enabled

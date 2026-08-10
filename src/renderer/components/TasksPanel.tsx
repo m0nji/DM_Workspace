@@ -1,17 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { remoteConnKey, tasksAvailable, useStore, workspaceScopeKey, type RemoteTasksState } from '../store';
 import type {
-  RemoteTask, RemoteTaskAccess, RemoteTaskRun
+  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskRun, RemoteProjectMember
 } from '../../shared/types';
 import {
-  SCHEDULE_TEMPLATES, buildTaskBody, formatTaskSchedule, templateIdForTask,
-  type ScheduleTemplateId
+  DEFAULT_SCHEDULE_PARTS, SCHEDULE_FREQUENCIES, buildTaskBody, formatTaskSchedule, parseSchedule,
+  type ScheduleFrequency, type ScheduleParts
 } from '../task-schedule';
 import { describeTaskError } from '../task-error';
 import { formatDateTime } from '../task-datetime';
+import { toAbsPath } from '../workdir-path';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DirectoryPickerDialog } from './DirectoryPickerDialog';
 
 // Panel für geplante Agenten-Tasks eines Remote-Projekts (Arbeitspaket B,
 // Aufgabe 4). Drei Bereiche wie im Web-Client (DM_Workspace_Web/web/src/views/
@@ -44,6 +47,7 @@ export function TasksPanel(): React.JSX.Element | null {
   const setOpen = useStore((s) => s.setTasksPanelOpen);
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   const loadRemoteTasks = useStore((s) => s.loadRemoteTasks);
+  const loadRemoteMembers = useStore((s) => s.loadRemoteMembers);
   const ws = useStore((s) => s.workspaces.find((w) => w.id === s.activeWorkspaceId));
 
   const scope: TaskScope | null = ws?.kind === 'remote' && ws.remote
@@ -51,6 +55,7 @@ export function TasksPanel(): React.JSX.Element | null {
     : null;
   const key = scope ? remoteConnKey(scope.serverId, scope.scopeKey) : null;
   const entry = useStore((s) => (key ? s.remoteTasks[key] : undefined));
+  const membersEntry = useStore((s) => (key ? s.remoteMembers[key] : undefined));
   // Starten/Abbrechen ist KEINE Ableitung aus der Projektrolle — der Server
   // liefert access.canRun eigens (GET .../tasks), und der Client baut die
   // Regel nicht nach (siehe RemoteTaskAccess in shared/types.ts). Solange die
@@ -68,8 +73,10 @@ export function TasksPanel(): React.JSX.Element | null {
   }, [open, available, setOpen]);
 
   useEffect(() => {
-    if (open && available && activeWorkspaceId) void loadRemoteTasks(activeWorkspaceId);
-  }, [open, available, activeWorkspaceId, loadRemoteTasks]);
+    if (!(open && available && activeWorkspaceId)) return;
+    void loadRemoteTasks(activeWorkspaceId);
+    void loadRemoteMembers(activeWorkspaceId);
+  }, [open, available, activeWorkspaceId, loadRemoteTasks, loadRemoteMembers]);
 
   // Zurück zur Liste beim Schließen und bei jedem Wechsel des Projekt-Scopes —
   // sonst zeigte ein späteres Wiederöffnen (oder ein Workspace-Wechsel bei
@@ -105,6 +112,7 @@ export function TasksPanel(): React.JSX.Element | null {
             <TasksList
               scope={scope}
               entry={entry}
+              members={membersEntry?.members ?? []}
               canRun={canRun}
               onReload={() => void loadRemoteTasks(activeWorkspaceId!)}
               onOpenDetail={(taskId) => setView({ mode: 'detail', taskId })}
@@ -121,6 +129,8 @@ export function TasksPanel(): React.JSX.Element | null {
               scope={scope}
               task={view.taskId ? activeTask : null}
               access={entry?.access ?? null}
+              members={membersEntry?.members ?? []}
+              membersError={membersEntry?.error ?? null}
               onDone={() => setView({ mode: 'list' })}
               onCancel={() => setView({ mode: 'list' })}
             />
@@ -136,13 +146,21 @@ export function TasksPanel(): React.JSX.Element | null {
 interface TasksListProps {
   scope: TaskScope;
   entry: RemoteTasksState | undefined;
+  members: RemoteProjectMember[];
   canRun: boolean;
   onReload: () => void;
   onOpenDetail: (taskId: string) => void;
   onOpenForm: (taskId: string | null) => void;
 }
 
-function TasksList({ scope, entry, canRun, onReload, onOpenDetail, onOpenForm }: TasksListProps): React.JSX.Element {
+// Die Liste zeigte bisher die rohe Nutzer-UUID — dieselbe Kennung, die das
+// Formular gerade abgeschafft hat.
+function memberName(members: RemoteProjectMember[], ownerId: string | null, t: TFunction): string {
+  if (!ownerId) return t('tasks.scheduled.list.ownerNone');
+  return members.find((m) => m.userId === ownerId)?.displayName ?? t('tasks.scheduled.list.ownerUnknown');
+}
+
+function TasksList({ scope, entry, members, canRun, onReload, onOpenDetail, onOpenForm }: TasksListProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
   const tasks = entry?.tasks ?? [];
   const canManage = entry?.access?.canManage ?? false;
@@ -242,7 +260,7 @@ function TasksList({ scope, entry, canRun, onReload, onOpenDetail, onOpenForm }:
                     ? `${t(`tasks.scheduled.runStatus.${task.lastRun.status}`)} · ${formatDateTime(task.lastRun.startedAt, i18n.language)}`
                     : t('tasks.scheduled.list.lastRunNone')}
                 </span>
-                <span>{t('tasks.scheduled.list.owner')}: {task.ownerId ?? t('tasks.scheduled.list.ownerNone')}</span>
+                <span>{t('tasks.scheduled.list.owner')}: {memberName(members, task.ownerId, t)}</span>
               </div>
               <div className="tasks-row-actions">
                 <button
@@ -475,23 +493,33 @@ interface TaskFormProps {
   scope: TaskScope;
   task: RemoteTask | null; // null = neuer Task
   access: RemoteTaskAccess | null;
+  members: RemoteProjectMember[];
+  membersError: RemoteTaskError | null;
   onDone: () => void;
   onCancel: () => void;
 }
 
-function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): React.JSX.Element {
+// Wochentage in Cron-Reihenfolge (0 = Sonntag). Dieselben Übersetzungen wie in
+// der Liste, damit Auswahl und Anzeige denselben Wortlaut tragen.
+const WEEKDAY_OPTIONS = [
+  'tasks.scheduled.schedule.weekday.sun',
+  'tasks.scheduled.schedule.weekday.mon',
+  'tasks.scheduled.schedule.weekday.tue',
+  'tasks.scheduled.schedule.weekday.wed',
+  'tasks.scheduled.schedule.weekday.thu',
+  'tasks.scheduled.schedule.weekday.fri',
+  'tasks.scheduled.schedule.weekday.sat'
+] as const;
+
+function TaskForm({ scope, task, access, members, membersError, onDone, onCancel }: TaskFormProps): React.JSX.Element {
   const { t } = useTranslation();
   const [name, setName] = useState(task?.name ?? '');
   const [agent, setAgent] = useState<RemoteTask['agent']>(task?.agent ?? 'claude');
   const [prompt, setPrompt] = useState(task?.prompt ?? '');
   const [workdir, setWorkdir] = useState(task?.workdir ?? '.');
-  const [templateId, setTemplateId] = useState<ScheduleTemplateId>(task ? templateIdForTask(task) : 'dailyAt3');
-  const [intervalMinutes, setIntervalMinutes] = useState(
-    task && task.scheduleKind === 'interval' ? task.scheduleExpr : '15'
-  );
-  const [customCronExpr, setCustomCronExpr] = useState(
-    task && templateIdForTask(task) === 'customCron' ? task.scheduleExpr : '0 3 * * 1'
-  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleParts>(task ? parseSchedule(task) : DEFAULT_SCHEDULE_PARTS);
+  const patchSchedule = (patch: Partial<ScheduleParts>): void => setSchedule((prev) => ({ ...prev, ...patch }));
   const [timeoutMinutes, setTimeoutMinutes] = useState(task ? String(Math.round(task.timeoutMs / 60_000)) : '10');
   const [enabled, setEnabled] = useState(task?.enabled ?? true);
   const [ownerId, setOwnerId] = useState(task?.ownerId ?? '');
@@ -499,6 +527,12 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
   const [saving, setSaving] = useState(false);
 
   const canAssign = access?.canAssign ?? false;
+  // Zuweisbar sind nur Mitglieder ab Editor-Rolle (parseTaskBody im Server).
+  // Die aktuell zugewiesene Person bleibt in der Auswahl, auch wenn sie
+  // zwischenzeitlich auf Viewer zurückgestuft wurde — sonst zeigte die Auswahl
+  // fälschlich „niemand", und das Speichern eines anderen Feldes löschte die
+  // Zuweisung unbemerkt. Dieselbe Regel wendet der Web-Client an.
+  const assignable = members.filter((m) => m.role !== 'viewer' || m.userId === task?.ownerId);
 
   const save = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -506,7 +540,7 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
     // Feldauswahl (insbesondere die Zeitzone, die es nur beim Anlegen gibt)
     // steckt in buildTaskBody — rein und ohne React getestet, siehe dort.
     const body = buildTaskBody(
-      { name, agent, prompt, workdir, templateId, intervalMinutes, customCronExpr, timeoutMinutes, enabled, ownerId, canAssign },
+      { name, agent, prompt, workdir, schedule, timeoutMinutes, enabled, ownerId, canAssign },
       task ? 'edit' : 'create'
     );
 
@@ -545,10 +579,17 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
         </label>
         <label>
           <span className="wizard-label">{t('tasks.scheduled.form.workdir')}</span>
-          <input className="wizard-input mono" value={workdir} onChange={(e) => setWorkdir(e.target.value)} />
+          <div className="tasks-workdir-field">
+            <input className="wizard-input mono" value={workdir} onChange={(e) => setWorkdir(e.target.value)} />
+            <button type="button" className="confirm-btn" onClick={() => setPickerOpen(true)}>
+              {t('tasks.scheduled.form.workdirBrowse')}
+            </button>
+          </div>
         </label>
       </div>
-      <p className="modal-hint" style={{ marginTop: -6 }}>{t('tasks.scheduled.form.workdirHint')}</p>
+      {/* Der aufgelöste Pfad statt eines Hinweistexts: Er beantwortet dieselbe
+          Frage („relativ wozu?") und zeigt zusätzlich, wo man gerade landet. */}
+      <p className="modal-hint mono" style={{ marginTop: -6 }}>{toAbsPath(workdir)}</p>
 
       <label>
         <span className="wizard-label">{t('tasks.scheduled.form.prompt')}</span>
@@ -560,27 +601,77 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
 
       <label>
         <span className="wizard-label">{t('tasks.scheduled.form.schedule')}</span>
-        <select className="wizard-input" value={templateId} onChange={(e) => setTemplateId(e.target.value as ScheduleTemplateId)}>
-          {SCHEDULE_TEMPLATES.map((tpl) => (
-            <option key={tpl.id} value={tpl.id}>{t(`tasks.scheduled.schedule.template.${tpl.id}`)}</option>
+        <select
+          className="wizard-input"
+          value={schedule.frequency}
+          onChange={(e) => patchSchedule({ frequency: e.target.value as ScheduleFrequency })}
+        >
+          {SCHEDULE_FREQUENCIES.map((f) => (
+            <option key={f} value={f}>{t(`tasks.scheduled.schedule.frequency.${f}`)}</option>
           ))}
         </select>
       </label>
-      {templateId === 'interval' && (
+
+      {/* Die Vorlage gibt nur den Startwert vor — angezeigt wird sie als
+          gefülltes, änderbares Feld, nicht als unveränderliche Beschriftung. */}
+      {schedule.frequency === 'hourly' && (
         <label>
-          <span className="wizard-label">{t('tasks.scheduled.schedule.intervalLabel')}</span>
+          <span className="wizard-label">{t('tasks.scheduled.schedule.minuteLabel')}</span>
           <input
-            className="wizard-input" type="number" min={1} max={10080} value={intervalMinutes} required
-            placeholder={t('tasks.scheduled.schedule.intervalPlaceholder')} onChange={(e) => setIntervalMinutes(e.target.value)}
+            className="wizard-input" type="number" min={0} max={59} value={schedule.minute} required
+            onChange={(e) => patchSchedule({ minute: e.target.value })}
           />
         </label>
       )}
-      {templateId === 'customCron' && (
+      {schedule.frequency === 'daily' && (
+        <label>
+          <span className="wizard-label">{t('tasks.scheduled.schedule.timeLabel')}</span>
+          <input
+            className="wizard-input" type="time" value={schedule.time} required
+            onChange={(e) => patchSchedule({ time: e.target.value })}
+          />
+        </label>
+      )}
+      {schedule.frequency === 'weekly' && (
+        <div className="tasks-form-row-2">
+          <label>
+            <span className="wizard-label">{t('tasks.scheduled.schedule.weekdayLabel')}</span>
+            <select
+              className="wizard-input"
+              value={String(schedule.weekday)}
+              onChange={(e) => patchSchedule({ weekday: Number(e.target.value) })}
+            >
+              {WEEKDAY_OPTIONS.map((key, day) => (
+                <option key={key} value={day}>{t(key)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="wizard-label">{t('tasks.scheduled.schedule.timeLabel')}</span>
+            <input
+              className="wizard-input" type="time" value={schedule.time} required
+              onChange={(e) => patchSchedule({ time: e.target.value })}
+            />
+          </label>
+        </div>
+      )}
+      {schedule.frequency === 'interval' && (
+        <label>
+          <span className="wizard-label">{t('tasks.scheduled.schedule.intervalLabel')}</span>
+          <input
+            className="wizard-input" type="number" min={1} max={10080} value={schedule.intervalMinutes} required
+            placeholder={t('tasks.scheduled.schedule.intervalPlaceholder')}
+            onChange={(e) => patchSchedule({ intervalMinutes: e.target.value })}
+          />
+        </label>
+      )}
+      {schedule.frequency === 'customCron' && (
         <label>
           <span className="wizard-label">{t('tasks.scheduled.schedule.customCronLabel')}</span>
           <input
-            className="wizard-input mono" value={customCronExpr} required
-            placeholder={t('tasks.scheduled.schedule.customCronPlaceholder')} onChange={(e) => setCustomCronExpr(e.target.value)}
+            className="wizard-input mono" value={schedule.cronExpr} required
+            placeholder={t('tasks.scheduled.schedule.customCronPlaceholder')}
+            onChange={(e) => patchSchedule({ cronExpr: e.target.value })}
           />
         </label>
       )}
@@ -595,13 +686,32 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
         </label>
         <label>
           <span className="wizard-label">{t('tasks.scheduled.form.owner')}</span>
-          <input
-            className="wizard-input" value={ownerId} disabled={!canAssign}
-            title={canAssign ? '' : t('tasks.scheduled.blocked.assign')}
-            placeholder={t('tasks.scheduled.form.ownerPlaceholder')} onChange={(e) => setOwnerId(e.target.value)}
-          />
+          {members.length > 0 ? (
+            <select
+              className="wizard-input" value={ownerId} disabled={!canAssign}
+              title={canAssign ? '' : t('tasks.scheduled.blocked.assign')}
+              onChange={(e) => setOwnerId(e.target.value)}
+            >
+              <option value="">{t('tasks.scheduled.form.ownerNone')}</option>
+              {assignable.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName} ({t(`tasks.scheduled.role.${m.role}`)})
+                </option>
+              ))}
+            </select>
+          ) : (
+            // Kommt die Mitgliederliste nicht (Server kurz weg, kein Zugriff),
+            // bleibt das frühere Textfeld statt einer leeren Auswahl — ein
+            // Nebenwert darf das ganze Formular nicht blockieren.
+            <input
+              className="wizard-input" value={ownerId} disabled={!canAssign}
+              title={canAssign ? '' : t('tasks.scheduled.blocked.assign')}
+              placeholder={t('tasks.scheduled.form.ownerPlaceholder')} onChange={(e) => setOwnerId(e.target.value)}
+            />
+          )}
         </label>
       </div>
+      {membersError && <div className="setting-error">{describeTaskError(membersError, t)}</div>}
       <p className="modal-hint" style={{ marginTop: -6 }}>{t('tasks.scheduled.form.ownerHint')}</p>
 
       <label className="wizard-confirm-toggle">
@@ -614,6 +724,19 @@ function TaskForm({ scope, task, access, onDone, onCancel }: TaskFormProps): Rea
         <button type="button" className="confirm-btn" onClick={onCancel}>{t('tasks.scheduled.form.cancel')}</button>
         <button type="submit" className="confirm-btn primary" disabled={saving}>{t('tasks.scheduled.form.save')}</button>
       </div>
+
+      {/* scope.scopeKey ist hier immer die Projekt-UUID: Das Tasks-Panel ist
+          über tasksAvailable() für den User-Scope gesperrt (store.ts, Stufe
+          „user-runtime"), der reservierte Wert 'user' kann also nicht auftreten. */}
+      {pickerOpen && (
+        <DirectoryPickerDialog
+          serverId={scope.serverId}
+          projectId={scope.scopeKey}
+          initialWorkdir={workdir}
+          onSelect={(picked) => { setWorkdir(picked); setPickerOpen(false); }}
+          onCancel={() => setPickerOpen(false)}
+        />
+      )}
     </form>
   );
 }

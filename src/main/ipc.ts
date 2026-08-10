@@ -433,6 +433,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (!req) { rejectPayload('remoteTasks:list', raw); return invalidTaskPayload; }
     return remote.tasks.list(req.serverId, req.projectId);
   });
+  // Mitglieder für die Zuweisung im Task-Formular. Liegt bei remote.tasks,
+  // weil der Fehlerkatalog derselbe ist (siehe RemoteTasks.members).
+  handle('remote:members', (_e, raw: unknown) => {
+    const req = parseRemoteRef(raw);
+    if (!req) { rejectPayload('remote:members', raw); return invalidTaskPayload; }
+    return remote.tasks.members(req.serverId, req.projectId);
+  });
   handle('remoteTasks:create', (_e, raw: unknown) => {
     const req = parseRemoteTaskCreate(raw);
     if (!req) { rejectPayload('remoteTasks:create', raw); return invalidTaskPayload; }

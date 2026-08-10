@@ -8,7 +8,7 @@ import type {
   RemoteWorkspaceInfo, RemoteConnectionInfo, RemoteStatusEvent, RemoteDriverEvent,
   RemotePresenceEvent, RemoteFsListResult, RemoteFsReadResult, RemoteFsWriteResult,
   RemoteFsOkResult, ServerConfig, RemoteTaskEvent, RemoteTaskListResult, RemoteTaskResult,
-  RemoteTaskOkResult, RemoteTaskRunsResult, RemoteRunResult
+  RemoteTaskOkResult, RemoteTaskRunsResult, RemoteRunResult, RemoteMembersResult
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -182,6 +182,8 @@ const api: RendererApi = {
     ipcRenderer.invoke('remoteTasks:listRuns', { serverId, projectId, taskId }) as Promise<RemoteTaskRunsResult>,
   remoteTasksGetRun: (serverId: string, projectId: string, runId: string) =>
     ipcRenderer.invoke('remoteTasks:getRun', { serverId, projectId, runId }) as Promise<RemoteRunResult>,
+  remoteMembersList: (serverId: string, projectId: string) =>
+    ipcRenderer.invoke('remote:members', { serverId, projectId }) as Promise<RemoteMembersResult>,
   remoteTaskLogSubscribe: (serverId: string, scopeKey: string, runId: string) =>
     ipcRenderer.send('remoteTasks:logSubscribe', { serverId, scopeKey, runId }),
   remoteTaskLogUnsubscribe: (serverId: string, scopeKey: string, runId: string) =>

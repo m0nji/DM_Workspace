@@ -150,4 +150,43 @@ describe('RemoteTasks', () => {
     expect(url).toBe('https://dmw.example/api/projects/proj1/runs/r1/cancel');
     expect(init.method).toBe('POST');
   });
+
+  it('holt die Projektmitglieder und lässt nur vollständige Einträge durch', async () => {
+    // Der Owner-Picker ersetzt ein UUID-Textfeld: Ein Eintrag ohne userId oder
+    // displayName wäre eine Auswahl ohne Beschriftung bzw. ohne Wert — also
+    // aussortieren statt halb anzeigen.
+    const fetchFn = fetchOnce(200, {
+      members: [
+        { userId: 'u1', username: 'm0nji', displayName: 'Thomas', role: 'owner' },
+        { userId: 'u2', username: 'ada', displayName: 'Ada', role: 'viewer' },
+        { userId: 'u3', username: 'kaputt' },
+        'unfug'
+      ],
+      ownRole: 'owner'
+    });
+    const api = new RemoteTasks({ resolve, fetchFn });
+
+    const res = await api.members('srv1', 'proj1');
+
+    expect(res).toEqual({
+      ok: true,
+      members: [
+        { userId: 'u1', username: 'm0nji', displayName: 'Thomas', role: 'owner' },
+        { userId: 'u2', username: 'ada', displayName: 'Ada', role: 'viewer' }
+      ]
+    });
+    const [url] = (fetchFn as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]!;
+    expect(url).toBe('https://dmw.example/api/projects/proj1/members');
+  });
+
+  it('meldet eine fehlende members-Liste als Server-Fehler', async () => {
+    const api = new RemoteTasks({ resolve, fetchFn: fetchOnce(200, {}) });
+    expect(await api.members('srv1', 'proj1')).toMatchObject({ ok: false, code: 'server' });
+  });
+
+  it('reicht 403 als forbidden durch, wenn man kein Mitglied des Projekts ist', async () => {
+    const api = new RemoteTasks({ resolve, fetchFn: fetchOnce(403, { error: 'Kein Mitglied dieses Projekts' }) });
+    expect(await api.members('srv1', 'proj1'))
+      .toEqual({ ok: false, code: 'forbidden', message: 'Kein Mitglied dieses Projekts' });
+  });
 });
