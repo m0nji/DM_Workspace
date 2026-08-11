@@ -6,7 +6,8 @@ export type IconName =
   | 'command-palette' | 'settings' | 'preview' | 'search'
   | 'back' | 'forward' | 'reload' | 'folder' | 'close'
   | 'folder-open' | 'file-code' | 'file-text' | 'file-config'
-  | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit' | 'server' | 'clock';
+  | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit' | 'server' | 'clock'
+  | 'keyboard' | 'undo' | 'play';
 
 // Every icon authored on a 24×24 canvas as stroked paths so they share weight,
 // scale and optical size. Values are arrays of SVG path `d` strings.
@@ -89,7 +90,22 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   clock: [
     'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0',
     'M12 7v5l3 2'
-  ]
+  ],
+  keyboard: [
+    'M2 6m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z',
+    'M6 10l0 .01',
+    'M10 10l0 .01',
+    'M14 10l0 .01',
+    'M18 10l0 .01',
+    'M6 14l0 .01',
+    'M18 14l0 .01',
+    'M10 14l4 .01'
+  ],
+  undo: [
+    'M9 14l-4 -4l4 -4',
+    'M5 10h11a4 4 0 1 1 0 8h-1'
+  ],
+  play: ['M7 4v16l13 -8z']
 };
 
 export interface IconProps { name: IconName; size?: number; }

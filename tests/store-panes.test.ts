@@ -1,0 +1,189 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useStore } from '../src/renderer/store';
+import { registerTerminalFocus, unregisterTerminalFocus } from '../src/renderer/terminal-registry';
+import type { LayoutNode } from '../src/shared/types';
+
+const pane = (id: string): LayoutNode => ({ type: 'pane', id });
+const split = (id: string, direction: 'h' | 'v', a: LayoutNode, b: LayoutNode): LayoutNode =>
+  ({ type: 'split', id, direction, ratio: 0.5, children: [a, b] });
+
+// 2x2-Gitter:  tl | tr
+//              ---+---
+//              bl | br
+const grid = (): LayoutNode => split('s0', 'v',
+  split('s1', 'h', pane('tl'), pane('tr')),
+  split('s2', 'h', pane('bl'), pane('br')));
+
+const saveState = vi.fn();
+
+// persist() im Store schreibt ueber eine Promise-Kette; zwei Ticks reichen,
+// damit saveInFlight wieder frei ist (wie in store-workspaces.test.ts).
+const flushMicrotasks = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+describe('Pane-Navigation im Store', () => {
+  beforeEach(() => {
+    saveState.mockClear();
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { saveState, kill: vi.fn() }
+    };
+    (globalThis as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number })
+      .requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    useStore.setState({
+      version: 1,
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: grid() }],
+      activeWorkspaceId: 'w1',
+      focusedPaneId: 'tl',
+      maximizedPaneId: null,
+      settings: { themeId: 'default', terminalOpacity: 0.75 }
+    });
+  });
+
+  it('bewegt den Fokus in jede Richtung', () => {
+    useStore.getState().focusPaneInDirection('right');
+    expect(useStore.getState().focusedPaneId).toBe('tr');
+    useStore.getState().focusPaneInDirection('down');
+    expect(useStore.getState().focusedPaneId).toBe('br');
+    useStore.getState().focusPaneInDirection('left');
+    expect(useStore.getState().focusedPaneId).toBe('bl');
+    useStore.getState().focusPaneInDirection('up');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+  });
+
+  it('laesst den Fokus am Rand stehen', () => {
+    useStore.getState().focusPaneInDirection('left');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+    useStore.getState().focusPaneInDirection('up');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+  });
+
+  it('tut nichts, solange ein Pane maximiert ist', () => {
+    useStore.setState({ maximizedPaneId: 'tl' });
+    useStore.getState().focusPaneInDirection('right');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+  });
+
+  it('tut nichts ohne fokussiertes Pane', () => {
+    useStore.setState({ focusedPaneId: null });
+    useStore.getState().focusPaneInDirection('right');
+    expect(useStore.getState().focusedPaneId).toBeNull();
+  });
+
+  it('tut nichts im Willkommensbildschirm ohne Layout', () => {
+    useStore.setState({ workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: null }] });
+    useStore.getState().focusPaneInDirection('right');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+  });
+
+  // Der eigentliche Zweck der Aktion: nicht nur focusedPaneId setzen, sondern
+  // auch den DOM-Fokus per focusTerminal aufs Ziel-Pane holen. Ohne die
+  // requestAnimationFrame(() => focusTerminal(target))-Zeile wuerde nur die
+  // Markierung wandern, waehrend die Tastatureingabe im alten Terminal bliebe --
+  // das faellt aber nur auf, wenn hier tatsaechlich focusTerminal geprueft wird.
+  it('holt den DOM-Fokus per focusTerminal auf das Ziel-Pane nach', () => {
+    const trFocus = vi.fn();
+    registerTerminalFocus('tr', trFocus);
+    try {
+      useStore.getState().focusPaneInDirection('right');
+      expect(trFocus).toHaveBeenCalledTimes(1);
+    } finally {
+      unregisterTerminalFocus('tr');
+    }
+  });
+
+  it('ruft focusTerminal nicht, wenn die Bewegung bei maximiertem Pane wirkungslos bleibt', () => {
+    const trFocus = vi.fn();
+    registerTerminalFocus('tr', trFocus);
+    try {
+      useStore.setState({ maximizedPaneId: 'tl' });
+      useStore.getState().focusPaneInDirection('right');
+      expect(trFocus).not.toHaveBeenCalled();
+    } finally {
+      unregisterTerminalFocus('tr');
+    }
+  });
+});
+
+describe('Panes tauschen im Store', () => {
+  beforeEach(() => {
+    saveState.mockClear();
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { saveState, kill: vi.fn() }
+    };
+    (globalThis as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number })
+      .requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    useStore.setState({
+      version: 1,
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: grid() }],
+      activeWorkspaceId: 'w1',
+      focusedPaneId: 'tl',
+      maximizedPaneId: null,
+      settings: { themeId: 'default', terminalOpacity: 0.75 }
+    });
+  });
+
+  const paneOrder = (): string[] => {
+    const layout = useStore.getState().workspaces[0].layout;
+    const walk = (n: LayoutNode | null): string[] =>
+      n === null ? [] : n.type === 'pane' ? [n.id] : [...walk(n.children[0]), ...walk(n.children[1])];
+    return walk(layout);
+  };
+
+  it('tauscht zwei Panes im aktiven Workspace', () => {
+    useStore.getState().swapPanesInLayout('tl', 'br');
+    expect(paneOrder()).toEqual(['br', 'tr', 'bl', 'tl']);
+  });
+
+  it('laesst den Fokus auf derselben Pane-Id', () => {
+    useStore.getState().swapPanesInLayout('tl', 'br');
+    expect(useStore.getState().focusedPaneId).toBe('tl');
+  });
+
+  // persist() schreibt beim ersten Aufruf synchron, danach erst wieder, wenn
+  // der vorige Schreibvorgang aufgeloest ist (saveInFlight/pendingSave im
+  // Store). Deshalb wie in store-workspaces.test.ts die Microtasks leeren,
+  // bevor geprueft wird -- sonst haengt das Ergebnis an der Testreihenfolge.
+  it('schreibt den neuen Zustand weg', async () => {
+    await flushMicrotasks();
+    saveState.mockClear();
+    useStore.getState().swapPanesInLayout('tl', 'br');
+    await flushMicrotasks();
+    expect(saveState).toHaveBeenCalled();
+  });
+
+  // Beim Drag hat das mousedown auf dem Pane-Kopf die xterm-Textarea geblurrt,
+  // und das Umhaengen der Container nimmt sie kurz aus dem Dokument. Ohne das
+  // Nachziehen per focusTerminal sitzt der Rahmen sichtbar auf dem getauschten
+  // Pane, waehrend die Tastatureingabe ins Leere geht.
+  it('holt den DOM-Fokus nach, wenn das fokussierte Pane getauscht wurde', () => {
+    const tlFocus = vi.fn();
+    registerTerminalFocus('tl', tlFocus);
+    try {
+      useStore.getState().swapPanesInLayout('tl', 'br');
+      expect(tlFocus).toHaveBeenCalledTimes(1);
+    } finally {
+      unregisterTerminalFocus('tl');
+    }
+  });
+
+  it('laesst den Fokus in Ruhe, wenn ein unbeteiligtes Pane fokussiert ist', () => {
+    const tlFocus = vi.fn();
+    registerTerminalFocus('tl', tlFocus);
+    try {
+      useStore.setState({ focusedPaneId: 'tl' });
+      useStore.getState().swapPanesInLayout('tr', 'br');
+      expect(tlFocus).not.toHaveBeenCalled();
+    } finally {
+      unregisterTerminalFocus('tl');
+    }
+  });
+
+  it('ist wirkungslos bei gleicher oder unbekannter Id', () => {
+    useStore.getState().swapPanesInLayout('tl', 'tl');
+    expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+    useStore.getState().swapPanesInLayout('tl', 'gibtesnicht');
+    expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+  });
+});

@@ -80,6 +80,10 @@ function Label(): React.JSX.Element {
   );
 }
 
+// Eigener MIME-Typ statt text/plain: eine aus dem Terminal gezogene
+// Textauswahl traegt ihn nicht und kann deshalb keinen Tausch ausloesen.
+const PANE_DRAG_TYPE = 'application/x-dm-pane';
+
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
   const isRemote = isRemotePaneKey(paneId);
@@ -113,6 +117,8 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const [editingLabel, setEditingLabel] = React.useState(false);
   const [labelDraft, setLabelDraft] = React.useState(manualLabel);
   const labelInputRef = React.useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = React.useState(false);
+  const swapPanesInLayout = useStore((s) => s.swapPanesInLayout);
 
   React.useEffect(() => {
     if (!editingLabel) return;
@@ -121,6 +127,19 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
     labelInputRef.current?.select();
   }, [editingLabel, manualLabel]);
 
+  // Absicherung gegen haengenbleibende Hervorhebung: bricht der Nutzer den
+  // Drag per Escape ueber einem FREMDEN Pane ab, feuert dort weder dragleave
+  // noch drop -- dessen lokaler dragOver-Zustand wuerde sonst nie zurueckgesetzt.
+  // dragend feuert dagegen immer auf der Quelle und bubbelt bis window, egal wo
+  // der Zeiger steht und ob abgebrochen wurde. Der Listener laeuft nur, solange
+  // dieses Pane ueberhaupt hervorgehoben ist -- kein Dauer-Listener pro Pane.
+  React.useEffect(() => {
+    if (!dragOver) return;
+    const onDragEndAnywhere = (): void => setDragOver(false);
+    window.addEventListener('dragend', onDragEndAnywhere);
+    return () => window.removeEventListener('dragend', onDragEndAnywhere);
+  }, [dragOver]);
+
   const saveLabel = (): void => {
     setPaneTitle(paneId, labelDraft);
     setEditingLabel(false);
@@ -128,10 +147,38 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
 
   return (
     <div
-      className={`pane ${focused ? 'focused' : ''}`}
+      className={`pane ${focused ? 'focused' : ''} ${dragOver ? 'drop-target' : ''}`}
       onMouseDownCapture={() => setFocusedPane(paneId)}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(PANE_DRAG_TYPE)) return;
+        // Ohne preventDefault lehnt der Browser den Drop ab.
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // Nur raeumen, wenn der Zeiger das Pane wirklich verlaesst -- beim
+        // Wechsel zwischen Kindelementen feuert dragleave ebenfalls.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        const sourceId = e.dataTransfer.getData(PANE_DRAG_TYPE);
+        setDragOver(false);
+        if (!sourceId || sourceId === paneId) return;
+        e.preventDefault();
+        swapPanesInLayout(sourceId, paneId);
+      }}
     >
-      <div className="pane-header">
+      <div
+        className="pane-header"
+        draggable={!editingLabel}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(PANE_DRAG_TYPE, paneId);
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        onDragEnd={() => setDragOver(false)}
+      >
         <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
         <div className={`pane-heading ${label ? 'has-label' : ''}`}>
           <span className="pane-title pane-title-full" title={folder}>{folder}</span>

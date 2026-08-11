@@ -63,19 +63,33 @@ function ShortcutsSection(): React.JSX.Element {
         {SHORTCUT_DEFINITIONS.map((def) => {
           const isRecording = recording === def.action;
           const overridden = !!bindings?.[def.action];
+          const label = t(`settings.shortcuts.action.${def.action}`);
+          const recordTitle = isRecording ? t('common.cancel') : t('settings.shortcuts.record');
+          const resetTitle = t('settings.shortcuts.reset');
           return (
             <div className={`shortcut-row ${isRecording ? 'recording' : ''}`} key={def.action}>
-              <span className="shortcut-label">{t(`settings.shortcuts.action.${def.action}`)}</span>
+              <span className="shortcut-label" title={label}>{label}</span>
               <span className="shortcut-keys">
                 {isRecording
                   ? <span className="shortcut-recording">{t('settings.shortcuts.pressKeys')}</span>
                   : formatShortcutCaps(resolved[def.action], isMac).map((k, i) => <kbd className="key-cap" key={i}>{k}</kbd>)}
               </span>
-              <button className="cwd-btn" onClick={() => { setError(null); setRecording(isRecording ? null : def.action); }}>
-                {isRecording ? t('common.cancel') : t('settings.shortcuts.record')}
+              <button
+                className={`icon-btn shortcut-action ${isRecording ? 'active' : ''}`}
+                title={`${recordTitle} — ${label}`}
+                aria-label={`${recordTitle} — ${label}`}
+                onClick={() => { setError(null); setRecording(isRecording ? null : def.action); }}
+              >
+                <Icon name={isRecording ? 'close' : 'keyboard'} size={15} />
               </button>
-              <button className="cwd-btn ghost" disabled={!overridden} onClick={() => { setError(null); resetBinding(def.action); }}>
-                {t('settings.shortcuts.reset')}
+              <button
+                className="icon-btn shortcut-action"
+                title={`${resetTitle} — ${label}`}
+                aria-label={`${resetTitle} — ${label}`}
+                disabled={!overridden}
+                onClick={() => { setError(null); resetBinding(def.action); }}
+              >
+                <Icon name="undo" size={15} />
               </button>
             </div>
           );
@@ -112,15 +126,27 @@ function TemplatesSection(): React.JSX.Element {
       <div className="template-list">
         {templates.map((tpl) => {
           const cmdCount = tpl.startupCommands ? Object.keys(tpl.startupCommands).length : 0;
-          return (
+          const meta = `${tpl.cwd}${cmdCount ? ` · ${t('settings.templates.startupCommands', { count: cmdCount })}` : ''}`;
+            return (
             <div className="template-row" key={tpl.id}>
               <span className="template-info">
-                <span className="template-name">{tpl.name}</span>
-                <span className="template-meta">{tpl.cwd}{cmdCount ? ` · ${t('settings.templates.startupCommands', { count: cmdCount })}` : ''}</span>
+                <span className="template-name" title={tpl.name}>{tpl.name}</span>
+                <span className="template-meta" title={meta}>{meta}</span>
               </span>
-              <button className="cwd-btn" onClick={() => run(tpl.id)}>{t('settings.templates.run')}</button>
-              <button className="cwd-btn ghost" onClick={() => edit(tpl.id)}>{t('settings.templates.edit')}</button>
-              <button className="cwd-btn ghost danger" onClick={() => deleteTemplate(tpl.id)}>{t('settings.templates.delete')}</button>
+              <span className="row-actions">
+                <button className="icon-btn" title={`${t('settings.templates.run')} — ${tpl.name}`}
+                        aria-label={`${t('settings.templates.run')} — ${tpl.name}`} onClick={() => run(tpl.id)}>
+                  <Icon name="play" size={15} />
+                </button>
+                <button className="icon-btn" title={`${t('settings.templates.edit')} — ${tpl.name}`}
+                        aria-label={`${t('settings.templates.edit')} — ${tpl.name}`} onClick={() => edit(tpl.id)}>
+                  <Icon name="edit" size={15} />
+                </button>
+                <button className="icon-btn danger" title={`${t('settings.templates.delete')} — ${tpl.name}`}
+                        aria-label={`${t('settings.templates.delete')} — ${tpl.name}`} onClick={() => deleteTemplate(tpl.id)}>
+                  <Icon name="trash" size={15} />
+                </button>
+              </span>
             </div>
           );
         })}
@@ -271,26 +297,31 @@ function ServerRow({ server }: { server: ServerConfig }): React.JSX.Element {
 
   return (
     <div className="server-row">
-      <div className="template-row">
+      {/* Gestapelt statt nebeneinander: die Anmelde-Buttons brauchen ihre
+          Beschriftung (als Icon nicht unterscheidbar) und ließen daneben zu
+          wenig Platz — Name und URL wurden abgeschnitten. */}
+      <div className="server-head">
         <span className="template-info">
-          <span className="template-name">{server.name}</span>
-          <span className="template-meta">{server.baseUrl} · {statusLabel}</span>
+          <span className="template-name" title={server.name}>{server.name}</span>
+          <span className="template-meta" title={server.baseUrl}>{server.baseUrl} · {statusLabel}</span>
         </span>
-        {status?.loggedIn ? (
-          <button className="cwd-btn ghost" disabled={busy} onClick={logout}>{t('settings.account.logout')}</button>
-        ) : (
-          <>
-            <button className="cwd-btn" disabled={busy} onClick={() => { setError(null); setLoginOpen((v) => !v); }}>
-              {t('settings.account.login')}
-            </button>
-            <button className="cwd-btn" disabled={busy} onClick={browserLogin}>
-              {busy ? t('settings.account.waiting') : t('settings.account.loginBrowser')}
-            </button>
-          </>
-        )}
-        <button className="cwd-btn ghost danger" disabled={busy} onClick={() => removeServer(server.id)}>
-          {t('settings.account.removeServer')}
-        </button>
+        <span className="server-actions">
+          {status?.loggedIn ? (
+            <button className="cwd-btn ghost" disabled={busy} onClick={logout}>{t('settings.account.logout')}</button>
+          ) : (
+            <>
+              <button className="cwd-btn" disabled={busy} onClick={() => { setError(null); setLoginOpen((v) => !v); }}>
+                {t('settings.account.login')}
+              </button>
+              <button className="cwd-btn" disabled={busy} onClick={browserLogin}>
+                {busy ? t('settings.account.waiting') : t('settings.account.loginBrowser')}
+              </button>
+            </>
+          )}
+          <button className="cwd-btn ghost danger" disabled={busy} onClick={() => removeServer(server.id)}>
+            {t('settings.account.removeServer')}
+          </button>
+        </span>
       </div>
       {error && <div className="setting-error">{error}</div>}
       {loginOpen && !status?.loggedIn && (

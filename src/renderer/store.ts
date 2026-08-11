@@ -7,8 +7,9 @@ import type {
 } from '../shared/types';
 import type { RemoteFilesContext } from './files-api';
 import {
-  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds
+  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, swapPanes
 } from '../shared/layout-tree';
+import { findPaneInDirection, type NavDirection } from '../shared/layout-navigate';
 import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
 import { createIdGenerator } from '../shared/ids';
 import { DEFAULT_THEME_ID } from '../shared/themes';
@@ -383,6 +384,8 @@ export interface StoreState extends AppState {
   closeActivePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number, persistNow?: boolean) => void;
   toggleMaximize: (paneId: string) => void;
+  focusPaneInDirection: (direction: NavDirection) => void;
+  swapPanesInLayout: (aId: string, bId: string) => void;
   // settings
   settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
@@ -946,6 +949,52 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+
+  // Nachbar-Pane in Blickrichtung fokussieren. Anders als beim Klick gibt es
+  // hier kein mousedown auf der xterm-Textarea, das den DOM-Fokus mitnimmt --
+  // ohne focusTerminal wanderte nur die Markierung und getippt wuerde weiter
+  // im alten Terminal. rAF wie ueberall sonst, damit das Ziel-Pane sichtbar
+  // und vermessen ist, bevor der Fokus gesetzt wird.
+  focusPaneInDirection: (direction) => {
+    const s = get();
+    // Maximiert ist sichtbar genau ein Pane -- "links davon" gibt es nicht.
+    if (s.maximizedPaneId || !s.focusedPaneId) return;
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws?.layout) return;
+    const target = findPaneInDirection(ws.layout, s.focusedPaneId, direction);
+    if (!target || target === s.focusedPaneId) return;
+    set({ focusedPaneId: target });
+    requestAnimationFrame(() => focusTerminal(target));
+  },
+
+  // Zwei Panes tauschen die Plaetze. Der Fokus bleibt bewusst auf derselben
+  // Pane-Id -- getauscht wird die Position, nicht der Inhalt, und das
+  // fokussierte Terminal ist danach dasselbe (nur woanders).
+  swapPanesInLayout: (aId, bId) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws?.layout || aId === bId) return s;
+    const ids = collectPaneIds(ws.layout);
+    if (!ids.includes(aId) || !ids.includes(bId)) return s;
+    const workspaces = s.workspaces.map((w) =>
+      w.id === ws.id ? { ...w, layout: swapPanes(ws.layout!, aId, bId) } : w);
+    // Sind die getauschten Plaetze unterschiedlich gross, aendern beide
+    // Terminals ihre Groesse -- wie beim Split einmal atomar nachziehen,
+    // statt allein auf das Timing des ResizeObserver zu bauen.
+    refreshTerminalLayoutAfterCommit(aId);
+    refreshTerminalLayoutAfterCommit(bId);
+    // War das fokussierte Pane am Tausch beteiligt, ist sein DOM-Fokus weg:
+    // das mousedown auf dem Kopf hat die Textarea geblurrt, und beim Umhaengen
+    // nimmt replaceChildren beide Container kurz aus dem Dokument. Ohne dieses
+    // Nachziehen zeigt der Rahmen auf ein Pane, in das man nicht tippen kann.
+    // rAF wie bei den anderen Layout-Mutationen, damit das Ziel am neuen Platz
+    // steht, bevor der Fokus gesetzt wird.
+    const focus = s.focusedPaneId;
+    if (focus === aId || focus === bId) requestAnimationFrame(() => focusTerminal(focus));
+    const next = { ...s, workspaces };
+    persist(next);
+    return next;
+  }),
+
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),
 

@@ -123,6 +123,14 @@ export function buildCommandList({
         run: act(() => s.requestClosePane(focusedPaneId))
       }
     );
+    // Fokuswechsel zwischen Panes: dieselbe Sichtbarkeitsregel wie die
+    // uebrigen Pane-Aktionen (nur bei fokussiertem Pane, lokal wie remote).
+    list.push(
+      { id: 'focus-pane-left', title: t('palette.cmd.focusPaneLeft'), category: catActions, hint: hint('focusPaneLeft'), run: act(() => s.focusPaneInDirection('left')) },
+      { id: 'focus-pane-right', title: t('palette.cmd.focusPaneRight'), category: catActions, hint: hint('focusPaneRight'), run: act(() => s.focusPaneInDirection('right')) },
+      { id: 'focus-pane-up', title: t('palette.cmd.focusPaneUp'), category: catActions, hint: hint('focusPaneUp'), run: act(() => s.focusPaneInDirection('up')) },
+      { id: 'focus-pane-down', title: t('palette.cmd.focusPaneDown'), category: catActions, hint: hint('focusPaneDown'), run: act(() => s.focusPaneInDirection('down')) }
+    );
   }
 
   list.push(

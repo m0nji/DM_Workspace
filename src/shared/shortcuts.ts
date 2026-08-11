@@ -14,7 +14,11 @@ export const SHORTCUT_ACTIONS = [
   'splitVertical',
   'toggleMaximize',
   'openSettings',
-  'togglePreview'
+  'togglePreview',
+  'focusPaneLeft',
+  'focusPaneRight',
+  'focusPaneUp',
+  'focusPaneDown'
 ] as const;
 
 export type ShortcutAction = typeof SHORTCUT_ACTIONS[number];
@@ -39,7 +43,13 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { action: 'splitVertical', label: 'Split top and bottom', macDefault: 'Mod+Shift+D', otherDefault: 'Mod+Alt+Shift+D' },
   { action: 'toggleMaximize', label: 'Maximize focused pane', macDefault: 'Mod+Enter', otherDefault: 'Mod+Enter' },
   { action: 'openSettings', label: 'Open settings', macDefault: 'Mod+Comma', otherDefault: 'Mod+Comma' },
-  { action: 'togglePreview', label: 'Toggle preview panel', macDefault: 'Mod+Shift+M', otherDefault: 'Mod+Shift+M' }
+  { action: 'togglePreview', label: 'Toggle preview panel', macDefault: 'Mod+Shift+M', otherDefault: 'Mod+Shift+M' },
+  // Same combo on every platform: easier to remember, and it leaves the bare
+  // Ctrl+Arrow word-jump free for the shell on Windows/Linux.
+  { action: 'focusPaneLeft', label: 'Focus pane left', macDefault: 'Mod+Shift+ArrowLeft', otherDefault: 'Mod+Shift+ArrowLeft' },
+  { action: 'focusPaneRight', label: 'Focus pane right', macDefault: 'Mod+Shift+ArrowRight', otherDefault: 'Mod+Shift+ArrowRight' },
+  { action: 'focusPaneUp', label: 'Focus pane up', macDefault: 'Mod+Shift+ArrowUp', otherDefault: 'Mod+Shift+ArrowUp' },
+  { action: 'focusPaneDown', label: 'Focus pane down', macDefault: 'Mod+Shift+ArrowDown', otherDefault: 'Mod+Shift+ArrowDown' }
 ];
 
 const MODIFIERS = ['Mod', 'Alt', 'Shift'] as const;
@@ -52,6 +62,10 @@ function normalizeToken(part: string): string {
   if (lower === ',' || lower === 'comma') return 'Comma';
   if (lower === 'esc' || lower === 'escape') return 'Escape';
   if (lower === ' ' || lower === 'space' || lower === 'spacebar') return 'Space';
+  if (lower === 'arrowleft' || lower === 'left') return 'ArrowLeft';
+  if (lower === 'arrowright' || lower === 'right') return 'ArrowRight';
+  if (lower === 'arrowup' || lower === 'up') return 'ArrowUp';
+  if (lower === 'arrowdown' || lower === 'down') return 'ArrowDown';
   if (lower.length === 1) return lower.toUpperCase();
   return lower[0].toUpperCase() + lower.slice(1);
 }
@@ -123,7 +137,8 @@ function keyTokenFromCode(code: string): string | null {
   const map: Record<string, string> = {
     Comma: 'Comma', Period: 'Period', Slash: 'Slash', Backslash: 'Backslash',
     Enter: 'Enter', NumpadEnter: 'Enter', Space: 'Space', Escape: 'Escape',
-    Minus: 'Minus', Equal: 'Equal'
+    Minus: 'Minus', Equal: 'Equal',
+    ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown'
   };
   return map[code] ?? null;
 }
@@ -148,8 +163,8 @@ export function shortcutMatches(e: ShortcutLikeEvent, binding: string, isMac: bo
   return actual !== null && actual === normalizeShortcut(binding);
 }
 
-const MAC_SYMBOLS: Record<string, string> = { Mod: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↩', Comma: ',', Escape: '⎋', Space: '␣' };
-const PC_LABELS: Record<string, string> = { Mod: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Enter: 'Enter', Comma: ',', Escape: 'Esc', Space: 'Space' };
+const MAC_SYMBOLS: Record<string, string> = { Mod: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↩', Comma: ',', Escape: '⎋', Space: '␣', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
+const PC_LABELS: Record<string, string> = { Mod: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Enter: 'Enter', Comma: ',', Escape: 'Esc', Space: 'Space', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
 
 // Per-key display tokens of a normalized binding, e.g. ['⌘','⇧','P'] on macOS or
 // ['Ctrl','Shift','P'] elsewhere. Multi-character keys (F5, Tab, ArrowLeft) stay

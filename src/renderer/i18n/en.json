@@ -123,7 +123,11 @@
         "splitVertical": "Split top and bottom",
         "toggleMaximize": "Maximize focused pane",
         "openSettings": "Open settings",
-        "togglePreview": "Toggle preview panel"
+        "togglePreview": "Toggle preview panel",
+        "focusPaneLeft": "Focus pane to the left",
+        "focusPaneRight": "Focus pane to the right",
+        "focusPaneUp": "Focus pane above",
+        "focusPaneDown": "Focus pane below"
       }
     },
     "templates": {
@@ -183,6 +187,10 @@
       "toggleMaximize": "Toggle focused pane maximize",
       "searchPane": "Search focused pane",
       "closePane": "Close focused pane",
+      "focusPaneLeft": "Focus the pane to the left",
+      "focusPaneRight": "Focus the pane to the right",
+      "focusPaneUp": "Focus the pane above",
+      "focusPaneDown": "Focus the pane below",
       "togglePreview": "Toggle preview panel",
       "openFileBrowser": "Open file browser",
       "openSettings": "Open settings",

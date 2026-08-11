@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset, swapPanes } from '../src/shared/layout-tree';
 import type { SplitNode } from '../src/shared/types';
 
 describe('createIdGenerator', () => {
@@ -178,5 +178,55 @@ describe('makePreset', () => {
     expect(tree.children[0].children[1].direction).toBe('h');
     expect(tree.children[1].children[0].direction).toBe('h');
     expect(tree.children[1].children[1].direction).toBe('h');
+  });
+});
+
+describe('swapPanes', () => {
+  // 2x2-Gitter:  tl | tr
+  //              ---+---
+  //              bl | br
+  const grid = (): SplitNode => ({
+    type: 'split', id: 's0', direction: 'v', ratio: 0.4,
+    children: [
+      { type: 'split', id: 's1', direction: 'h', ratio: 0.3, children: [makePane('tl'), makePane('tr')] },
+      { type: 'split', id: 's2', direction: 'h', ratio: 0.6, children: [makePane('bl'), makePane('br')] }
+    ]
+  });
+
+  it('tauscht zwei Panes ueber Split-Grenzen hinweg', () => {
+    const result = swapPanes(grid(), 'tl', 'br');
+    expect(collectPaneIds(result)).toEqual(['br', 'tr', 'bl', 'tl']);
+  });
+
+  it('laesst Split-Ids, Richtungen und Ratios unangetastet', () => {
+    const result = swapPanes(grid(), 'tl', 'br') as SplitNode;
+    expect(result.id).toBe('s0');
+    expect(result.direction).toBe('v');
+    expect(result.ratio).toBe(0.4);
+    expect((result.children[0] as SplitNode).ratio).toBe(0.3);
+    expect((result.children[1] as SplitNode).ratio).toBe(0.6);
+  });
+
+  it('tauscht auch Geschwister innerhalb desselben Splits', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(collectPaneIds(swapPanes(tree, 'a', 'b'))).toEqual(['b', 'a']);
+  });
+
+  it('ist wirkungslos, wenn beide Ids gleich sind', () => {
+    const tree = grid();
+    expect(swapPanes(tree, 'tl', 'tl')).toBe(tree);
+  });
+
+  it('ist wirkungslos bei einer unbekannten Id', () => {
+    const tree = grid();
+    expect(swapPanes(tree, 'tl', 'gibtesnicht')).toBe(tree);
+    expect(swapPanes(tree, 'gibtesnicht', 'br')).toBe(tree);
+  });
+
+  it('gibt unveraenderte Teilbaeume referenzgleich zurueck', () => {
+    const tree = grid();
+    const result = swapPanes(tree, 'tl', 'tr') as SplitNode;
+    // Nur der obere Split aendert sich; der untere bleibt dasselbe Objekt.
+    expect(result.children[1]).toBe(tree.children[1]);
   });
 });

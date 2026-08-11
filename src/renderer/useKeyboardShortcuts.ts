@@ -64,6 +64,25 @@ export function useKeyboardShortcuts(): void {
       // Exact matching disambiguates the two split bindings (vertical carries an extra modifier).
       if (is('splitVertical')) { if (s.focusedPaneId) { stop(); s.splitActivePane(s.focusedPaneId, 'v'); } return; }
       if (is('splitHorizontal')) { if (s.focusedPaneId) { stop(); s.splitActivePane(s.focusedPaneId, 'h'); } return; }
+      // Mod+Shift+Arrow is also the platform's own text-selection shortcut
+      // (⌘⇧←/→ to line start/end on mac, Ctrl+Shift+Arrow by word elsewhere), so
+      // inside a real editable the selection must win and the key has to travel
+      // on untouched — no stop() on that path. Editables outside a modal
+      // (FileEditor, the pane SearchBar, the command palette input) would
+      // otherwise never see the keystroke at all, because this handler runs in
+      // the capture phase on window.
+      // xterm's helper textarea is not a field the user edits — excluding it
+      // keeps the shortcut working exactly where it is meant to work.
+      const editable = (e.target as HTMLElement | null)
+        ?.closest?.('input, textarea:not(.xterm-helper-textarea), [contenteditable="true"]');
+      if (!editable) {
+        // stop() here too: outside an editable, an arrow key would otherwise
+        // also reach the terminal as an escape sequence.
+        if (is('focusPaneLeft')) { stop(); s.focusPaneInDirection('left'); return; }
+        if (is('focusPaneRight')) { stop(); s.focusPaneInDirection('right'); return; }
+        if (is('focusPaneUp')) { stop(); s.focusPaneInDirection('up'); return; }
+        if (is('focusPaneDown')) { stop(); s.focusPaneInDirection('down'); return; }
+      }
     };
     // Capture phase so we intercept before xterm's textarea handler.
     window.addEventListener('keydown', handler, true);

@@ -186,3 +186,47 @@ describe('shortcutMatches', () => {
     )).toBe(false);
   });
 });
+
+describe('Pfeiltasten-Kuerzel fuer den Fokuswechsel', () => {
+  it('normalisiert Pfeil-Aliasse auf ein stabiles Token', () => {
+    expect(normalizeShortcut('Mod+Shift+ArrowLeft')).toBe('Mod+Shift+ArrowLeft');
+    expect(normalizeShortcut('ctrl+shift+arrowright')).toBe('Mod+Shift+ArrowRight');
+    expect(normalizeShortcut('cmd+shift+up')).toBe('Mod+Shift+ArrowUp');
+    expect(normalizeShortcut('mod+shift+down')).toBe('Mod+Shift+ArrowDown');
+  });
+
+  it('setzt auf beiden Plattformen dieselben Defaults', () => {
+    const mac = getDefaultShortcuts(true);
+    const pc = getDefaultShortcuts(false);
+    expect(mac.focusPaneLeft).toBe('Mod+Shift+ArrowLeft');
+    expect(mac.focusPaneRight).toBe('Mod+Shift+ArrowRight');
+    expect(mac.focusPaneUp).toBe('Mod+Shift+ArrowUp');
+    expect(mac.focusPaneDown).toBe('Mod+Shift+ArrowDown');
+    expect(pc.focusPaneLeft).toBe(mac.focusPaneLeft);
+    expect(pc.focusPaneDown).toBe(mac.focusPaneDown);
+  });
+
+  it('leitet das Token aus dem physischen code ab', () => {
+    const ev = { key: 'ArrowLeft', code: 'ArrowLeft', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true };
+    expect(shortcutFromEvent(ev, false)).toBe('Mod+Shift+ArrowLeft');
+    expect(shortcutMatches(ev, 'Mod+Shift+ArrowLeft', false)).toBe(true);
+  });
+
+  it('zeigt Pfeile als Symbol statt als Wort', () => {
+    expect(formatShortcutCaps('Mod+Shift+ArrowLeft', true)).toEqual(['⌘', '⇧', '←']);
+    expect(formatShortcutCaps('Mod+Shift+ArrowRight', false)).toEqual(['Ctrl', 'Shift', '→']);
+    expect(formatShortcutCaps('Mod+Shift+ArrowUp', false)).toEqual(['Ctrl', 'Shift', '↑']);
+    expect(formatShortcutCaps('Mod+Shift+ArrowDown', false)).toEqual(['Ctrl', 'Shift', '↓']);
+  });
+
+  it('sind unter Windows nicht fuer das Terminal reserviert', () => {
+    expect(isReservedTerminalShortcut('Mod+Shift+ArrowLeft', false)).toBe(false);
+  });
+
+  it('kollidieren nicht mit den bestehenden Kuerzeln', () => {
+    const pc = getDefaultShortcuts(false);
+    expect(isShortcutConflict('Mod+Shift+ArrowLeft', 'focusPaneLeft', pc)).toBe(false);
+    // Gegenprobe: eine bereits vergebene Kombination wird erkannt.
+    expect(isShortcutConflict('Mod+Shift+ArrowRight', 'focusPaneLeft', pc)).toBe(true);
+  });
+});

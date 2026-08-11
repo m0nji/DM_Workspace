@@ -104,6 +104,34 @@ export function setRatio(node: LayoutNode, splitId: string, ratio: number): Layo
   return { ...node, children: [a, b] };
 }
 
+/**
+ * Exchange the positions of two panes. Split ids, directions and ratios stay
+ * untouched — only the two `PaneNode`s trade places.
+ *
+ * What travels is the pane ID, and everything keyed by it comes along: the
+ * terminal (pane-host.ts holds one stable container per id and MOVES it rather
+ * than remounting), the title, the cwd. So this reorders the layout without
+ * restarting a single shell.
+ */
+export function swapPanes(node: LayoutNode, aId: string, bId: string): LayoutNode {
+  if (aId === bId) return node;
+  const ids = collectPaneIds(node);
+  if (!ids.includes(aId) || !ids.includes(bId)) return node;
+
+  const walk = (n: LayoutNode): LayoutNode => {
+    if (n.type === 'pane') {
+      if (n.id === aId) return makePane(bId);
+      if (n.id === bId) return makePane(aId);
+      return n;
+    }
+    const a = walk(n.children[0]);
+    const b = walk(n.children[1]);
+    if (a === n.children[0] && b === n.children[1]) return n; // unchanged subtree
+    return { ...n, children: [a, b] };
+  };
+  return walk(node);
+}
+
 function split(id: string, direction: Direction, a: LayoutNode, b: LayoutNode): SplitNode {
   return { type: 'split', id, direction, ratio: 0.5, children: [a, b] };
 }

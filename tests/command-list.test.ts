@@ -184,4 +184,20 @@ describe('buildCommandList', () => {
     connectRemoteWithFeatures([]);
     expect(ids()).not.toContain('tasks-open');
   });
+
+  it('listet alle vier Richtungen mit Kuerzel-Hinweis', () => {
+    const list = build();
+    expect(list.map((c) => c.id)).toEqual(expect.arrayContaining([
+      'focus-pane-left', 'focus-pane-right', 'focus-pane-up', 'focus-pane-down'
+    ]));
+    const left = list.find((c) => c.id === 'focus-pane-left');
+    expect(left?.title).toBe('palette.cmd.focusPaneLeft');
+    // build() laeuft mit isMac: false
+    expect(left?.hint).toBe('Ctrl+Shift+←');
+  });
+
+  it('listet sie nicht ohne fokussiertes Pane', () => {
+    useStore.setState({ focusedPaneId: null });
+    expect(ids()).not.toContain('focus-pane-left');
+  });
 });

@@ -2,7 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
-## Unreleased
+## 0.13.0 – 2026-08-11
+- feat: A pane's focus can now move by keyboard alone. `Mod+Shift+Left/Right/Up/Down` (Cmd on macOS, Ctrl elsewhere) moves focus to the neighboring pane in that direction, and typing continues in the new pane without needing a click first. Wrap-around is deliberately left out — pressing left at the left edge does nothing — and a maximized pane ignores the shortcut entirely, since there is nothing else on screen to move to. The four shortcuts show up in Settings → Keyboard shortcuts and in the command palette, and can be rebound like any other shortcut
+- feat: Two panes can be swapped by dragging one pane's header onto another. The terminal moves with its pane — the running shell and its scrollback survive the swap rather than being closed and started fresh — so a swap is a pure rearrangement, not a restart. Only a direct swap between two panes is supported; a pane cannot be dropped into a new spot in the layout tree
 
 ## 0.12.0 – 2026-08-10
 - change: A scheduled task's schedule can be adjusted after you pick it. The list offered finished templates — "Weekly, Monday 03:00" among them — and wanting anything else, a Tuesday instead of a Monday, meant falling back on "Custom cron expression" and writing `0 3 * * 2` by hand. That list is now a list of frequencies, and the fields belonging to the chosen one sit below it, filled in and editable: a weekday and a time for a weekly task, a time for a daily one, a minute for an hourly one. A new weekly task still starts at Monday 03:00; moving it to Tuesday is now a dropdown. Editing works the same way round — a task saved as `0 3 * * 2` opens as Tuesday, 03:00, rather than as an expression. A schedule that doesn't fit the pattern, one with a list or a step in it, still opens as "Custom cron expression" with its text untouched, so opening and saving a hand-written schedule cannot quietly destroy it

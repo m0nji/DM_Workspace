@@ -629,6 +629,11 @@ input[type="checkbox"]:checked::after {
 .pane { display: flex; flex-direction: column; border: 1px solid var(--border);
   border-radius: var(--radius-control); overflow: hidden; min-width: 0; min-height: 0; height: 100%;
   background: var(--dm-pane-bg); }
+/* Drop-Ziel beim Verschieben eines Panes. Innerer Schein statt Rahmen, damit
+   die Pane-Groesse sich waehrend des Drags nicht aendert. */
+.pane.drop-target { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pane-header[draggable="true"] { cursor: grab; }
+.pane-header[draggable="true"]:active { cursor: grabbing; }
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
   background: var(--dm-pane-header); border-bottom: 1px solid var(--border);
   container: pane-header / inline-size; }
@@ -921,30 +926,40 @@ body.drag-active webview { pointer-events: none; }
 
 /* ── Settings: shortcuts & templates ────────────────────────────────────── */
 .shortcut-list, .template-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+/* `minmax(0, 1fr)` statt `1fr`: sonst weigert sich die Label-Spalte zu
+   schrumpfen und lange Übersetzungen (DE) schieben die Zeile aus dem Dialog.
+   Aktionen sind Icon-Buttons, damit auch bei langen Labels Platz bleibt. */
 .shortcut-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 .shortcut-row.recording { border-color: var(--accent); }
-.shortcut-label { font-size: 13px; white-space: nowrap; }
-.shortcut-keys { display: inline-flex; gap: 3px; }
+.shortcut-label { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shortcut-keys { display: inline-flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.shortcut-action { width: 26px; height: 26px; flex-shrink: 0; }
+.shortcut-action:disabled { opacity: .35; cursor: default; }
+.shortcut-action:disabled:hover { color: var(--muted); background: none; }
 .key-cap {
   background: var(--input); border: 1px solid var(--border-strong); border-bottom-width: 2px;
-  border-radius: 5px; padding: 2px 6px; font-size: 11px;
+  border-radius: 5px; padding: 2px 5px; font-size: 11px; white-space: nowrap;
   font-family: ui-monospace, monospace; color: var(--text);
 }
 .shortcut-recording { color: var(--accent); font-size: 12px; }
 .cwd-btn.ghost:disabled { opacity: 0.4; cursor: default; }
 .setting-error { color: var(--danger); font-size: 11px; margin: -2px 0 10px; }
-.template-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
-  padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+/* minmax(0, 1fr) wie bei .shortcut-row: `1fr` schrumpft sonst nicht unter die
+   Inhaltsbreite und lange Namen schieben sich unter die Buttons. */
+.template-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+.row-actions { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.icon-btn.danger:hover:not(:disabled) { color: var(--danger-hover); }
 .template-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.template-name { font-size: 13px; }
+.template-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .template-meta { color: var(--muted); font-size: 11px; font-family: Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .add-template { width: 100%; background: transparent; border: 1px dashed var(--border); color: var(--muted);
   border-radius: 8px; padding: 9px; cursor: pointer; font-size: 13px; margin-bottom: 4px; }
@@ -1204,6 +1219,11 @@ body.drag-active webview { pointer-events: none; }
 
 /* Konto & Server (Settings) + Remote-Workspace-Dialog */
 .server-row { display: flex; flex-direction: column; gap: 6px; }
+/* Gestapelt: die Anmelde-Buttons tragen Text und ließen daneben zu wenig
+   Platz für Name und URL. */
+.server-head { display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.server-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .server-login-form { display: flex; gap: 6px; align-items: center; margin: 4px 0 8px; }
 .server-login-form .wizard-input { flex: 1; width: auto; }
 .remote-ws-modal { min-width: 480px; }

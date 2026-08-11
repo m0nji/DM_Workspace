@@ -123,7 +123,11 @@
         "splitVertical": "Oben und unten teilen",
         "toggleMaximize": "Fokussierten Bereich maximieren",
         "openSettings": "Einstellungen öffnen",
-        "togglePreview": "Vorschau-Bereich umschalten"
+        "togglePreview": "Vorschau-Bereich umschalten",
+        "focusPaneLeft": "Fokus nach links",
+        "focusPaneRight": "Fokus nach rechts",
+        "focusPaneUp": "Fokus nach oben",
+        "focusPaneDown": "Fokus nach unten"
       }
     },
     "templates": {
@@ -183,6 +187,10 @@
       "toggleMaximize": "Fokussierten Bereich maximieren umschalten",
       "searchPane": "Fokussierten Bereich durchsuchen",
       "closePane": "Fokussierten Bereich schließen",
+      "focusPaneLeft": "Fokus auf den Bereich links",
+      "focusPaneRight": "Fokus auf den Bereich rechts",
+      "focusPaneUp": "Fokus auf den Bereich darüber",
+      "focusPaneDown": "Fokus auf den Bereich darunter",
       "togglePreview": "Vorschau-Bereich umschalten",
       "openFileBrowser": "Datei-Browser öffnen",
       "openSettings": "Einstellungen öffnen",
