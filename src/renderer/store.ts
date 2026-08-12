@@ -325,6 +325,11 @@ export interface StoreState extends AppState {
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
   focusedPaneId: string | null;
+  // Am Kopf gegriffenes Pane, solange ein Drag läuft — sonst null. Global statt
+  // lokal, weil während des Drags JEDES Pane seine Rolle kennen muss (Quelle,
+  // Drop-Ziel, unbeteiligt) und der Hinweis auf dem Ziel die Quelle beim Namen
+  // nennt. Transient: nichts davon wird persistiert.
+  draggingPaneId: string | null;
   // Offene Rückfrage vor dem Schließen. `remote` unterscheidet nur den Text und
   // den Vollzug — der Dialog selbst ist für beide Fälle derselbe (App.tsx), damit
   // kein Einstiegspunkt still an der Rückfrage vorbeikommt.
@@ -395,6 +400,7 @@ export interface StoreState extends AppState {
   setPaneCwd: (paneId: string, cwd: string) => void;
   setPaneAutoTitle: (paneId: string, title: string) => void;
   setFocusedPane: (paneId: string) => void;
+  setDraggingPane: (paneId: string | null) => void;
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
   setWorkspaceColor: (id: string, color: string) => void;
@@ -585,6 +591,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneCwd: {},
   paneAutoTitles: {},
   focusedPaneId: null,
+  draggingPaneId: null,
   pendingClosePane: null,
   windowFocused: true,
   searchOpenPaneId: null,
@@ -949,6 +956,13 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+
+  // Gesetzt im dragstart des Pane-Kopfes, geräumt im dragend. dragend feuert
+  // immer auf der Quelle — auch bei Abbruch per Escape und auch, wenn der
+  // Zeiger das Fenster verlassen hat. Der Tausch selbst räumt bewusst NICHT
+  // mit: er findet nur beim erfolgreichen Drop statt, das dragend dagegen
+  // immer, und zwei Zuständige für dasselbe Aufräumen wären einer zu viel.
+  setDraggingPane: (paneId) => set({ draggingPaneId: paneId }),
 
   // Nachbar-Pane in Blickrichtung fokussieren. Anders als beim Klick gibt es
   // hier kein mousedown auf der xterm-Textarea, das den DOM-Fokus mitnimmt --

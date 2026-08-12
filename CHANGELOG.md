@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.13.1 – 2026-08-12
+- change: Dragging a pane by its header now shows what is about to happen. The only feedback used to be a hairline around the pane under the cursor, easily missed on a full layout. While a drag is running, the panes not taking part step back behind a soft blur, the pane in your hand stays sharp and outlined in the accent colour, and the pane you are hovering is ringed and labelled "Swap with …", naming the pane that would move into its place — because a drop swaps two panes rather than inserting one, and nothing in the old highlight said so
+- fix: A pane being dragged no longer highlights itself as a drop target. Picking up a pane immediately marked it as a valid place to drop, for the whole duration of the drag, although releasing there does nothing at all. Hovering the pane you are dragging now shows the "cannot drop here" cursor instead
+
 ## 0.13.0 – 2026-08-11
 - feat: A pane's focus can now move by keyboard alone. `Mod+Shift+Left/Right/Up/Down` (Cmd on macOS, Ctrl elsewhere) moves focus to the neighboring pane in that direction, and typing continues in the new pane without needing a click first. Wrap-around is deliberately left out — pressing left at the left edge does nothing — and a maximized pane ignores the shortcut entirely, since there is nothing else on screen to move to. The four shortcuts show up in Settings → Keyboard shortcuts and in the command palette, and can be rebound like any other shortcut
 - feat: Two panes can be swapped by dragging one pane's header onto another. The terminal moves with its pane — the running shell and its scrollback survive the swap rather than being closed and started fresh — so a swap is a pure rearrangement, not a restart. Only a direct swap between two panes is supported; a pane cannot be dropped into a new spot in the layout tree

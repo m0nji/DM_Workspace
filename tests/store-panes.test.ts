@@ -37,6 +37,7 @@ describe('Pane-Navigation im Store', () => {
       activeWorkspaceId: 'w1',
       focusedPaneId: 'tl',
       maximizedPaneId: null,
+      draggingPaneId: null,
       settings: { themeId: 'default', terminalOpacity: 0.75 }
     });
   });
@@ -120,6 +121,7 @@ describe('Panes tauschen im Store', () => {
       activeWorkspaceId: 'w1',
       focusedPaneId: 'tl',
       maximizedPaneId: null,
+      draggingPaneId: null,
       settings: { themeId: 'default', terminalOpacity: 0.75 }
     });
   });
@@ -185,5 +187,31 @@ describe('Panes tauschen im Store', () => {
     expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
     useStore.getState().swapPanesInLayout('tl', 'gibtesnicht');
     expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+  });
+
+  // Waehrend eines Drags braucht JEDES Pane die Id der Quelle: nur damit kann
+  // es entscheiden, ob es selbst gegriffen ist, Drop-Ziel oder unbeteiligt --
+  // und der Hinweis auf dem Ziel nennt die Quelle beim Namen.
+  describe('draggingPaneId', () => {
+    it('ist ohne laufenden Drag null', () => {
+      expect(useStore.getState().draggingPaneId).toBeNull();
+    });
+
+    it('merkt sich die Quelle und raeumt sie wieder ab', () => {
+      useStore.getState().setDraggingPane('tl');
+      expect(useStore.getState().draggingPaneId).toBe('tl');
+      useStore.getState().setDraggingPane(null);
+      expect(useStore.getState().draggingPaneId).toBeNull();
+    });
+
+    // Abgeraeumt wird im dragend, nicht im Tausch: dragend feuert auch dann,
+    // wenn gar nicht abgelegt wurde (Escape, Drop ins Leere). Wuerde der Tausch
+    // mitraeumen, gaebe es zwei Zustaendige fuer dieselbe Sache.
+    it('bleibt vom Tausch selbst unberuehrt', () => {
+      useStore.getState().setDraggingPane('tl');
+      useStore.getState().swapPanesInLayout('tl', 'br');
+      expect(useStore.getState().draggingPaneId).toBe('tl');
+      useStore.getState().setDraggingPane(null);
+    });
   });
 });

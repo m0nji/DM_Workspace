@@ -340,6 +340,8 @@
     "splitVertical": "Split into top & bottom",
     "maximize": "Maximize",
     "restore": "Restore",
+    "swapWith": "Swap with “{{name}}”",
+    "swapWithUnnamed": "Swap into this spot",
     "closeTitle": "Close window?",
     "closeMessage": "This window and its running terminal process will be closed.",
     "closeConfirm": "Close window",

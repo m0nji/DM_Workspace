@@ -8,6 +8,7 @@ import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
 import { basename } from '../../shared/fs-path';
 import { isRemotePaneKey } from '../../shared/remote-pane-key';
+import { paneDisplayName } from '../pane-display-name';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -80,6 +81,19 @@ function Label(): React.JSX.Element {
   );
 }
 
+// Zwei gegenlaeufige Pfeile — die Aktion ist ein Tausch, kein Einsetzen.
+// Groesser als die Kopf-Icons, weil dieses hier allein in der Pane-Mitte steht.
+function Swap(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 16 16" {...svg}>
+      <path d="M2.5 5.5h9" />
+      <path d="M9.5 3.5l2 2-2 2" />
+      <path d="M13.5 10.5h-9" />
+      <path d="M6.5 8.5l-2 2 2 2" />
+    </svg>
+  );
+}
+
 // Eigener MIME-Typ statt text/plain: eine aus dem Terminal gezogene
 // Textauswahl traegt ihn nicht und kann deshalb keinen Tausch ausloesen.
 const PANE_DRAG_TYPE = 'application/x-dm-pane';
@@ -119,6 +133,20 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const labelInputRef = React.useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = React.useState(false);
   const swapPanesInLayout = useStore((s) => s.swapPanesInLayout);
+  const setDraggingPane = useStore((s) => s.setDraggingPane);
+  const draggingPaneId = useStore((s) => s.draggingPaneId);
+  // Der Hinweis auf dem Drop-Ziel nennt die QUELLE beim Namen. Deren
+  // Beschriftung steht nicht in den Props dieses Panes -- sie kommt aus
+  // denselben Selektoren, mit denen ein Pane sonst nur sich selbst beschriftet.
+  const dragSourceName = useStore((s) => {
+    const id = s.draggingPaneId;
+    if (!id) return '';
+    const manual = s.workspaces.find((w) => w.paneTitles?.[id])?.paneTitles?.[id] ?? '';
+    return paneDisplayName(manual || s.paneAutoTitles[id] || '', s.paneCwd[id] ?? '');
+  });
+  const isDragSource = draggingPaneId === paneId;
+  // Unbeteiligt ist, wer waehrend eines Drags weder gegriffen noch Ziel ist.
+  const isBystander = draggingPaneId !== null && !isDragSource && !dragOver;
 
   React.useEffect(() => {
     if (!editingLabel) return;
@@ -140,6 +168,16 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
     return () => window.removeEventListener('dragend', onDragEndAnywhere);
   }, [dragOver]);
 
+  // Zweite Absicherung, diesmal fuer den globalen Zustand: verschwindet die
+  // Quelle mitten im Drag (Pane geschlossen, Workspace gewechselt), feuert ihr
+  // dragend nie und draggingPaneId bliebe stehen -- die ganze Oberflaeche
+  // bliebe unscharf. Beim Tausch greift das nicht, dort bleibt dieses
+  // Component montiert (siehe pane-host.ts).
+  React.useEffect(() => {
+    if (!isDragSource) return;
+    return () => setDraggingPane(null);
+  }, [isDragSource, setDraggingPane]);
+
   const saveLabel = (): void => {
     setPaneTitle(paneId, labelDraft);
     setEditingLabel(false);
@@ -147,10 +185,19 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
 
   return (
     <div
-      className={`pane ${focused ? 'focused' : ''} ${dragOver ? 'drop-target' : ''}`}
+      className={['pane',
+        focused ? 'focused' : '',
+        dragOver ? 'drop-target' : '',
+        isDragSource ? 'drag-source' : '',
+        isBystander ? 'drag-bystander' : ''].filter(Boolean).join(' ')}
       onMouseDownCapture={() => setFocusedPane(paneId)}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(PANE_DRAG_TYPE)) return;
+        // Auf dem gegriffenen Pane selbst bewusst NICHT preventDefault: dann
+        // lehnt Chromium den Drop von sich aus ab und zeigt den
+        // "nicht ablegen"-Zeiger, statt einen Tausch zu versprechen, den onDrop
+        // ohnehin verwirft.
+        if (isDragSource) return;
         // Ohne preventDefault lehnt der Browser den Drop ab.
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
@@ -176,8 +223,12 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         onDragStart={(e) => {
           e.dataTransfer.setData(PANE_DRAG_TYPE, paneId);
           e.dataTransfer.effectAllowed = 'move';
+          setDraggingPane(paneId);
         }}
-        onDragEnd={() => setDragOver(false)}
+        onDragEnd={() => {
+          setDragOver(false);
+          setDraggingPane(null);
+        }}
       >
         <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
         <div className={`pane-heading ${label ? 'has-label' : ''}`}>
@@ -260,6 +311,21 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         <SearchBar paneId={paneId} />
         <TerminalView paneId={paneId} cwd={cwd} active={active} />
       </div>
+      {/* Sagt an, WAS beim Loslassen passiert: getauscht wird mit der Quelle,
+          nicht eingefuegt. aria-hidden, weil ein HTML5-Drag ohnehin nur mit
+          der Maus laeuft -- fuer die Tastatur gibt es Mod+Shift+Pfeil. */}
+      {dragOver && (
+        <div className="pane-drop-hint" aria-hidden="true">
+          <span className="pane-drop-hint-inner">
+            <Swap />
+            <span className="pane-drop-hint-text">
+              {dragSourceName
+                ? t('pane.swapWith', { name: dragSourceName })
+                : t('pane.swapWithUnnamed')}
+            </span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

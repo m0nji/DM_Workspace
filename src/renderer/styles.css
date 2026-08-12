@@ -626,12 +626,13 @@ input[type="checkbox"]:checked::after {
    (see pane-host.ts). Both are pure size pass-throughs around .pane. */
 .pane-slot, .pane-portal-host { width: 100%; height: 100%; min-width: 0; min-height: 0; }
 
+/* position: relative traegt das Rollen-Overlay unten. Unbedenklich: .pane-body
+   und .xterm-host-wrap sind bereits eigene Positionierungs-Kontexte, es ankert
+   also kein bestehendes Overlay weiter aussen. */
 .pane { display: flex; flex-direction: column; border: 1px solid var(--border);
   border-radius: var(--radius-control); overflow: hidden; min-width: 0; min-height: 0; height: 100%;
-  background: var(--dm-pane-bg); }
-/* Drop-Ziel beim Verschieben eines Panes. Innerer Schein statt Rahmen, damit
-   die Pane-Groesse sich waehrend des Drags nicht aendert. */
-.pane.drop-target { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  background: var(--dm-pane-bg); position: relative; }
+
 .pane-header[draggable="true"] { cursor: grab; }
 .pane-header[draggable="true"]:active { cursor: grabbing; }
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
@@ -715,6 +716,79 @@ input[type="checkbox"]:checked::after {
 
 /* Pane focus ring */
 .pane.focused { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+
+/* --- Drag am Pane-Kopf --------------------------------------------------
+   Solange ein Pane gezogen wird, hat jedes Pane genau eine von drei Rollen
+   (vergeben in Pane.tsx): Quelle, Drop-Ziel oder unbeteiligt. Laeuft kein
+   Drag, traegt keines eine dieser Klassen und alles sieht aus wie sonst.
+
+   DIESER BLOCK MUSS NACH .pane.focused STEHEN. Beide Selektoren wiegen gleich
+   schwer, also entscheidet die Reihenfolge -- und das Greifen eines Pane-Kopfes
+   fokussiert per onMouseDownCapture genau dieses Pane. Die Quelle ist waehrend
+   des Drags also IMMER auch die fokussierte Pane; weiter oben verschluckte
+   .pane.focused ihren Ring vollstaendig.
+
+   Durchgehendes Prinzip: die Rueckmeldung liegt IM Pane (inset-Schatten,
+   Overlay), nie am Rahmen. Eine geaenderte border-width verschiebt die
+   Pane-Groesse mitten im Drag und zoege ein Terminal-Refit nach sich. Der
+   Fokus-Schatten hilft hier ohnehin nicht: er liegt aussen und wird vom
+   overflow:hidden des .split-child abgeschnitten. */
+
+/* Traeger fuer Blur und Toenung. Dauerhaft vorhanden und ueber opacity/
+   visibility geschaltet, damit es weich einblendet statt zu springen -- das
+   Muster von .drop-overlay. pointer-events aus, sonst schluckt das Overlay
+   die dragleave-/drop-Ereignisse des Panes darunter.
+   z-index 8 liegt ueber Suchleiste (6) und Terminal-Drop-Overlay (6); beide
+   duerfen waehrend eines Pane-Drags nicht scharf durchstechen. */
+.pane::after {
+  content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  opacity: 0; visibility: hidden; transition: opacity .12s ease;
+}
+
+/* Unbeteiligt: tritt zurueck, damit Quelle und Ziel das Bild tragen. */
+.pane.drag-bystander::after {
+  opacity: 1; visibility: visible;
+  background: rgba(0, 0, 0, .3);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+
+/* Quelle: bleibt scharf und lesbar -- man soll sehen, was man in der Hand
+   haelt. Der Ring liegt innen, ein aeusserer wuerde abgeschnitten. */
+.pane.drag-source {
+  opacity: .9; border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Drop-Ziel: kraeftiger Ring plus weicher Schein nach innen. Die Flaeche
+   bleibt scharf; lesbar wird der Hinweis durch seinen eigenen Untergrund,
+   nicht durch Weichzeichnen des Panes. */
+.pane.drop-target {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent),
+              inset 0 0 24px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.pane.drop-target::after {
+  opacity: 1; visibility: visible;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Hinweisfeld auf dem Drop-Ziel. Nur solange der Zeiger darueber steht im
+   DOM; pointer-events aus, damit die Kindknoten kein dragleave ausloesen. */
+.pane-drop-hint {
+  position: absolute; inset: 0; z-index: 9; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+}
+.pane-drop-hint-inner {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  box-sizing: border-box; padding: 8px 14px;
+  border: 1px solid var(--accent); border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--panel-elevated) 92%, transparent);
+  color: var(--text-strong); font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+.pane-drop-hint-inner svg { color: var(--accent); flex: none; }
+/* Ein schmales Pane soll den Hinweis kuerzen, nicht umbrechen. */
+.pane-drop-hint-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Agent status dot in the pane header */
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }

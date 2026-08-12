@@ -340,6 +340,8 @@
     "splitVertical": "Oben und unten teilen",
     "maximize": "Maximieren",
     "restore": "Wiederherstellen",
+    "swapWith": "Tauschen mit „{{name}}“",
+    "swapWithUnnamed": "Hierher tauschen",
     "closeTitle": "Fenster schließen?",
     "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
     "closeConfirm": "Fenster schließen",
