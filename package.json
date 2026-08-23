@@ -1,6 +1,6 @@
 {
   "name": "dm-workspace",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Cross-platform tiling terminal multiplexer",
   "main": "out/main/index.js",
   "author": "DM Workspace",
@@ -76,8 +76,20 @@
     ],
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
