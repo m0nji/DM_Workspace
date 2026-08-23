@@ -19,8 +19,55 @@ export interface SpawnOptions {
   target?: SpawnTarget;
 }
 
+// Windows PowerShell 5.1 is bound to PSReadLine 2.0.0, whose
+// RecomputeInitialCoords recalculates the input column as
+// `_initialX % BufferWidth` on every console size change — once the pty has
+// been narrower than the prompt is long, the column stays wrong for good.
+// PowerShell 7 ships PSReadLine >= 2.2 with that method rewritten, so
+// preferring pwsh removes the cause instead of healing the symptom (see
+// docs/superpowers/plans/2026-08-22-psreadline-initialx-fix.md).
+//
+// PATH is scanned directly rather than shelling out to `where.exe`: a handful
+// of existsSync calls cost microseconds where a child process costs tens of
+// milliseconds, and nothing can hang, fail, or need a shell of its own.
+export function resolveWindowsShell(
+  pathEnv: string | undefined,
+  exists: (file: string) => boolean = existsSync
+): string {
+  try {
+    for (const entry of (pathEnv ?? '').split(';')) {
+      // PATH entries may be quoted and may carry stray whitespace.
+      const dir = entry.trim().replace(/^"(.*)"$/, '$1');
+      if (dir === '') continue;
+      const candidate = join(dir, 'pwsh.exe');
+      if (exists(candidate)) return candidate;
+    }
+  } catch {
+    // A malformed PATH must never be the reason a pane cannot start.
+  }
+  return 'powershell.exe';
+}
+
+// OFFEN, bewusst zurückgestellt (22.08.2026): ein Opt-out für diesen Vorzug.
+// Heute ist die Wahl wirkungslos, solange kein pwsh installiert ist — sie wird
+// aber schlagartig für ALLE Windows-Panes scharf, sobald jemand PowerShell 7
+// installiert, ohne dass an der App etwas getan wurde. pwsh liest ein anderes
+// $PROFILE (Documents\PowerShell\ statt Documents\WindowsPowerShell\), hat
+// einen anderen Modulsatz und eine andere .NET-Basis; wiederhergestellte
+// Sessions wachen dann in einer anderen Shell auf. Der abgestimmte Schnitt,
+// falls das gebaut wird: Setting `shell` mit „automatisch / powershell / pwsh /
+// eigener Pfad", Default „automatisch" — also genau das, was defaultShell()
+// hier tut. Die Verdrahtung steht bereits, SpawnOptions.shell wird respektiert;
+// es fehlt nur jemand, der es setzt. Nicht ungefragt umsetzen.
+//
+// defaultShell runs on every spawn, so the lookup happens once per process —
+// same reasoning as ensureZshIntegrationDir / ensureScreenrc below.
+let win32Shell: string | null = null;
 function defaultShell(): string {
-  if (process.platform === 'win32') return 'powershell.exe';
+  if (process.platform === 'win32') {
+    if (win32Shell === null) win32Shell = resolveWindowsShell(process.env.PATH);
+    return win32Shell;
+  }
   return process.env.SHELL || '/bin/zsh';
 }
 
@@ -92,6 +139,10 @@ function cwdHookEnv(shell: string): Record<string, string> {
 // B2 ein Remote-Backend mit identischer Schnittstelle daneben stellen kann.
 export class PtyManager implements TerminalBackend {
   private procs = new Map<string, pty.IPty>();
+  // Last size requested per pane — kept for panes that have no process yet, so
+  // a resize arriving before the spawn survives instead of vanishing, and used
+  // to drop resizes that wouldn't change anything. See resize().
+  private dims = new Map<string, { cols: number; rows: number }>();
   private dataListeners: TerminalDataListener[] = [];
   private exitListeners: TerminalExitListener[] = [];
 
@@ -113,16 +164,35 @@ export class PtyManager implements TerminalBackend {
     proc.onData((data) => this.dataListeners.forEach((l) => l(paneId, data)));
     proc.onExit(({ exitCode }) => {
       this.procs.delete(paneId);
+      this.dims.delete(paneId);
       this.exitListeners.forEach((l) => l(paneId, exitCode));
     });
     this.procs.set(paneId, proc);
+    // A resize for a pane that had no process yet was remembered instead of
+    // dropped (see resize). Apply it now, so a pane whose resize overtook its
+    // spawn doesn't keep running at the size it was spawned with — the shell
+    // would print its prompt at a width the terminal no longer has.
+    const pending = this.dims.get(paneId);
+    this.dims.set(paneId, { cols: opts.cols, rows: opts.rows });
+    if (pending && (pending.cols !== opts.cols || pending.rows !== opts.rows)) {
+      this.resize(paneId, pending.cols, pending.rows);
+    }
   }
 
   write(paneId: string, data: string): void {
     this.procs.get(paneId)?.write(data);
   }
 
+  // Every settled layout change forwards the pane's current dimensions, so the
+  // same size arrives repeatedly (re-focus, a height-only drag that doesn't
+  // change the column count, a flush after a programmatic relayout). Passing
+  // that on costs a SIGWINCH that makes TUIs repaint for nothing, so only real
+  // changes reach the pty. Panes without a process keep the size anyway —
+  // spawn() picks it up.
   resize(paneId: string, cols: number, rows: number): void {
+    const last = this.dims.get(paneId);
+    if (last && last.cols === cols && last.rows === rows) return;
+    this.dims.set(paneId, { cols, rows });
     this.procs.get(paneId)?.resize(cols, rows);
   }
 
@@ -132,6 +202,9 @@ export class PtyManager implements TerminalBackend {
       proc.kill();
       this.procs.delete(paneId);
     }
+    // Also drops a remembered size for a pane that never spawned, so a later
+    // pane reusing the id doesn't inherit it.
+    this.dims.delete(paneId);
   }
 
   killAll(): void {
@@ -144,6 +217,7 @@ export class PtyManager implements TerminalBackend {
   killAllAndWait(timeoutMs = 1500): Promise<void> {
     const procs = [...this.procs.values()];
     this.procs.clear();
+    this.dims.clear();
     return killAndWait(procs, timeoutMs);
   }
 }

@@ -147,8 +147,25 @@ function createWindow(): void {
     }
   });
 
+  // Maximieren MUSS vor dem Laden passieren, nicht erst in 'ready-to-show'.
+  // Sonst layoutet der Renderer zuerst auf der (kleineren) Normalgröße: die
+  // Panes fitten schmal, spawnen ihr PTY schmal, die Shell druckt dort ihren
+  // ersten Prompt — und erst danach springt das Fenster auf Monitorbreite.
+  // PowerShells PSReadLine 2.0.0 rechnet bei jeder Konsolengrößenänderung
+  // `_initialX = _initialX % BufferWidth`; war das PTY dabei schmaler als der
+  // Prompt lang ist, zeichnet es die Eingabe fortan mitten in den Prompt.
+  // Siehe docs/superpowers/plans/2026-08-22-psreadline-initialx-fix.md.
+  //
+  // maximize() zeigt ein verstecktes Fenster (ShowWindow(SW_MAXIMIZE)), also
+  // direkt wieder verstecken — Anzeige bleibt Sache von 'ready-to-show'.
+  // getNormalBounds() überlebt das unverändert, die gespeicherte Normalgröße
+  // geht also nicht verloren.
+  if (saved?.isMaximized) {
+    mainWindow.maximize();
+    mainWindow.hide();
+  }
+
   mainWindow.once('ready-to-show', () => {
-    if (saved?.isMaximized) mainWindow?.maximize();
     mainWindow?.show();
   });
 

@@ -136,6 +136,83 @@ describe('DM brand styles', () => {
     expect(activeHoverRules[0]).toContain('color: var(--text-strong);');
   });
 
+  it('marks a register group with a rail only, never a second filled surface', () => {
+    // Grouped surface: the group is marked exactly ONCE, and that one marker is
+    // already the bar itself (.sidebar / .workspace-tabs carry the --panel fill).
+    // A filled box inside it would draw the same edge a second time.
+    // ruleBodies matches the selector as a substring, so this one query already
+    // covers the bare rule and both placement-scoped ones.
+    const container = ruleBodies('.ws-group');
+    expect(container.length).toBeGreaterThan(0);
+    container.forEach((rule) => {
+      expect(rule).not.toMatch(/(^|;|\s)background(-color)?\s*:/);
+      expect(rule).not.toMatch(/(^|;|\s)border\s*:/);
+    });
+
+    // The rail exists on both axes and takes the group's colour.
+    const rail = ruleBodies('.ws-group::before');
+    expect(rail.length).toBeGreaterThan(0);
+    // Exactly one of them paints; the placement-scoped rules only place it.
+    expect(rail.filter((r) => r.includes('background: var(--ws-group-color, var(--accent));'))).toHaveLength(1);
+    expect(ruleBodies('.sidebar .ws-group::before')).toHaveLength(1);
+    expect(ruleBodies('.workspace-tabs .ws-group::before')).toHaveLength(1);
+  });
+
+  it('rings the grouping drop target inwards, so a scrolling bar cannot clip it', () => {
+    const into = ruleBodies('.ws-item.drop-into, .workspace-tab.drop-into, .ws-group-chip.drop-into');
+
+    expect(into).toHaveLength(1);
+    expect(into[0]).toContain('inset 0 0 0 2px var(--accent)');
+  });
+
+  it('keeps the drop hint out of the drag stream', () => {
+    const hint = ruleBodies('.ws-drop-hint');
+
+    expect(hint).toHaveLength(1);
+    // Without this the hint's own nodes swallow dragleave/drop under the pointer.
+    expect(hint[0]).toContain('pointer-events: none;');
+    // Portalled to body, so it must not scroll with the bar it describes.
+    expect(hint[0]).toContain('position: fixed;');
+  });
+
+  it('marks a running register without resizing it', () => {
+    // outline, not border: a border would change the dot's box and make the row
+    // jump every time a command starts or ends. The offset is what makes it read
+    // as a ring rather than as a slightly fatter dot.
+    // The rule lists both dots; ruleBodies matches on the selector text right
+    // before the brace, so query the last one in the group. Two rules carry it:
+    // the base one and its reduced-motion counterpart.
+    const rules = ruleBodies('[data-busy] .ws-group-dot.running');
+    expect(rules).toHaveLength(2);
+    rules.forEach((rule) => {
+      expect(rule).toContain('outline: 2px solid var(--busy-color, var(--accent));');
+      expect(rule).toContain('outline-offset: 2px;');
+      expect(rule).not.toMatch(/(^|;|\s)border\s*:/);
+    });
+    // The quiet ring is the base rule, and nothing about it moves.
+    expect(rules[0]).not.toContain('animation:');
+  });
+
+  it('offers every busy variant the settings can select', () => {
+    for (const variant of ['pulse', 'blink', 'spin']) {
+      expect(styles, `variant ${variant} has no rule`).toContain(`[data-busy="${variant}"] .dot.running`);
+    }
+    // The quiet ring is deliberately the base rule with nothing animating it.
+    expect(styles).not.toContain('[data-busy="ring"]');
+    for (const frames of ['dmws-busy-pulse', 'dmws-busy-blink', 'dmws-busy-spin']) {
+      expect(styles, `keyframes ${frames} missing`).toContain(`@keyframes ${frames}`);
+    }
+    // Speed and colour come from the settings, never hard-coded.
+    expect(styles).toContain('var(--busy-speed, 1200ms)');
+  });
+
+  it('falls back to the quiet ring when the user asked for less motion', () => {
+    const reduced = styles.slice(styles.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('animation: none;');
+    // The indicator itself must survive — only its motion goes.
+    expect(reduced).toContain('outline: 2px solid var(--busy-color, var(--accent));');
+  });
+
   it('guards disabled button hover states', () => {
     expect(ruleBodies('.confirm-btn:hover')).toHaveLength(0);
     expect(ruleBodies('.confirm-btn-danger:hover')).toHaveLength(0);

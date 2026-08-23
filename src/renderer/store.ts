@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import type {
-  AppState, PresetKind, Direction, Workspace, WorkspaceTemplate, Settings, UpdateEvent, PaneStatus, SettingsSection,
+  AppState, PresetKind, Direction, Workspace, WorkspaceGroup, WorkspaceTemplate, Settings, UpdateEvent,
+  PaneShellState, PaneStatus, SettingsSection,
   LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
   RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope,
   RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent, RemoteProjectMember
 } from '../shared/types';
+import { applyTabDrop, normalizeGroups, type DropTarget, type GroupedList } from '../shared/workspace-groups';
+import type { TabDropIntent } from '../shared/tab-drop-intent';
 import type { RemoteFilesContext } from './files-api';
 import {
   makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, swapPanes
@@ -54,6 +57,14 @@ const nextSplitId = createIdGenerator('s');
 const nextWsId = createIdGenerator('w');
 const nextTemplateId = createIdGenerator('tpl');
 const nextServerId = createIdGenerator('srv');
+const nextGroupId = createIdGenerator('g');
+
+// Eine geteilte Leerkonstante statt eines frischen `[]` pro Zustand: die
+// Navigation liest die Gruppen per Selektor, und ein jedes Mal neues Array
+// hiesse fuer sie "hat sich geaendert" bei jeder beliebigen Store-Aenderung.
+// `workspaceGroups` ist im Store immer ein echtes Array, nie undefined — ein
+// `?? []` im Selektor waere derselbe Fehler und ist damit unnoetig.
+const NO_GROUPS: WorkspaceGroup[] = [];
 
 // ---- Remote-Workspaces ------------------------------------------------------
 
@@ -318,10 +329,28 @@ export interface TemplateWizardState {
 }
 
 export interface StoreState extends AppState {
+  // In AppState optional (ein Bestand vor den Gruppen hat das Feld nicht), im
+  // Store immer gesetzt — siehe NO_GROUPS.
+  workspaceGroups: WorkspaceGroup[];
+  // Gruppe, deren Chip gerade inline umbenannt werden soll. Liegt im Store,
+  // weil der Anstoß von außerhalb der Navigation kommen kann (Command Palette)
+  // — dasselbe Muster wie searchOpenPaneId. Flüchtig: persistSnapshot ist eine
+  // Whitelist und führt das Feld nicht, es überlebt also keinen Neustart.
+  //
+  // Zeigt der Wert auf eine Gruppe, die es nicht mehr gibt, ist er wirkungslos:
+  // die Navigation vergleicht ihn nur gegen Gruppen, die sie ohnehin rendert.
+  // Deshalb räumt ihn keine der Lösch-Aktionen eigens ab.
+  renamingGroupId: string | null;
   maximizedPaneId: string | null;
   hydrated: boolean;
   settingsOpen: boolean;
   paneStatus: Record<string, PaneStatus>;
+  // Was die Shell je Pane gerade tut, gemeldet aus dem Prompt-Marker. Getrennt
+  // von paneStatus, weil beides verschiedene Fragen beantwortet: paneStatus ist
+  // die Heuristik auf dem Ausgabestrom (und traegt das "Fertig"-Badge), dies
+  // ist die Auskunft der Shell selbst. shared/pane-busy.ts fuehrt sie zusammen.
+  // Fluechtig wie paneStatus: persistSnapshot ist eine Whitelist, die es nicht fuehrt.
+  paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
   focusedPaneId: string | null;
@@ -380,6 +409,16 @@ export interface StoreState extends AppState {
   renameWorkspace: (id: string, name: string) => void;
   setWorkspaceCwd: (id: string, cwd: string) => void;
   deleteWorkspace: (id: string) => void;
+  // Register-Gruppen. Ein Drop entscheidet ueber Reihenfolge UND Zugehoerigkeit
+  // in einem Zug — deshalb eine Action und nicht zwei.
+  dropWorkspaceTab: (draggedId: string, target: DropTarget, intent: TabDropIntent) => void;
+  renameWorkspaceGroup: (groupId: string, name: string) => void;
+  // Stösst das Inline-Umbenennen am Chip an; null beendet es wieder, damit ein
+  // stehengebliebener Wert den Editor nicht beim naechsten Rendern aufreisst.
+  setRenamingGroup: (groupId: string | null) => void;
+  setWorkspaceGroupCollapsed: (groupId: string, collapsed: boolean) => void;
+  dissolveWorkspaceGroup: (groupId: string) => void;
+  ungroupWorkspace: (workspaceId: string) => void;
   // layout
   applyPreset: (kind: PresetKind) => void;
   splitActivePane: (paneId: string, direction: Direction) => void;
@@ -397,6 +436,7 @@ export interface StoreState extends AppState {
   setSettingsOpen: (open: boolean, focusSection?: SettingsSection | null) => void;
   clearSettingsFocusSection: () => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
+  setPaneShell: (paneId: string, state: PaneShellState) => void;
   setPaneCwd: (paneId: string, cwd: string) => void;
   setPaneAutoTitle: (paneId: string, title: string) => void;
   setFocusedPane: (paneId: string) => void;
@@ -529,11 +569,15 @@ function stripKey(map: Record<string, string> | undefined, key: string): Record<
 let saveInFlight = false;
 let pendingSave: AppState | null = null;
 
+// Eine Whitelist: was hier nicht steht, wird nie gespeichert. Ein neues
+// persistiertes Feld muss deshalb genau hier eingetragen werden, sonst ist es
+// nach dem ersten Speichern weg.
 function persistSnapshot(state: AppState): AppState {
   return {
     version: 1,
     workspaces: state.workspaces,
     workspaceTemplates: state.workspaceTemplates ?? [],
+    workspaceGroups: state.workspaceGroups ?? [],
     activeWorkspaceId: state.activeWorkspaceId,
     settings: state.settings
   };
@@ -577,10 +621,53 @@ function activeBrowseRoot(s: StoreState): string {
   return paneCwd ?? ws?.cwd ?? '~';
 }
 
+// Hat ein Drop wirklich etwas veraendert? Der reine Id-Vergleich reichte,
+// solange es nur eine Reihenfolge gab. Mit Gruppen gibt es zwei weitere Achsen:
+// ein Register kann an derselben Stelle bleiben und trotzdem einer Gruppe
+// beitreten, und eine Gruppe kann entstehen oder wegfallen, ohne dass sich die
+// Reihenfolge aendert. Beides saehe fuer den alten Vergleich aus wie "nichts
+// passiert" und wuerde nicht gespeichert.
+function sameArrangement(a: GroupedList, b: GroupedList): boolean {
+  if (a.groups.length !== b.groups.length) return false;
+  if (a.groups.some((g, i) => g !== b.groups[i])) return false;
+  if (a.workspaces.length !== b.workspaces.length) return false;
+  return a.workspaces.every((w, i) => w.id === b.workspaces[i].id && w.groupId === b.workspaces[i].groupId);
+}
+
+// Gemeinsamer Weg fuer jeden Drop auf die Registerleiste. Auch das reine
+// Umsortieren laeuft hier durch: ein `before` vor dem ersten bzw. `after` nach
+// dem letzten Mitglied einer Gruppe loest die Zugehoerigkeit auf, und das darf
+// nicht davon abhaengen, welche Action die Oberflaeche gerade aufruft.
+function applyDrop(
+  s: StoreState,
+  draggedId: string,
+  target: DropTarget,
+  intent: TabDropIntent
+): StoreState {
+  const before: GroupedList = { workspaces: s.workspaces, groups: s.workspaceGroups };
+  const after = applyTabDrop(before, draggedId, target, intent, nextGroupId);
+  if (sameArrangement(before, after)) return s;
+  const next = { ...s, workspaces: after.workspaces, workspaceGroups: after.groups };
+  persist(next);
+  return next;
+}
+
+// Entfernt die Gruppenzugehoerigkeit eines Registers, ohne das uebrige Objekt
+// anzufassen — und gibt dasselbe Objekt zurueck, wenn es ohnehin keiner Gruppe
+// angehoert, damit React unveraenderte Register als unveraendert sieht.
+function withoutGroup(w: Workspace): Workspace {
+  if (w.groupId === undefined) return w;
+  const next = { ...w };
+  delete next.groupId;
+  return next;
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
   workspaceTemplates: [],
+  workspaceGroups: NO_GROUPS,
+  renamingGroupId: null,
   activeWorkspaceId: null,
   settings: DEFAULT_SETTINGS,
   maximizedPaneId: null,
@@ -588,6 +675,7 @@ export const useStore = create<StoreState>((set, get) => ({
   settingsOpen: false,
   settingsFocusSection: null,
   paneStatus: {},
+  paneShell: {},
   paneCwd: {},
   paneAutoTitles: {},
   focusedPaneId: null,
@@ -629,7 +717,11 @@ export const useStore = create<StoreState>((set, get) => ({
     nextWsId.seed(loaded.workspaces.map((w) => w.id));
     nextTemplateId.seed(templates.map((t) => t.id));
     nextServerId.seed((loaded.settings.servers ?? []).map((srv) => srv.id));
-    set({ ...loaded, workspaceTemplates: templates, hydrated: true });
+    // Ohne das Seeden hiesse die erste neue Gruppe nach einem Neustart wieder
+    // 'g1' — und uebernaehme damit die Mitglieder der geladenen g1.
+    const groups = loaded.workspaceGroups ?? NO_GROUPS;
+    nextGroupId.seed(groups.map((g) => g.id));
+    set({ ...loaded, workspaceTemplates: templates, workspaceGroups: groups, hydrated: true });
   },
 
   activeWorkspace: () => get().workspaces.find((w) => w.id === get().activeWorkspaceId),
@@ -669,22 +761,68 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
-  reorderWorkspace: (draggedId, targetId, position) => set((s) => {
-    if (draggedId === targetId) return s;
-    const dragged = s.workspaces.find((w) => w.id === draggedId);
-    const targetIndex = s.workspaces.findIndex((w) => w.id === targetId);
-    if (!dragged || targetIndex < 0) return s;
+  // Umsortieren ist der Sonderfall eines Drops mit 'before'/'after'. Beide Wege
+  // teilen sich applyDrop, damit ein Register nicht je nach aufrufender Action
+  // in einer Gruppe haengen bleibt, die es gerade verlassen hat.
+  reorderWorkspace: (draggedId, targetId, position) =>
+    set((s) => applyDrop(s, draggedId, { kind: 'workspace', id: targetId }, position)),
 
-    const workspaces = s.workspaces.filter((w) => w.id !== draggedId);
-    const adjustedTargetIndex = workspaces.findIndex((w) => w.id === targetId);
-    const insertIndex = adjustedTargetIndex + (position === 'after' ? 1 : 0);
-    workspaces.splice(insertIndex, 0, dragged);
+  dropWorkspaceTab: (draggedId, target, intent) => set((s) => applyDrop(s, draggedId, target, intent)),
 
-    // Dropping an item immediately beside itself can describe the order that is
-    // already present. Avoid an unnecessary state update and disk write then.
-    if (workspaces.every((w, index) => w.id === s.workspaces[index]?.id)) return s;
+  renameWorkspaceGroup: (groupId, name) => set((s) => {
+    // Ein leerer Name ist erlaubt: der Chip zeigt dann nur die Farbe, und genau
+    // so wird eine Gruppe angelegt.
+    const workspaceGroups = s.workspaceGroups.map(
+      (g) => g.id === groupId && g.name !== name ? { ...g, name } : g
+    );
+    if (workspaceGroups.every((g, i) => g === s.workspaceGroups[i])) return s;
+    const next = { ...s, workspaceGroups };
+    persist(next);
+    return next;
+  }),
 
-    const next = { ...s, workspaces };
+  setRenamingGroup: (groupId) => set({ renamingGroupId: groupId }),
+
+  setWorkspaceGroupCollapsed: (groupId, collapsed) => set((s) => {
+    const workspaceGroups = s.workspaceGroups.map((g) => {
+      if (g.id !== groupId || (g.collapsed ?? false) === collapsed) return g;
+      const nextGroup = { ...g };
+      // Ausgeklappt heisst "Feld fehlt" (siehe WorkspaceGroup) — sonst haette
+      // derselbe Zustand zwei Schreibweisen.
+      if (collapsed) nextGroup.collapsed = true; else delete nextGroup.collapsed;
+      return nextGroup;
+    });
+    if (workspaceGroups.every((g, i) => g === s.workspaceGroups[i])) return s;
+    const next = { ...s, workspaceGroups };
+    persist(next);
+    return next;
+  }),
+
+  // Gruppe aufloesen: die Register bleiben, wo sie sind, und verlieren nur ihre
+  // Zugehoerigkeit. Sie lagen als zusammenhaengender Lauf nebeneinander, also
+  // ist die Liste danach schon gueltig — es gibt nichts zu normalisieren.
+  dissolveWorkspaceGroup: (groupId) => set((s) => {
+    if (!s.workspaceGroups.some((g) => g.id === groupId)) return s;
+    const workspaces = s.workspaces.map((w) => w.groupId === groupId ? withoutGroup(w) : w);
+    const workspaceGroups = s.workspaceGroups.filter((g) => g.id !== groupId);
+    const next = { ...s, workspaces, workspaceGroups };
+    persist(next);
+    return next;
+  }),
+
+  // Ein einzelnes Register herausloesen. Anders als beim Aufloesen muss hier
+  // normalisiert werden: sass es in der Mitte eines Laufs, reisst sein Austritt
+  // die Gruppe auseinander. normalizeGroups zieht die verbliebenen Mitglieder
+  // wieder zusammen, das herausgeloeste Register landet dahinter. War es das
+  // letzte Mitglied, faellt die Gruppe gleich mit weg.
+  ungroupWorkspace: (workspaceId) => set((s) => {
+    const ws = s.workspaces.find((w) => w.id === workspaceId);
+    if (!ws || ws.groupId === undefined) return s;
+    const grouped = normalizeGroups({
+      workspaces: s.workspaces.map((w) => w.id === workspaceId ? withoutGroup(w) : w),
+      groups: s.workspaceGroups
+    });
+    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups };
     persist(next);
     return next;
   }),
@@ -710,10 +848,11 @@ export const useStore = create<StoreState>((set, get) => ({
       return next;
     }
     const paneStatus = { ...s.paneStatus };
+    const paneShell = { ...s.paneShell };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
     // pane-keyed metadata has to follow the id change or titles/pending startup
@@ -734,7 +873,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const firstPane = collectPaneIds(layout)[0] ?? null;
     if (firstPane) requestAnimationFrame(() => focusTerminal(firstPane));
     const next = {
-      ...s, workspaces, paneStatus, paneCwd, paneAutoTitles,
+      ...s, workspaces, paneStatus, paneShell, paneCwd, paneAutoTitles,
       maximizedPaneId: null,
       focusedPaneId: firstPane
     };
@@ -745,10 +884,11 @@ export const useStore = create<StoreState>((set, get) => ({
   deleteWorkspace: (id) => set((s) => {
     const ws = s.workspaces.find((w) => w.id === id);
     const paneStatus = { ...s.paneStatus };
+    const paneShell = { ...s.paneShell };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     const remote = { ...s.remote };
     const remoteTasks = { ...s.remoteTasks };
@@ -765,11 +905,17 @@ export const useStore = create<StoreState>((set, get) => ({
       delete remoteTasks[connKey];
       delete remoteMembers[connKey];
     }
-    const workspaces = s.workspaces.filter((w) => w.id !== id);
+    // War das Register das letzte seiner Gruppe, bliebe sonst ein Chip ohne
+    // Mitglieder stehen — eine Gruppe ohne Inhalt hat niemand herstellen wollen.
+    const grouped = normalizeGroups({
+      workspaces: s.workspaces.filter((w) => w.id !== id),
+      groups: s.workspaceGroups
+    });
+    const workspaces = grouped.workspaces;
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, workspaceGroups: grouped.groups, paneStatus, paneShell, paneCwd, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -786,14 +932,15 @@ export const useStore = create<StoreState>((set, get) => ({
     // with nothing left to address them — unkillable until quit. Tear them down
     // and drop their pane-keyed metadata, exactly as closeActivePane does.
     const paneStatus = { ...s.paneStatus };
+    const paneShell = { ...s.paneShell };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws?.layout ?? null).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
     });
     const workspaces = s.workspaces.map((w) =>
       w.id === s.activeWorkspaceId ? { ...w, layout } : w);
-    const next = { ...s, workspaces, paneStatus, paneCwd, paneAutoTitles, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneShell, paneCwd, paneAutoTitles, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -856,6 +1003,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (isRemotePaneKey(paneId)) return s; // Remote-Panes: siehe closeRemotePane
     releasePane(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
+    const paneShell = { ...s.paneShell }; delete paneShell[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const paneAutoTitles = { ...s.paneAutoTitles }; delete paneAutoTitles[paneId];
     let successor: string | null = null;
@@ -887,6 +1035,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...s,
       workspaces,
       paneStatus,
+      paneShell,
       paneCwd,
       paneAutoTitles,
       focusedPaneId,
@@ -919,6 +1068,15 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setSettingsOpen: (open, focusSection = null) => set({ settingsOpen: open, settingsFocusSection: open ? focusSection : null }),
   clearSettingsFocusSection: () => set({ settingsFocusSection: null }),
+
+  // Reine Meldestelle: TerminalView bildet seine zwei vorhandenen Ereignisse
+  // (Prompt-Marker gesehen / Zeile abgeschickt) auf die drei Werte ab, mehr
+  // nicht. Was daraus folgt, entscheidet shared/pane-busy.ts — dort ist es ohne
+  // jsdom testbar und steht genau einmal.
+  setPaneShell: (paneId, state) => set((s) => {
+    if (s.paneShell[paneId] === state) return s;
+    return { ...s, paneShell: { ...s.paneShell, [paneId]: state } };
+  }),
 
   setPaneStatus: (paneId, status) => set((s) => {
     if (s.paneStatus[paneId] === status) return s;
@@ -1357,6 +1515,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Erst die Remote-Workspaces dieses Servers schließen (Panes abbestellen),
     // dann den Server samt gespeicherter Session im Main-Prozess entfernen.
     const paneStatus = { ...s.paneStatus };
+    const paneShell = { ...s.paneShell };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     const remote = { ...s.remote };
@@ -1368,7 +1527,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const workspaces = s.workspaces.filter((w) => {
       if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
       collectPaneIds(w.layout).forEach((pid) => {
-        releasePane(pid); delete paneStatus[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+        releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
       });
       const connKey = remoteConnKey(serverId, workspaceScopeKey(w.remote));
       delete remote[connKey];
@@ -1380,10 +1539,13 @@ export const useStore = create<StoreState>((set, get) => ({
     const servers = (s.settings.servers ?? []).filter((srv) => srv.id !== serverId);
     const settings: Settings = { ...s.settings };
     if (servers.length) settings.servers = servers; else delete settings.servers;
-    const activeWorkspaceId = workspaces.some((w) => w.id === s.activeWorkspaceId)
+    // Ein Server nimmt seine Remote-Workspaces still mit. Lagen die in einer
+    // Gruppe, kann sie dadurch leerlaufen oder auseinanderfallen.
+    const grouped = normalizeGroups({ workspaces, groups: s.workspaceGroups });
+    const activeWorkspaceId = grouped.workspaces.some((w) => w.id === s.activeWorkspaceId)
       ? s.activeWorkspaceId
-      : (workspaces[0]?.id ?? null);
-    const next = { ...s, workspaces, settings, remote, remoteTasks, remoteMembers, paneStatus, paneCwd, paneAutoTitles, activeWorkspaceId };
+      : (grouped.workspaces[0]?.id ?? null);
+    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups, settings, remote, remoteTasks, remoteMembers, paneStatus, paneShell, paneCwd, paneAutoTitles, activeWorkspaceId };
     persist(next);
     return next;
   }),

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile, migrateWindowBounds } from '../src/main/persistence';
-import type { AppState } from '../src/shared/types';
+import type { AppState, Settings, Workspace } from '../src/shared/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -233,6 +233,116 @@ describe('persistence serialize/deserialize', () => {
       workspaceTemplates: [{ id: 't', name: 'T', cwd: '/repo', layout: { type: 'pane', id: 'tp1' } }]
     }));
     expect(result.workspaceTemplates?.[0].confirmStartupCommands).toBe(true);
+  });
+});
+
+// Groups are a side band: `workspaces` stays flat and each entry carries an
+// optional groupId. Everything below is about the two invariants surviving a
+// trip through disk — every groupId names a group that exists, and a group's
+// members sit next to each other.
+describe('persistence workspace groups', () => {
+  const settings: Settings = {
+    themeId: 'default', terminalOpacity: 0.8, workspaceNavigationPlacement: 'left'
+  };
+  const ws = (id: string, groupId?: string): Workspace => ({
+    id, name: `Workspace ${id}`, cwd: '/home/x', layout: null,
+    ...(groupId === undefined ? {} : { groupId })
+  });
+  const raw = (workspaces: unknown[], workspaceGroups?: unknown) => JSON.stringify({
+    version: 1,
+    activeWorkspaceId: 'w1',
+    workspaces,
+    settings,
+    ...(workspaceGroups === undefined ? {} : { workspaceGroups })
+  });
+
+  it('round-trips workspaces together with their groups', () => {
+    const state: AppState = {
+      version: 1,
+      activeWorkspaceId: 'w1',
+      workspaces: [ws('w1', 'g1'), ws('w2', 'g1'), ws('w3')],
+      workspaceGroups: [{ id: 'g1', name: 'Backend', color: '#cc3333', collapsed: true }],
+      settings
+    };
+    expect(deserialize(serialize(state))).toEqual(state);
+  });
+
+  it('loads a state written before groups existed, unchanged', () => {
+    const state: AppState = {
+      version: 1, activeWorkspaceId: 'w1', workspaces: [ws('w1'), ws('w2')], settings
+    };
+    const result = deserialize(serialize(state));
+    expect(result).toEqual(state);
+    // Absent, not an empty array: identical to what an older build wrote.
+    expect('workspaceGroups' in result).toBe(false);
+  });
+
+  it('keeps a group whose name is still empty', () => {
+    // The state a group is in between being created and being named.
+    const result = deserialize(raw([ws('w1', 'g1')], [{ id: 'g1', name: '' }]));
+    expect(result.workspaceGroups).toEqual([{ id: 'g1', name: '' }]);
+    expect(result.workspaces[0].groupId).toBe('g1');
+  });
+
+  it('drops a groupId that names no group', () => {
+    const result = deserialize(raw([ws('w1', 'ghost'), ws('w2')]));
+    expect(result.workspaces.map((w) => w.id)).toEqual(['w1', 'w2']);
+    expect(result.workspaces.every((w) => w.groupId === undefined)).toBe(true);
+    expect(result.workspaceGroups).toBeUndefined();
+  });
+
+  it('ignores an empty groupId', () => {
+    const result = deserialize(raw([{ ...ws('w1'), groupId: '' }]));
+    expect('groupId' in result.workspaces[0]).toBe(false);
+  });
+
+  it('drops a group that has no members left', () => {
+    const result = deserialize(raw([ws('w1')], [{ id: 'g1', name: 'Leer' }]));
+    expect(result.workspaceGroups).toBeUndefined();
+    expect(result.workspaces.map((w) => w.id)).toEqual(['w1']); // workspace survives
+  });
+
+  it('pulls a broken run back together at its first member', () => {
+    const result = deserialize(raw(
+      [ws('w1', 'g1'), ws('w2'), ws('w3', 'g1')],
+      [{ id: 'g1', name: 'Backend' }]
+    ));
+    expect(result.workspaces.map((w) => w.id)).toEqual(['w1', 'w3', 'w2']);
+    expect(result.workspaceGroups).toEqual([{ id: 'g1', name: 'Backend' }]);
+  });
+
+  it('drops unreadable group entries without taking the workspaces with them', () => {
+    const result = deserialize(raw(
+      [ws('w1', 'g1'), ws('w2', 'g2')],
+      [null, 'nope', 7, { id: '', name: 'Namenlos' }, { id: 'g1' }, { id: 'g2', name: 'Gut' }]
+    ));
+    // Losing one group beats losing every workspace, so both registers stay.
+    expect(result.workspaces.map((w) => w.id)).toEqual(['w1', 'w2']);
+    expect(result.workspaceGroups).toEqual([{ id: 'g2', name: 'Gut' }]);
+    expect(result.workspaces[0].groupId).toBeUndefined(); // g1 was unreadable
+    expect(result.workspaces[1].groupId).toBe('g2');
+  });
+
+  it('keeps the first of two groups sharing an id', () => {
+    const result = deserialize(raw(
+      [ws('w1', 'g1')],
+      [{ id: 'g1', name: 'Erste' }, { id: 'g1', name: 'Zweite' }]
+    ));
+    expect(result.workspaceGroups).toEqual([{ id: 'g1', name: 'Erste' }]);
+  });
+
+  it('ignores a workspaceGroups field that is not an array', () => {
+    const result = deserialize(raw([ws('w1', 'g1')], { g1: { id: 'g1', name: 'Objekt' } }));
+    expect(result.workspaceGroups).toBeUndefined();
+    expect(result.workspaces[0].groupId).toBeUndefined();
+  });
+
+  it('drops collapsed and color when they carry the wrong type', () => {
+    const result = deserialize(raw(
+      [ws('w1', 'g1')],
+      [{ id: 'g1', name: 'Backend', color: 42, collapsed: 'yes' }]
+    ));
+    expect(result.workspaceGroups).toEqual([{ id: 'g1', name: 'Backend' }]);
   });
 });
 

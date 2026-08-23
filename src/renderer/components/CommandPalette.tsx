@@ -27,6 +27,11 @@ export function CommandPalette(): React.JSX.Element | null {
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const workspaces = useStore((s) => s.workspaces);
+  // Eigenes Abo, nicht aus actions gelesen: renameWorkspaceGroup und
+  // setWorkspaceGroupCollapsed aendern NUR workspaceGroups. Ohne dieses Abo
+  // rendert die Palette nicht neu, das Memo laeuft nicht, und der Eintrag boete
+  // weiter "einklappen" an, obwohl die Gruppe laengst eingeklappt ist.
+  const workspaceGroups = useStore((s) => s.workspaceGroups);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   const focusedPaneId = useStore((s) => s.focusedPaneId);
@@ -45,12 +50,12 @@ export function CommandPalette(): React.JSX.Element | null {
   const commands = useMemo(
     () => buildCommandList({
       actions: useStore.getState(),
-      workspaces, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote,
+      workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote,
       t,
       isMac,
       close: () => setOpen(false)
     }),
-    [workspaces, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, setOpen, t]
+    [workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, setOpen, t]
   );
 
   const filtered = useMemo(() => {

@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
 import { Icon } from './Icon';
-import type { RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
+import type { BusyIndicator, RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
+import {
+  BUSY_INDICATOR_KINDS,
+  BUSY_INDICATOR_SPEED_DEFAULT_MS,
+  BUSY_INDICATOR_SPEED_MAX_MS,
+  BUSY_INDICATOR_SPEED_MIN_MS
+} from '../../shared/types';
 import { BUILTIN_THEMES, getTheme } from '../../shared/themes';
 import {
   SHORTCUT_DEFINITIONS, resolveShortcuts, formatShortcut, formatShortcutCaps, shortcutFromEvent,
@@ -418,6 +424,22 @@ const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
   { id: 'updates', labelKey: 'settings.nav.updates' }
 ];
 
+// Beschriftungen der Indikator-Arten. Als Tabelle statt als switch, damit eine
+// neue Art in BUSY_INDICATOR_KINDS hier sofort einen Typfehler ausloest, wenn
+// niemand einen Text dafuer geschrieben hat.
+const BUSY_KIND_LABELS: Record<BusyIndicator, ParseKeys> = {
+  off: 'settings.notifications.busy.kindOff',
+  ring: 'settings.notifications.busy.kindRing',
+  pulse: 'settings.notifications.busy.kindPulse',
+  blink: 'settings.notifications.busy.kindBlink',
+  spin: 'settings.notifications.busy.kindSpin'
+};
+
+// Eigene Palette statt eines Imports aus WorkspaceEditModal: dort gehoert sie
+// zur Identitaet eines Workspace, hier zur Sichtbarkeit einer Anzeige. Die
+// Werte stimmen ueberein, damit die Oberflaeche eine Sprache spricht.
+const BUSY_COLORS = ['#c97b4a', '#4a90c9', '#5cb85c', '#c95a5a', '#a05ac9', '#c9b34a'];
+
 export function SettingsPanel(): React.JSX.Element | null {
   const { t } = useTranslation();
   const open = useStore((s) => s.settingsOpen);
@@ -438,6 +460,7 @@ export function SettingsPanel(): React.JSX.Element | null {
   // The effective background is the override if set, otherwise the theme's own.
   const activeBg = settings.terminalBackground ?? getTheme(settings.themeId).background;
   const workspaceNavigationPlacement = settings.workspaceNavigationPlacement ?? 'left';
+  const busyIndicator = settings.busyIndicator ?? 'off';
 
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
@@ -654,6 +677,81 @@ export function SettingsPanel(): React.JSX.Element | null {
                 <p className="modal-hint">
                   {t('settings.notifications.showReadyBadgeHint')}
                 </p>
+                </div>
+
+                <div className="settings-group">
+                <div className="modal-section-label">{t('settings.notifications.busy.title')}</div>
+
+                <div className="setting-row">
+                  <label>{t('settings.notifications.busy.kind')}</label>
+                  <div className="segmented-control" role="group" aria-label={t('settings.notifications.busy.kind')}>
+                    {BUSY_INDICATOR_KINDS.map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        className={`segmented-control-item ${busyIndicator === kind ? 'active' : ''}`}
+                        aria-pressed={busyIndicator === kind}
+                        onClick={() => updateSettings({ busyIndicator: kind })}
+                      >
+                        {t(BUSY_KIND_LABELS[kind])}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Farbe und Tempo nur zeigen, wenn sie etwas bewirken. */}
+                {busyIndicator !== 'off' && (
+                  <>
+                    <div className="setting-row">
+                      <label>{t('settings.notifications.busy.color')}</label>
+                      <div className="ws-edit-swatches">
+                        <button
+                          type="button"
+                          className={`ws-edit-swatch ${settings.busyIndicatorColor ? '' : 'active'}`}
+                          style={{ background: 'var(--accent)' }}
+                          title={t('settings.notifications.busy.colorDefault')}
+                          onClick={() => updateSettings({ busyIndicatorColor: undefined })}
+                        />
+                        {BUSY_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            className={`ws-edit-swatch ${settings.busyIndicatorColor === c ? 'active' : ''}`}
+                            style={{ background: c }}
+                            onClick={() => updateSettings({ busyIndicatorColor: c })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="setting-row">
+                      <label htmlFor="busy-speed">{t('settings.notifications.busy.speed')}</label>
+                      <span className="setting-range">
+                        <input
+                          id="busy-speed"
+                          type="range"
+                          min={BUSY_INDICATOR_SPEED_MIN_MS}
+                          max={BUSY_INDICATOR_SPEED_MAX_MS}
+                          step={100}
+                          value={settings.busyIndicatorSpeedMs ?? BUSY_INDICATOR_SPEED_DEFAULT_MS}
+                          onChange={(e) => updateSettings({ busyIndicatorSpeedMs: Number(e.target.value) })}
+                        />
+                        <span className="setting-range-value">
+                          {t('settings.notifications.busy.speedValue', {
+                            seconds: ((settings.busyIndicatorSpeedMs ?? BUSY_INDICATOR_SPEED_DEFAULT_MS) / 1000).toFixed(1)
+                          })}
+                        </span>
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                <p className="modal-hint">
+                  {t('settings.notifications.busy.hint')}
+                </p>
+                {busyIndicator !== 'off' && busyIndicator !== 'ring' && (
+                  <p className="modal-hint">{t('settings.notifications.busy.reducedMotion')}</p>
+                )}
                 </div>
 
                 <div className="settings-group">

@@ -27,6 +27,7 @@ import { attachLinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
+import { PSREADLINE_HEAL_SEQUENCE } from '../../shared/psreadline-heal';
 import {
   STUCK_MODE_RESET,
   sanitizeRestoredScrollback,
@@ -273,6 +274,51 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     };
     term.parser.registerOscHandler(9, (data) => reportCwd(parseOsc9(data)));
     term.parser.registerOscHandler(7, (data) => reportCwd(parseOsc7(data)));
+    // Heilung der PSReadLine-Eingabespalte nach einer Verbreiterung.
+    //
+    // PSReadLine 2.0.0 rechnet bei jeder Konsolengrößenänderung
+    // `_initialX %= BufferWidth`. War das PTY dabei schmaler als der Prompt
+    // lang ist, bleibt die Spalte dauerhaft falsch und jede Eingabe wird
+    // mitten in den Prompt gezeichnet. Nur `InvokePrompt()` repariert das; der
+    // Bootstrap legt es auf F24, wir drücken die Taste danach für den Nutzer
+    // (siehe src/shared/psreadline-heal.ts und den Plan im docs-Ordner).
+    //
+    // Drei Bedingungen, alle notwendig:
+    //  * win32 und lokal — die Bytes sind win32-input-mode. Conhost verwirft
+    //    ein unbekanntes CSI still, eine POSIX-Pty hat aber gar keinen Parser
+    //    dafür und würde sie als getippt in die Kommandozeile schreiben.
+    //  * Die Pane hat den privaten Prompt-Marker mit unserem Nonce gezeigt.
+    //    Auf win32 bekommt nur powershell/pwsh den Bootstrap (siehe
+    //    shellArgs) — der Marker IST also der Beleg, dass hier eine
+    //    PowerShell mit gebundenem F24 sitzt.
+    //  * Seit diesem Marker wurde keine Zeile abgeschickt. Nur dann kann ein
+    //    Programm laufen, das die Bytes statt PSReadLine abbekäme.
+    const healEnabled = !remote && window.api.platform === 'win32';
+    // Die Heilung muss dem Resize folgen, nicht ihm vorauslaufen: InvokePrompt
+    // liest Console.CursorLeft, und vor dem Reflow steht der noch auf der
+    // umgebrochenen Position. Umgekehrt darf die Verzögerung nicht in die Nähe
+    // menschlicher Reaktionszeit kommen — wer nach dem Ziehen sofort tippt,
+    // soll nicht doch in den kaputten Prompt schreiben. Beides zusammen ist
+    // eine kurze Frist: das Resize geht als IPC raus und wird im Main synchron
+    // an ResizePseudoConsole durchgereicht, die Tastenbytes nehmen danach
+    // denselben Weg.
+    const HEAL_DELAY_MS = 30;
+    let promptArmed = false;
+    let healTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleHeal = (): void => {
+      if (!healEnabled) return;
+      if (healTimer !== null) clearTimeout(healTimer);
+      healTimer = setTimeout(() => {
+        healTimer = null;
+        if (!promptArmed) return;
+        // Bewusst ohne autoTitleTracker/activity: das sind synthetische Bytes,
+        // kein Nutzer-Input. Der Marker, den InvokePrompt danach erneut
+        // ausgibt, trifft eine Pane am leeren Prompt — der Titel ist dort
+        // ohnehin schon leer, das Re-Arming ist also folgenlos.
+        window.api.input({ paneId, data: PSREADLINE_HEAL_SEQUENCE });
+      }, HEAL_DELAY_MS);
+    };
+
     // A private marker emitted only by DM Workspace's LOCAL shell hook. Unlike
     // OSC 7, it is not forwarded by a remote SSH shell, so it safely tells the
     // title tracker when a command ended and the local prompt is ready again.
@@ -283,6 +329,14 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // capture for the next line the user types (a sudo password).
       if (isPromptPayload(data, window.api.promptNonce)) {
         autoTitleTracker.onShellPrompt();
+        // Ab hier steht ein leerer lokaler Prompt — der einzige Zustand, in dem
+        // die Heilung gefahrlos gesendet werden darf.
+        promptArmed = true;
+        // Zusätzlich melden, damit die Navigation es sehen kann. promptArmed
+        // bleibt lokal, weil die Heilung es synchron braucht; hier wird nur
+        // gemeldet, nicht abgeleitet — was der Zustand bedeutet, entscheidet
+        // shared/pane-busy.ts.
+        useStore.getState().setPaneShell(paneId, 'atPrompt');
         // The local prompt is on screen, so no full-screen program owns the
         // terminal: an alt screen or mouse tracking still active here is stale —
         // left behind by a TUI that crashed or was killed (e.g. by an app
@@ -391,6 +445,12 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
       useStore.getState().setPaneAutoTitle(paneId, '');
+      // Eine tote Pane arbeitet nicht mehr. Ohne das bliebe der zuletzt
+      // gemeldete Zustand stehen — bei einem Prozess, der mitten in einem
+      // Kommando stirbt, also 'running', und der Indikator hinge für immer.
+      // 'unknown' statt 'atPrompt': es gibt keinen Prompt mehr, der Rückfall
+      // auf die Heuristik ist hier die ehrlichere Aussage.
+      useStore.getState().setPaneShell(paneId, 'unknown');
       // tRef statt t: die Meldung erscheint in der Sprache, die beim Beenden des
       // Prozesses eingestellt ist — nicht in der, die beim Mount der Pane galt.
       term.write(`\r\n[${tRef.current('terminal.processExited', { code: exitCode })}]\r\n`);
@@ -400,6 +460,27 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // verworfen (der Server lehnt ihn ohnehin ab) — so tippt niemand
       // "ins Leere" mit sichtbarer Verzögerung bis zur Server-Ablehnung.
       if (remote && !isPaneWritable(useStore.getState(), paneId)) return;
+      // Erst das Absenden einer Zeile kann ein Programm starten, das die Bytes
+      // der Heilung abbekäme. Eine angefangene Eingabe ist harmlos: dort liegt
+      // PSReadLine noch selbst am Ruder und zeichnet sie nach InvokePrompt an
+      // der korrigierten Spalte neu — genau der Fall, für den die Heilung da
+      // ist. Bis zum nächsten Prompt-Marker bleibt sie danach aus.
+      if (/[\r\n]/.test(data)) {
+        promptArmed = false;
+        // 'running' heißt nur: seit dem letzten Prompt wurde eine Zeile
+        // abgeschickt. NICHT: hier arbeitet gerade etwas. Der Unterschied ist
+        // gemessen, an echten Claude- und Codex-Sitzungen: startet die Zeile ein
+        // interaktives Unterprogramm — Agent, ssh, REPL, tmux —, druckt das
+        // seinen eigenen Prompt, aber nie unseren Marker (Multiplexer schlucken
+        // den privaten OSC zusätzlich, siehe den Handler oben). Der Zustand
+        // bleibt dann bis zum Ende dieses Programms stehen, obwohl der Agent
+        // längst auf Eingabe wartet.
+        //
+        // Deshalb wertet pane-busy.ts nur 'atPrompt' als Auskunft und lässt
+        // sonst die Ausgabe entscheiden. Wer diesen Melder liest, darf ihn also
+        // nicht als „läuft" verstehen — er ist die Gegenprobe zu 'atPrompt'.
+        useStore.getState().setPaneShell(paneId, 'running');
+      }
       autoTitleTracker.onInput(data);
       window.api.input({ paneId, data });
       activity.onInput();
@@ -436,9 +517,19 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
     let spawned = false;
     let spawnSent = false; // true once the spawn IPC has actually gone out
-    const spawnOnce = () => {
+    // Zuletzt an das PTY gemeldete Geometrie — der Spawn zählt als erste
+    // Meldung. Ohne das schickt der Scheduler nach jedem Fit ein pty:resize,
+    // auch wenn sich cols/rows gar nicht geändert haben.
+    let sentCols = 0;
+    let sentRows = 0;
+    const spawnNow = (): void => {
       if (spawned) return;
       spawned = true;
+      // Unmittelbar vor dem Spawn noch einmal fitten: zwischen dem letzten Fit
+      // und dem Ablauf des Breiten-Debounce (siehe spawnOnce) kann sich die
+      // Pane bewegt haben, und die Spawn-Dimensionen sind genau die, mit denen
+      // die Shell ihren ersten Prompt zeichnet.
+      safeFit();
       void restoreOnce().then(() => {
         // Remote-Panes spawnen mit target: der BackendRouter reicht sie an das
         // RemotePtyBackend weiter (Subscribe statt lokalem PTY). Der scopeKey
@@ -453,8 +544,12 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           : undefined;
         // Ein fehlgeschlagener Spawn hinterlässt eine tote Pane — sichtbar machen
         // statt als stillen Rejection verpuffen zu lassen.
-        void window.api.spawn({ paneId, cwd, cols: term.cols || 80, rows: term.rows || 24, ...(target ? { target } : {}) })
+        const cols = term.cols || 80;
+        const rows = term.rows || 24;
+        void window.api.spawn({ paneId, cwd, cols, rows, ...(target ? { target } : {}) })
           .catch((err: unknown) => console.error(`[pane ${paneId}] spawn failed:`, err));
+        sentCols = cols;
+        sentRows = rows;
         spawnSent = true;
         // One-shot startup command for a pane created from a template. Consuming
         // clears it (and persists) so it never runs again after a restart. The
@@ -467,6 +562,47 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           activity.onInput();
         }
       });
+    };
+
+    // Spawnen erst, wenn die Panebreite stabil ist.
+    //
+    // Die Shell zeichnet ihren ersten Prompt sofort nach dem Spawn. Ändert sich
+    // die Spaltenzahl danach noch einmal, rechnet PowerShells PSReadLine 2.0.0
+    // `_initialX = _initialX % BufferWidth` — war das PTY dabei schmaler als
+    // der Prompt lang ist, landet jede Eingabe fortan mitten im Prompt
+    // (docs/superpowers/plans/2026-08-22-psreadline-initialx-fix.md). Zwei
+    // Frames wie bisher reichen dafür nicht: WebGL-Messung, Host-Pinning und
+    // ein Workspace-Wechsel verschieben die Breite noch danach.
+    //
+    // Panes ohne messbare Breite (verstecktes Workspace, clientWidth === 0)
+    // spawnen unverändert sofort mit dem 80x24-Fallback — dort gäbe es sonst
+    // nie einen Prozess. Die Deckelung verhindert, dass eine Pane, deren Breite
+    // sich dauernd ändert (laufender Splitter-Drag), gar nicht mehr startet.
+    const SPAWN_SETTLE_MS = 100;
+    const SPAWN_SETTLE_MAX = 10;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    let settleWidth = -1;
+    let settleTries = 0;
+    const paneWidth = (): number => (host.parentElement ?? host).clientWidth;
+    const spawnOnce = (): void => {
+      if (spawned) return;
+      const width = paneWidth();
+      if (width <= 0) { spawnNow(); return; }
+      if (settleTimer !== null) {
+        if (width === settleWidth) return; // schon armiert, Breite unverändert
+        clearTimeout(settleTimer);
+      }
+      settleWidth = width;
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        // Breite hat sich seit dem Armieren wieder bewegt: neu abwarten, bis
+        // das Budget aufgebraucht ist.
+        if (paneWidth() !== settleWidth && settleTries++ < SPAWN_SETTLE_MAX) {
+          spawnOnce();
+          return;
+        }
+        spawnNow();
+      }, SPAWN_SETTLE_MS);
     };
 
     // Fit + spawn after the flex layout has settled so the PTY starts at the
@@ -493,7 +629,21 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // spawn itself carries the freshly fitted cols/rows, so nothing is lost.
         return spawnSent;
       },
-      sendResize: () => window.api.resize({ paneId, cols: term.cols, rows: term.rows }),
+      // Unveränderte Geometrie nicht melden: jedes pty:resize löst am anderen
+      // Ende ein SIGWINCH bzw. einen ConPTY-Repaint aus, und genau der bringt
+      // PSReadLine dazu, seine Eingabespalte neu zu rechnen. Der Spawn zählt
+      // als erste Meldung (siehe sentCols/sentRows).
+      sendResize: () => {
+        if (term.cols === sentCols && term.rows === sentRows) return;
+        const widened = term.cols > sentCols;
+        sentCols = term.cols;
+        sentRows = term.rows;
+        window.api.resize({ paneId, cols: term.cols, rows: term.rows });
+        // Nur Verbreiterungen: beim Schmalerwerden ist die von PSReadLine neu
+        // gerechnete Spalte korrekt (der Prompt bricht dort wirklich um), erst
+        // das spätere Verbreitern macht sie falsch.
+        if (widened) scheduleHeal();
+      },
       // The wrapper's width: unlike the host it is never pinned, so it always
       // tracks the pane layout. Width changes defer the fit (see scheduler).
       getWidth: () => (host.parentElement ?? host).clientWidth
@@ -535,6 +685,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       saveScheduler.dispose();
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
+      if (settleTimer !== null) { clearTimeout(settleTimer); settleTimer = null; }
+      if (healTimer !== null) { clearTimeout(healTimer); healTimer = null; }
       ro.disconnect();
       resizeScheduler.dispose();
       unregisterTerminalLayoutRefresh(paneId);

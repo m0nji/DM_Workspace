@@ -2,10 +2,14 @@ import { homedir } from 'os';
 import { readFileSync } from 'fs';
 import { writeFileAtomic } from './atomic-write';
 import type {
-  AppState, LayoutNode, ServerConfig, Settings, WindowBounds, Workspace, WorkspaceTemplate,
-  WorkspaceNavigationPlacement
+  AppState, BusyIndicator, LayoutNode, ServerConfig, Settings, WindowBounds, Workspace,
+  WorkspaceGroup, WorkspaceTemplate, WorkspaceNavigationPlacement
+} from '../shared/types';
+import {
+  BUSY_INDICATOR_KINDS, BUSY_INDICATOR_SPEED_MAX_MS, BUSY_INDICATOR_SPEED_MIN_MS
 } from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
+import { normalizeGroups } from '../shared/workspace-groups';
 import { SHORTCUT_ACTIONS, type ShortcutAction } from '../shared/shortcuts';
 
 // Keep only entries whose value is a non-empty string; returns undefined when the
@@ -15,6 +19,10 @@ function migrateStringMap(raw: unknown): Record<string, string> | undefined {
   const entries = Object.entries(raw as Record<string, unknown>)
     .filter(([, value]) => typeof value === 'string' && value.trim().length > 0) as Array<[string, string]>;
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function isBusyIndicator(raw: unknown): raw is BusyIndicator {
+  return typeof raw === 'string' && (BUSY_INDICATOR_KINDS as readonly string[]).includes(raw);
 }
 
 // Keep only known shortcut actions mapped to non-empty strings.
@@ -84,6 +92,18 @@ export function migrateSettings(raw: unknown): Settings {
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
   if (typeof r.clickMovesCursor === 'boolean') out.clickMovesCursor = r.clickMovesCursor;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;
+  // Die drei Werte des Laufanzeigers landen in der Oberflaeche direkt in
+  // CSS-Eigenschaften, deshalb wird hier geprueft statt geglaubt: eine
+  // unbekannte Art waere ein Klassenname ins Leere, eine wilde Zahl eine
+  // Animationsdauer von Stunden oder Millisekunden.
+  if (isBusyIndicator(r.busyIndicator)) out.busyIndicator = r.busyIndicator;
+  if (typeof r.busyIndicatorColor === 'string') out.busyIndicatorColor = r.busyIndicatorColor;
+  if (typeof r.busyIndicatorSpeedMs === 'number' && Number.isFinite(r.busyIndicatorSpeedMs)) {
+    out.busyIndicatorSpeedMs = Math.min(
+      BUSY_INDICATOR_SPEED_MAX_MS,
+      Math.max(BUSY_INDICATOR_SPEED_MIN_MS, Math.round(r.busyIndicatorSpeedMs))
+    );
+  }
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
   if (typeof r.restoreTerminalHistory === 'boolean') out.restoreTerminalHistory = r.restoreTerminalHistory;
   // brandDesign/locale MUST survive the round-trip: dropping them here is what
@@ -177,6 +197,11 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
   const out: Workspace = { id: r.id, name: r.name, cwd: r.cwd, layout };
   if (typeof r.color === 'string') out.color = r.color;
   if (typeof r.tasksEnabled === 'boolean') out.tasksEnabled = r.tasksEnabled;
+  // Group membership has to be carried over explicitly: this function builds a
+  // NEW object and keeps only what is named here, so anything not listed is
+  // dropped on every load. An empty id would not name a group, so only a
+  // non-empty string counts; deserialize drops ids that name no group at all.
+  if (typeof r.groupId === 'string' && r.groupId.length > 0) out.groupId = r.groupId;
   const paneTitles = migrateStringMap(r.paneTitles);
   if (paneTitles) out.paneTitles = paneTitles;
   const pendingStartupCommands = migrateStringMap(r.pendingStartupCommands);
@@ -229,6 +254,37 @@ function migrateWorkspaceTemplate(raw: unknown): WorkspaceTemplate | undefined {
   return out;
 }
 
+// A group needs an id and a name. The name may be empty: that is exactly the
+// state a group is created in, before the user has typed one. Colour and
+// collapsed are optional and only kept when they have the expected type.
+function migrateWorkspaceGroup(raw: unknown): WorkspaceGroup | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || r.id.length === 0) return undefined;
+  if (typeof r.name !== 'string') return undefined;
+  const out: WorkspaceGroup = { id: r.id, name: r.name };
+  if (typeof r.color === 'string') out.color = r.color;
+  if (typeof r.collapsed === 'boolean') out.collapsed = r.collapsed;
+  return out;
+}
+
+// Unreadable entries are dropped rather than taking the whole list with them —
+// losing one group beats losing every workspace. On a duplicate id the first
+// entry wins: a `groupId` names exactly one group, so a second one carrying the
+// same id could never be addressed anyway.
+function migrateWorkspaceGroups(raw: unknown): WorkspaceGroup[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: WorkspaceGroup[] = [];
+  for (const entry of raw) {
+    const group = migrateWorkspaceGroup(entry);
+    if (group === undefined || seen.has(group.id)) continue;
+    seen.add(group.id);
+    out.push(group);
+  }
+  return out;
+}
+
 export function deserialize(json: string): AppState {
   try {
     // Explizit unknown statt des impliziten any von JSON.parse: die Guards unten
@@ -237,9 +293,19 @@ export function deserialize(json: string): AppState {
     const parsed: unknown = JSON.parse(json);
     if (!isValidRoot(parsed)) return defaultState();
     const rawWorkspaces = parsed.workspaces as unknown[];
-    const workspaces = rawWorkspaces
+    const migrated = rawWorkspaces
       .map(migrateWorkspace)
       .filter((w): w is Workspace => w !== undefined);
+    // Groups are repaired, not believed — same stance as the activeWorkspaceId
+    // check below. A file on disk can come from an older build, a crash between
+    // two writes, or an editor: normalizeGroups drops ids naming no group,
+    // drops groups with no members, and pulls a broken run back together. It
+    // runs first so everything below already sees the repaired list.
+    const normalized = normalizeGroups({
+      workspaces: migrated,
+      groups: migrateWorkspaceGroups((parsed as unknown as Record<string, unknown>).workspaceGroups)
+    });
+    const workspaces = normalized.workspaces;
     const rawActiveWorkspaceId = parsed.activeWorkspaceId as string | null;
     const activeWorkspaceId = workspaces.some((w) => w.id === rawActiveWorkspaceId)
       ? rawActiveWorkspaceId
@@ -251,6 +317,10 @@ export function deserialize(json: string): AppState {
       activeWorkspaceId,
       settings: migrateSettings(parsed.settings)
     };
+    // Absent rather than empty: a state with no groups has to look exactly like
+    // one written before groups existed, so nothing downstream has to tell the
+    // two apart.
+    if (normalized.groups.length > 0) out.workspaceGroups = normalized.groups;
     const rawTemplates = (parsed as unknown as Record<string, unknown>).workspaceTemplates;
     if (Array.isArray(rawTemplates)) {
       out.workspaceTemplates = rawTemplates

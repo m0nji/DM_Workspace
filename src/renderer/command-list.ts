@@ -5,7 +5,7 @@ import {
   REMOTE_MAX_PANES, remotePaneCloseBlock, remotePaneCreateBlock, tasksAvailable,
   type RemoteBlockReason, type RemoteConnectionState, type StoreState
 } from './store';
-import type { Workspace, WorkspaceTemplate } from '../shared/types';
+import type { Workspace, WorkspaceGroup, WorkspaceTemplate } from '../shared/types';
 
 export interface CommandItem {
   id: string;
@@ -28,6 +28,7 @@ export interface CommandListInput {
   actions: StoreState;               // die Aktionen, die run() auslöst
   workspaces: Workspace[];
   templates: WorkspaceTemplate[];
+  workspaceGroups: WorkspaceGroup[];
   activeWorkspaceId: string | null;
   focusedPaneId: string | null;
   shortcutBindings: Partial<Record<ShortcutAction, string>> | undefined;
@@ -41,13 +42,19 @@ export interface CommandListInput {
 // steckt die gesamte Fallunterscheidung lokal/remote, und genau die war bisher
 // die einzige Verzweigung dieses Arbeitspakets ohne Test.
 export function buildCommandList({
-  actions: s, workspaces, templates, activeWorkspaceId, focusedPaneId,
+  actions: s, workspaces, templates, workspaceGroups, activeWorkspaceId, focusedPaneId,
   shortcutBindings, remote, t, isMac, close
 }: CommandListInput): CommandItem[] {
   const bindings = resolveShortcuts(shortcutBindings, isMac);
   const hint = (a: ShortcutAction): string => formatShortcut(bindings[a], isMac);
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const act = (fn: () => void) => () => { close(); fn(); };
+  // Eine namenlose Gruppe ist ein gültiger Zustand (direkt nach dem Anlegen) —
+  // in einem Befehlstext wäre sie ohne Ersatzwort nicht benennbar. Dieselbe
+  // Aushilfe wie am Chip in der Navigation.
+  const groupLabel = (g: WorkspaceGroup): string => g.name || t('workspace.group.unnamed');
+  const groupOf = (w: Workspace | undefined): WorkspaceGroup | undefined =>
+    w?.groupId === undefined ? undefined : workspaceGroups.find((g) => g.id === w.groupId);
 
   const catActions = t('palette.group.actions');
   const catTemplates = t('palette.group.templates');
@@ -133,6 +140,66 @@ export function buildCommandList({
     );
   }
 
+  // Register-Gruppen. Das Gruppieren selbst bleibt bewusst eine Drag-Geste: es
+  // braucht immer ein zweites Register als Ziel, und ein Palettentext ohne
+  // Zielauswahl müsste sich eines aussuchen — dieselbe Begründung, mit der die
+  // Spec ein Tastenkürzel fürs Gruppieren ablehnt. Die Palette übernimmt die
+  // Verwaltung und den Beitritt zu einer BESTEHENDEN Gruppe, wo das Ziel im
+  // Eintrag selbst steht.
+  const activeGroup = groupOf(activeWs);
+  if (activeWs && activeGroup) {
+    const name = groupLabel(activeGroup);
+    const collapsed = activeGroup.collapsed ?? false;
+    list.push(
+      {
+        id: 'group-collapse',
+        title: collapsed ? t('palette.cmd.expandGroup', { name }) : t('palette.cmd.collapseGroup', { name }),
+        category: catActions,
+        run: act(() => s.setWorkspaceGroupCollapsed(activeGroup.id, !collapsed))
+      },
+      {
+        // Umbenennen braucht eine Eingabe, die die Palette nicht hat: der
+        // Eintrag setzt deshalb nur das Ziel und überlässt die Eingabe dem
+        // Inline-Editor am Chip — derselbe Weg, den 'search' zum Pane nimmt.
+        // Ohne das ließe sich eine Gruppe per Tastatur anlegen und auflösen,
+        // aber nie benennen, und namenlos ist ihr Anfangszustand.
+        id: 'group-rename',
+        title: t('palette.cmd.renameGroup', { name }),
+        category: catActions,
+        run: act(() => s.setRenamingGroup(activeGroup.id))
+      },
+      {
+        id: 'group-leave',
+        title: t('palette.cmd.leaveGroup', { name }),
+        // Herauslösen verschiebt sichtbar: aus der Mitte eines Laufs kann das
+        // Register nicht liegen bleiben, ohne die Gruppe zu zerreißen. Es in
+        // der Unterzeile zu sagen ist ehrlicher, als es geschehen zu lassen.
+        subtitle: t('palette.cmd.leaveGroupHint'),
+        category: catActions,
+        run: act(() => s.ungroupWorkspace(activeWs.id))
+      },
+      {
+        id: 'group-dissolve',
+        title: t('palette.cmd.dissolveGroup', { name }),
+        category: catActions,
+        run: act(() => s.dissolveWorkspaceGroup(activeGroup.id))
+      }
+    );
+  }
+  if (activeWs) {
+    // Ein Eintrag je Gruppe statt eines Eintrags mit Zielauswahl: so steht das
+    // Ziel im Text und die Palette braucht keinen zweiten Schritt.
+    workspaceGroups.forEach((g) => {
+      if (g.id === activeWs.groupId) return;
+      list.push({
+        id: `group-join-${g.id}`,
+        title: t('palette.cmd.joinGroup', { name: groupLabel(g) }),
+        category: catActions,
+        run: act(() => s.dropWorkspaceTab(activeWs.id, { kind: 'group', id: g.id }, 'into'))
+      });
+    });
+  }
+
   list.push(
     { id: 'toggle-preview', title: t('palette.cmd.togglePreview'), category: catActions, hint: hint('togglePreview'), run: act(() => s.togglePreview()) },
     { id: 'open-file-browser', title: t('palette.cmd.openFileBrowser'), category: catActions, run: act(() => s.openFiles()) },
@@ -146,14 +213,19 @@ export function buildCommandList({
 
   workspaces.forEach((w, idx) => {
     if (w.id === activeWorkspaceId) return;
+    // Zwei gleich benannte Workspaces sind in der Liste sonst nicht
+    // auseinanderzuhalten; die Gruppe steht deshalb mit in der Unterzeile und
+    // ist auch suchbar, damit "backend" alle Mitglieder findet.
+    const group = groupOf(w);
+    const inGroup = group ? t('palette.cmd.inGroup', { name: groupLabel(group) }) : undefined;
     list.push({
       id: `switch-${w.id}`,
       title: t('palette.cmd.switchToWorkspace', { name: w.name }),
-      subtitle: w.cwd,
+      subtitle: inGroup ? `${inGroup} · ${w.cwd}` : w.cwd,
       category: catWorkspaces,
       // Mod+1..9 jumps to the workspace at that position in the sidebar.
       hint: idx < 9 ? formatShortcut(`Mod+${idx + 1}`, isMac) : undefined,
-      keywords: w.cwd,
+      keywords: group ? `${w.cwd} ${groupLabel(group)}` : w.cwd,
       run: act(() => s.selectWorkspace(w.id))
     });
   });

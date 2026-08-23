@@ -32,14 +32,24 @@
     "closeConfirm": "Close workspace",
     "remoteServerRemoved": "Server removed",
     "remoteTitle": "Remote workspace on {{server}}",
-    "remoteTitleUnknown": "Remote workspace — server removed"
+    "remoteTitleUnknown": "Remote workspace — server removed",
+    "group": {
+      "unnamed": "Group",
+      "hintGroupWith": "Group with “{{name}}”",
+      "hintJoin": "Add to group “{{name}}”",
+      "hintLeave": "Move out of group “{{name}}”",
+      "rename": "Rename group"
+    }
   },
   "tooltip": {
     "editWorkspace": "Edit workspace",
     "deleteWorkspace": "Close workspace",
     "terminalsReady": "Terminals ready",
     "addWorkspace": "Add workspace",
-    "whatsNewChangelog": "What's new – show changelog"
+    "whatsNewChangelog": "What's new – show changelog",
+    "collapseGroup": "Collapse group",
+    "expandGroup": "Expand group",
+    "dissolveGroup": "Dissolve group"
   },
   "settings": {
     "title": "Settings",
@@ -152,7 +162,22 @@
       "showReadyBadgeHint": "Shows a green count on inactive workspaces when their terminals finish working.",
       "title": "Notifications",
       "desktopNotifications": "Desktop notifications",
-      "desktopNotificationsHint": "Show an OS notification when a terminal finishes in a background workspace. Off by default."
+      "desktopNotificationsHint": "Show an OS notification when a terminal finishes in a background workspace. Off by default.",
+      "busy": {
+        "title": "Running registers",
+        "hint": "Marks a register’s colour dot while one of its panes is producing output — that is, while something is still happening there. Once the shell is back at its prompt it reports that itself, and the mark reliably clears. Two limits: a command that stays completely silent for several seconds counts as finished. And a program that repaints its display regularly can flash briefly even while it waits for input.",
+        "kind": "Style",
+        "kindOff": "Off",
+        "kindRing": "Ring",
+        "kindPulse": "Pulse",
+        "kindBlink": "Blink",
+        "kindSpin": "Spin",
+        "color": "Colour",
+        "colorDefault": "Accent colour",
+        "speed": "Speed",
+        "speedValue": "{{seconds}} s",
+        "reducedMotion": "With reduced motion enabled system-wide, every style shows the quiet ring."
+      }
     },
     "updates": {
       "title": "Updates",
@@ -200,7 +225,15 @@
       "newFromTemplate": "New workspace from template: {{name}}",
       "editTemplate": "Edit template: {{name}}",
       "deleteTemplate": "Delete template: {{name}}",
-      "openTasks": "Open scheduled tasks"
+      "openTasks": "Open scheduled tasks",
+      "collapseGroup": "Collapse group “{{name}}”",
+      "expandGroup": "Expand group “{{name}}”",
+      "leaveGroup": "Move out of group “{{name}}”",
+      "leaveGroupHint": "The workspace moves to just after the group",
+      "dissolveGroup": "Dissolve group “{{name}}”",
+      "joinGroup": "Add to group “{{name}}”",
+      "inGroup": "Group “{{name}}”",
+      "renameGroup": "Rename group “{{name}}”"
     }
   },
   "welcome": {
@@ -536,7 +569,11 @@
         "skipped": "skipped",
         "interrupted": "interrupted"
       },
-      "role": { "owner": "Owner", "editor": "Editor", "viewer": "Viewer" }
+      "role": {
+        "owner": "Owner",
+        "editor": "Editor",
+        "viewer": "Viewer"
+      }
     }
   },
   "terminal": {

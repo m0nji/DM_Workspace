@@ -18,7 +18,7 @@
 // the app immediately repaints at the width xterm actually has.
 
 export interface ResizeSchedulerOptions {
-  /** Perform the fit; return false when the host isn't measurable (skips the IPC). */
+  /** Perform the fit; return false when the fit could not run (skips the IPC, arms a retry). */
   fit: () => boolean;
   /** Send the pty resize for the current dimensions. */
   sendResize: () => void;
@@ -33,6 +33,12 @@ export interface ResizeSchedulerOptions {
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
   debounceMs?: number;
+  /**
+   * How many times a failed fit is retried before the scheduler stops on its
+   * own. Every new resize event refunds the budget, so this only bounds a pane
+   * that never becomes fittable — see armRetry.
+   */
+  maxFitRetries?: number;
 }
 
 export interface ResizeScheduler {
@@ -48,22 +54,61 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
   const setTimer = opts.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
   const clearTimer = opts.clearTimer ?? ((h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>));
   const debounceMs = opts.debounceMs ?? 100;
+  const maxFitRetries = opts.maxFitRetries ?? 50;
 
   let frame: number | null = null;
   let timer: unknown = null; // trailing SIGWINCH debounce (height-only path)
   let settle: unknown = null; // deferred fit while the width is changing
+  let retry: unknown = null; // re-attempt after a fit that could not run
+  let retriesLeft = maxFitRetries;
   let lastWidth: number | null = null;
   let disposed = false;
+
+  const clearRetry = (): void => {
+    if (retry !== null) { clearTimer(retry); retry = null; }
+  };
 
   const cancelPending = (): void => {
     if (frame !== null) { caf(frame); frame = null; }
     if (timer !== null) { clearTimer(timer); timer = null; }
     if (settle !== null) { clearTimer(settle); settle = null; }
+    clearRetry();
+  };
+
+  // A fit can fail for reasons that pass on their own: the host isn't
+  // measurable yet, or the pane hasn't finished spawning (TerminalView's fit
+  // returns spawnSent, so the resize IPC can't race ahead of the spawn IPC).
+  // Dropping the resize there desyncs xterm from the pty — xterm is fitted to
+  // the new size, the shell still runs at the old one, and since the observer
+  // has already fired nothing ever reconciles them. So re-arm instead.
+  //
+  // The budget bounds the one case that never resolves: a pane that stays
+  // unmeasurable (a hidden workspace has clientWidth 0). Every real resize
+  // event refunds it, so becoming visible buys a fresh set of attempts.
+  const armRetry = (): void => {
+    if (disposed || retriesLeft <= 0) return;
+    retriesLeft--;
+    clearRetry();
+    retry = setTimer(() => {
+      retry = null;
+      if (!disposed) fitAndSend();
+    }, debounceMs);
+  };
+
+  // Fit and forward it to the pty in the same tick, so the two never disagree
+  // about the width.
+  const fitAndSend = (): void => {
+    lastWidth = opts.getWidth?.() ?? null;
+    if (!opts.fit()) { armRetry(); return; }
+    clearRetry();
+    opts.sendResize();
   };
 
   return {
     onResize() {
-      if (disposed || frame !== null) return;
+      if (disposed) return;
+      retriesLeft = maxFitRetries;
+      if (frame !== null) return;
       frame = raf(() => {
         frame = null;
         if (disposed) return;
@@ -75,14 +120,13 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
           if (settle !== null) clearTimer(settle);
           settle = setTimer(() => {
             settle = null;
-            if (disposed) return;
-            lastWidth = opts.getWidth?.() ?? null;
-            if (opts.fit()) opts.sendResize();
+            if (!disposed) fitAndSend();
           }, debounceMs);
           return;
         }
         lastWidth = width;
-        if (!opts.fit()) return;
+        if (!opts.fit()) { armRetry(); return; }
+        clearRetry();
         // Re-arm on every successful fit so the IPC fires once, after the last one.
         if (timer !== null) clearTimer(timer);
         timer = setTimer(() => {
@@ -94,8 +138,8 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
     flush() {
       if (disposed) return;
       cancelPending();
-      lastWidth = opts.getWidth?.() ?? null;
-      if (opts.fit()) opts.sendResize();
+      retriesLeft = maxFitRetries;
+      fitAndSend();
     },
     dispose() {
       disposed = true;

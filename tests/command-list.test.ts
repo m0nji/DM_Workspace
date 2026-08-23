@@ -42,6 +42,7 @@ function build(): CommandItem[] {
     actions: s,
     workspaces: s.workspaces,
     templates: s.workspaceTemplates ?? [],
+    workspaceGroups: s.workspaceGroups,
     activeWorkspaceId: s.activeWorkspaceId,
     focusedPaneId: s.focusedPaneId,
     shortcutBindings: s.settings.shortcutBindings,
@@ -94,6 +95,7 @@ describe('buildCommandList', () => {
       version: 1,
       workspaces: [{ id: 'w1', name: 'Lokal', cwd: '/tmp', layout: { type: 'pane', id: 'p1' } }],
       workspaceTemplates: [],
+      workspaceGroups: [],
       activeWorkspaceId: 'w1',
       settings: { themeId: 'default', terminalOpacity: 0.95 },
       remote: {},
@@ -199,5 +201,163 @@ describe('buildCommandList', () => {
   it('listet sie nicht ohne fokussiertes Pane', () => {
     useStore.setState({ focusedPaneId: null });
     expect(ids()).not.toContain('focus-pane-left');
+  });
+});
+
+// Register-Gruppen. Das Gruppieren selbst bleibt eine Drag-Geste — die Palette
+// verwaltet nur, was es schon gibt, und laesst einen Beitritt zu einer
+// bestehenden Gruppe zu, weil dort das Ziel im Eintrag selbst steht.
+describe('buildCommandList: Register-Gruppen', () => {
+  const ws = (id: string, groupId?: string) => ({
+    id, name: id.toUpperCase(), cwd: `/tmp/${id}`, layout: null,
+    ...(groupId === undefined ? {} : { groupId })
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { saveState, kill: vi.fn(), remotePaneCreate, remotePaneClose }
+    };
+    useStore.setState({
+      version: 1,
+      workspaces: [ws('w1', 'g1'), ws('w2', 'g1'), ws('w3')],
+      workspaceTemplates: [],
+      workspaceGroups: [{ id: 'g1', name: 'Backend' }],
+      activeWorkspaceId: 'w1',
+      settings: { themeId: 'default', terminalOpacity: 0.95 },
+      remote: {},
+      focusedPaneId: null,
+      maximizedPaneId: null,
+      pendingClosePane: null
+    });
+  });
+
+  it('bietet Verwaltung nur an, wenn der aktive Workspace in einer Gruppe ist', () => {
+    expect(ids()).toEqual(expect.arrayContaining(['group-collapse', 'group-leave', 'group-dissolve']));
+
+    useStore.setState({ activeWorkspaceId: 'w3' }); // gruppenlos
+    const loose = ids();
+    expect(loose).not.toContain('group-collapse');
+    expect(loose).not.toContain('group-leave');
+    expect(loose).not.toContain('group-dissolve');
+  });
+
+  it('nennt die Gruppe im Titel und schaltet zwischen Ein- und Ausklappen um', () => {
+    const collapse = build().find((c) => c.id === 'group-collapse');
+    expect(collapse?.title).toBe('palette.cmd.collapseGroup');
+
+    useStore.setState({ workspaceGroups: [{ id: 'g1', name: 'Backend', collapsed: true }] });
+    expect(build().find((c) => c.id === 'group-collapse')?.title).toBe('palette.cmd.expandGroup');
+  });
+
+  it('verschweigt nicht, dass Herausloesen das Register verschiebt', () => {
+    // Der Hinweis steht in der Unterzeile, wie bei den gesperrten
+    // Remote-Aktionen — der Titel bleibt kurz, die Folge trotzdem sichtbar.
+    expect(build().find((c) => c.id === 'group-leave')?.subtitle).toBe('palette.cmd.leaveGroupHint');
+  });
+
+  it('bietet je fremder Gruppe einen Beitritt an, nie fuer die eigene', () => {
+    useStore.setState({
+      workspaces: [ws('w1', 'g1'), ws('w2', 'g2'), ws('w3')],
+      workspaceGroups: [{ id: 'g1', name: 'Backend' }, { id: 'g2', name: 'Frontend' }]
+    });
+
+    expect(ids()).toContain('group-join-g2');
+    expect(ids()).not.toContain('group-join-g1'); // w1 ist bereits darin
+  });
+
+  it('greift fuer eine namenlose Gruppe auf das Ersatzwort zurueck', () => {
+    useStore.setState({ workspaceGroups: [{ id: 'g1', name: '' }] });
+    // Der Titel bleibt derselbe Schluessel; entscheidend ist, dass fuer den
+    // Namen nicht der Leerstring eingesetzt wird.
+    const dissolve = build().find((c) => c.id === 'group-dissolve');
+    expect(dissolve?.title).toBe('palette.cmd.dissolveGroup');
+  });
+
+  it('klappt die Gruppe des aktiven Workspace tatsaechlich ein', () => {
+    build().find((c) => c.id === 'group-collapse')?.run();
+    expect(useStore.getState().workspaceGroups).toEqual([{ id: 'g1', name: 'Backend', collapsed: true }]);
+  });
+
+  it('loest die Gruppe auf, ohne die Register zu verschieben', () => {
+    build().find((c) => c.id === 'group-dissolve')?.run();
+
+    const s = useStore.getState();
+    expect(s.workspaceGroups).toEqual([]);
+    expect(s.workspaces.map((w) => w.id)).toEqual(['w1', 'w2', 'w3']);
+    expect(s.workspaces.every((w) => w.groupId === undefined)).toBe(true);
+  });
+
+  it('loest den aktiven Workspace aus seiner Gruppe heraus', () => {
+    useStore.setState({ activeWorkspaceId: 'w2' });
+    build().find((c) => c.id === 'group-leave')?.run();
+
+    const s = useStore.getState();
+    expect(s.workspaces.find((w) => w.id === 'w2')?.groupId).toBeUndefined();
+    expect(s.workspaces.find((w) => w.id === 'w1')?.groupId).toBe('g1');
+  });
+
+  it('haengt den aktiven Workspace ans Ende der gewaehlten Gruppe', () => {
+    useStore.setState({
+      workspaces: [ws('w1', 'g1'), ws('w2', 'g1'), ws('w3')],
+      activeWorkspaceId: 'w3'
+    });
+
+    build().find((c) => c.id === 'group-join-g1')?.run();
+
+    const s = useStore.getState();
+    expect(s.workspaces.map((w) => w.id)).toEqual(['w1', 'w2', 'w3']);
+    expect(s.workspaces.every((w) => w.groupId === 'g1')).toBe(true);
+  });
+
+  it('nennt die Gruppe in Unterzeile und Suchbegriffen des Wechsel-Eintrags', () => {
+    const w2 = build().find((c) => c.id === 'switch-w2');
+    expect(w2?.subtitle).toBe('palette.cmd.inGroup · /tmp/w2');
+    expect(w2?.keywords).toBe('/tmp/w2 Backend');
+
+    const w3 = build().find((c) => c.id === 'switch-w3'); // gruppenlos
+    expect(w3?.subtitle).toBe('/tmp/w3');
+    expect(w3?.keywords).toBe('/tmp/w3');
+  });
+
+  it('laesst den Mod+N-Hinweis unveraendert', () => {
+    const grouped = build().find((c) => c.id === 'switch-w2')?.hint;
+
+    useStore.setState({
+      workspaces: [ws('w1'), ws('w2'), ws('w3')],
+      workspaceGroups: []
+    });
+    const loose = build().find((c) => c.id === 'switch-w2')?.hint;
+
+    // Der Hinweis folgt der Array-Position, nicht der Gruppierung.
+    expect(grouped).toBe(loose);
+    expect(grouped).toBeTruthy();
+  });
+
+  it('zeigt ohne Gruppen keinen einzigen Gruppen-Eintrag', () => {
+    useStore.setState({
+      workspaces: [ws('w1'), ws('w2'), ws('w3')],
+      workspaceGroups: []
+    });
+
+    const list = ids();
+    expect(list.some((id) => id.startsWith('group-'))).toBe(false);
+    expect(build().find((c) => c.id === 'switch-w2')?.subtitle).toBe('/tmp/w2');
+  });
+
+  // Umbenennen braucht eine Eingabe, die die Palette nicht hat. Der Eintrag
+  // setzt deshalb nur das Ziel; die Eingabe macht der Inline-Editor am Chip.
+  it('stoesst das Umbenennen an, statt selbst nach dem Namen zu fragen', () => {
+    expect(ids()).toContain('group-rename');
+
+    build().find((c) => c.id === 'group-rename')?.run();
+    expect(useStore.getState().renamingGroupId).toBe('g1');
+    // Der Name selbst bleibt unangetastet — die Palette benennt nicht um.
+    expect(useStore.getState().workspaceGroups).toEqual([{ id: 'g1', name: 'Backend' }]);
+  });
+
+  it('bietet das Umbenennen nicht an, wenn der aktive Workspace gruppenlos ist', () => {
+    useStore.setState({ activeWorkspaceId: 'w3' });
+    expect(ids()).not.toContain('group-rename');
   });
 });

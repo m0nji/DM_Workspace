@@ -215,3 +215,77 @@ describe('Panes tauschen im Store', () => {
     });
   });
 });
+
+// Der Shell-Zustand je Pane. Er speist die Anzeige "hier arbeitet noch etwas"
+// am Register und stammt aus dem Prompt-Marker, nicht aus der Heuristik.
+describe('Shell-Zustand der Panes im Store', () => {
+  beforeEach(() => {
+    saveState.mockClear();
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { saveState, kill: vi.fn() }
+    };
+    (globalThis as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number })
+      .requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    useStore.setState({
+      version: 1,
+      workspaces: [{ id: 'w1', name: 'One', cwd: '/tmp', layout: grid() }],
+      workspaceGroups: [],
+      activeWorkspaceId: 'w1',
+      focusedPaneId: 'tl',
+      maximizedPaneId: null,
+      paneStatus: {},
+      paneShell: {},
+      paneCwd: {},
+      paneAutoTitles: {},
+      pendingClosePane: null,
+      settings: { themeId: 'default', terminalOpacity: 0.75 }
+    });
+  });
+
+  it('merkt sich den gemeldeten Zustand je Pane', () => {
+    useStore.getState().setPaneShell('tl', 'atPrompt');
+    useStore.getState().setPaneShell('tr', 'running');
+
+    expect(useStore.getState().paneShell).toEqual({ tl: 'atPrompt', tr: 'running' });
+  });
+
+  it('erzeugt keinen neuen Zustand fuer eine unveraenderte Meldung', () => {
+    useStore.getState().setPaneShell('tl', 'running');
+    const before = useStore.getState().paneShell;
+
+    useStore.getState().setPaneShell('tl', 'running');
+
+    // Identitaet, nicht nur Gleichheit: die Navigation abonniert diese Map, ein
+    // neues Objekt pro Marker waere ein Rendern pro Prompt.
+    expect(useStore.getState().paneShell).toBe(before);
+  });
+
+  it('wird nicht persistiert', () => {
+    useStore.getState().setPaneShell('tl', 'running');
+    expect(saveState).not.toHaveBeenCalled();
+
+    useStore.getState().renameWorkspace('w1', 'Neu');
+    expect(saveState).toHaveBeenCalledTimes(1);
+    expect(saveState.mock.calls[0][0]).not.toHaveProperty('paneShell');
+  });
+
+  // Eine tote Pane darf keinen Eintrag hinterlassen: die Map wird ueber
+  // Pane-Ids adressiert, und die naechste Pane koennte dieselbe Id tragen.
+  it('raeumt den Eintrag beim Schliessen einer Pane ab', () => {
+    useStore.getState().setPaneShell('tl', 'running');
+    useStore.getState().setPaneShell('tr', 'running');
+
+    useStore.getState().closeActivePane('tl');
+
+    expect(useStore.getState().paneShell).toEqual({ tr: 'running' });
+  });
+
+  it('raeumt alle Eintraege beim Loeschen des Workspace ab', () => {
+    useStore.getState().setPaneShell('tl', 'running');
+    useStore.getState().setPaneShell('br', 'atPrompt');
+
+    useStore.getState().deleteWorkspace('w1');
+
+    expect(useStore.getState().paneShell).toEqual({});
+  });
+});

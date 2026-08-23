@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { createResizeScheduler } from '../src/renderer/resize-scheduler';
 
-function harness(fitResult: () => boolean = () => true, getWidth?: () => number) {
+function harness(
+  fitResult: () => boolean = () => true,
+  getWidth?: () => number,
+  maxFitRetries?: number
+) {
   let fits = 0;
   let resizes = 0;
   let rafCb: (() => void) | null = null;
   let rafCalls = 0;
-  // Multiple timers can be live at once (SIGWINCH debounce + width settle).
+  // Multiple timers can be live at once (SIGWINCH debounce + width settle + fit retry).
   const timers = new Map<number, () => void>();
   let nextTimer = 1;
   const sched = createResizeScheduler({
@@ -17,7 +21,8 @@ function harness(fitResult: () => boolean = () => true, getWidth?: () => number)
     caf: () => { rafCb = null; },
     setTimer: (fn) => { const id = nextTimer++; timers.set(id, fn); return id; },
     clearTimer: (h) => { timers.delete(h as number); },
-    debounceMs: 100
+    debounceMs: 100,
+    ...(maxFitRetries === undefined ? {} : { maxFitRetries })
   });
   return {
     sched,
@@ -60,12 +65,11 @@ describe('resize-scheduler', () => {
     expect(h.resizes()).toBe(1); // one SIGWINCH for the whole drag
   });
 
-  it('a failed fit does not arm the resize debounce', () => {
+  it('a failed fit sends no resize', () => {
     const h = harness(() => false);
     h.sched.onResize();
     h.fireRaf();
     expect(h.fits()).toBe(1);
-    expect(h.timerPending()).toBe(false);
     expect(h.resizes()).toBe(0);
   });
 
@@ -132,10 +136,10 @@ describe('resize-scheduler width settle', () => {
     const h = harness(() => true, () => width);
     h.sched.onResize();
     h.fireRaf();
-    expect(h.fits()).toBe(1); // first event: no previous width → live fit
+    expect(h.fits()).toBe(1); // first event: no previous width -> live fit
     h.sched.onResize();
     h.fireRaf();
-    expect(h.fits()).toBe(2); // width unchanged → still live
+    expect(h.fits()).toBe(2); // width unchanged -> still live
     h.fireTimer();
     expect(h.resizes()).toBe(1); // trailing SIGWINCH as before
   });
@@ -149,11 +153,11 @@ describe('resize-scheduler width settle', () => {
     width = 380;
     h.sched.onResize();
     h.fireRaf();
-    expect(h.fits()).toBe(1); // width changed → deferred, no fit yet
+    expect(h.fits()).toBe(1); // width changed -> deferred, no fit yet
     width = 350;
     h.sched.onResize();
     h.fireRaf();
-    expect(h.fits()).toBe(1); // still dragging → still deferred
+    expect(h.fits()).toBe(1); // still dragging -> still deferred
     h.fireAllTimers(); // settle
     expect(h.fits()).toBe(2); // one fit at the final width
     expect(h.resizes()).toBeGreaterThanOrEqual(1); // pty resized with it
@@ -186,5 +190,111 @@ describe('resize-scheduler width settle', () => {
     h.sched.dispose();
     h.fireAllTimers();
     expect(h.fits()).toBe(1); // only the initial live fit
+  });
+});
+
+// A fit fails when the host isn't measurable yet or the pane hasn't finished
+// spawning (TerminalView's fit returns spawnSent). Both pass on their own, but
+// the ResizeObserver has already fired: without a retry xterm stays fitted to
+// the new size while the pty keeps the old one, and nothing ever reconciles
+// them - the desync this whole module exists to prevent.
+describe('resize-scheduler fit retry', () => {
+  it('re-arms after a failed fit and sends the resize once the fit succeeds', () => {
+    let fitOk = false;
+    const h = harness(() => fitOk);
+    h.sched.onResize();
+    h.fireRaf();
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(0);
+    expect(h.timerPending()).toBe(true); // retry armed, not dropped
+    fitOk = true;
+    h.fireTimer();
+    expect(h.fits()).toBe(2);
+    expect(h.resizes()).toBe(1); // the resize the old code lost for good
+  });
+
+  it('keeps retrying while the fit keeps failing', () => {
+    let fitOk = false;
+    const h = harness(() => fitOk);
+    h.sched.onResize();
+    h.fireRaf();
+    h.fireTimer();
+    expect(h.fits()).toBe(2);
+    expect(h.timerPending()).toBe(true);
+    h.fireTimer();
+    expect(h.fits()).toBe(3);
+    expect(h.resizes()).toBe(0);
+    fitOk = true;
+    h.fireTimer();
+    expect(h.fits()).toBe(4);
+    expect(h.resizes()).toBe(1);
+  });
+
+  it('re-arms after a failed deferred fit on the width path', () => {
+    let width = 400;
+    let fitOk = true;
+    const h = harness(() => fitOk, () => width);
+    h.sched.onResize();
+    h.fireRaf();
+    h.fireAllTimers(); // initial live fit + trailing SIGWINCH
+    const before = h.resizes();
+    width = 300;
+    fitOk = false;
+    h.sched.onResize();
+    h.fireRaf();
+    h.fireAllTimers(); // settle fires, fit fails
+    expect(h.resizes()).toBe(before);
+    expect(h.timerPending()).toBe(true); // retry armed instead of giving up
+    fitOk = true;
+    h.fireAllTimers();
+    expect(h.resizes()).toBe(before + 1);
+  });
+
+  it('flush re-arms too when its immediate fit fails', () => {
+    let fitOk = false;
+    const h = harness(() => fitOk);
+    h.sched.flush();
+    expect(h.resizes()).toBe(0);
+    expect(h.timerPending()).toBe(true);
+    fitOk = true;
+    h.fireTimer();
+    expect(h.resizes()).toBe(1);
+  });
+
+  it('gives up after the retry budget so an unmeasurable pane cannot spin forever', () => {
+    const h = harness(() => false, undefined, 3);
+    h.sched.onResize();
+    h.fireRaf(); // initial fit fails, 3 retries left
+    h.fireTimer();
+    h.fireTimer();
+    h.fireTimer();
+    expect(h.fits()).toBe(4); // initial + 3 retries
+    expect(h.timerPending()).toBe(false); // budget spent, no endless 10 Hz loop
+  });
+
+  it('a new resize event refunds the retry budget', () => {
+    const h = harness(() => false, undefined, 1);
+    h.sched.onResize();
+    h.fireRaf();
+    h.fireTimer(); // budget spent
+    expect(h.timerPending()).toBe(false);
+    h.sched.onResize(); // a hidden workspace becoming visible fires this
+    h.fireRaf();
+    expect(h.fits()).toBe(3);
+    expect(h.timerPending()).toBe(true); // trying again
+  });
+
+  it('dispose cancels a pending retry', () => {
+    let fitOk = false;
+    const h = harness(() => fitOk);
+    h.sched.onResize();
+    h.fireRaf();
+    expect(h.timerPending()).toBe(true);
+    h.sched.dispose();
+    expect(h.timerPending()).toBe(false);
+    fitOk = true;
+    h.fireAllTimers();
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(0);
   });
 });

@@ -375,6 +375,190 @@ body {
 }
 .add-workspace-tab:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
 
+/* ---- Register-Gruppen ----------------------------------------------------
+   Die Gruppe bekommt bewusst KEINE eigene Fläche. Die Grouped-surface-Regel
+   oben sagt, dass eine gruppierte Fläche genau EINMAL markiert wird, und diese
+   eine Markierung ist bereits die Leiste selbst (.sidebar bzw. .workspace-tabs,
+   beide mit --panel gefüllt). Ein zweiter gefüllter Kasten darin würde dieselbe
+   Kante ein zweites Mal ziehen. Was die Gruppe zusammenhält, ist deshalb eine
+   2px-Schiene in ihrer Farbe — in der Sidebar links neben den Zeilen, bei den
+   Tabs als Unterstrich, also jeweils entlang der Achse, an der die Register
+   ohnehin aufgereiht sind.
+
+   Elementstruktur ist in beiden Platzierungen identisch; nur die CSS-Achse
+   unterscheidet sich (Vorfahre .sidebar vs .workspace-tabs). Ein anderer
+   Elementbaum je Platzierung würde beim Umschalten remounten, und was das mit
+   den Terminals macht, steht in App.tsx.
+
+   --ws-group-color setzt die Komponente inline aus group.color; ohne Farbe
+   fällt die Schiene auf den Akzent zurück. */
+.ws-group { position: relative; display: flex; min-width: 0; }
+.sidebar .ws-group { flex-direction: column; padding-left: 8px; }
+.workspace-tabs .ws-group { flex: 0 0 auto; align-items: center; gap: 6px; padding-bottom: 4px; }
+.ws-group::before {
+  content: '';
+  position: absolute;
+  border-radius: 2px;
+  background: var(--ws-group-color, var(--accent));
+  pointer-events: none;
+}
+.sidebar .ws-group::before { left: 0; top: 3px; bottom: 3px; width: 2px; }
+.workspace-tabs .ws-group::before { left: 2px; right: 2px; bottom: 0; height: 2px; }
+
+/* Der Chip führt die Gruppe an: Farbpunkt, Name, Mitgliederzahl. Klick klappt
+   ein und aus, Doppelklick benennt um. Die Beschriftung heißt bewusst
+   .ws-group-name und nicht .name — sechs e2e-Specs lesen .locator('.name') der
+   Reihe nach aus und würden einen zusätzlichen Treffer als Register zählen. */
+.ws-group-chip {
+  display: flex; align-items: center; gap: 6px;
+  flex: 0 0 auto; max-width: 160px; min-width: 0;
+  padding: 3px 7px; border-radius: 6px;
+  color: var(--muted); font-size: 11px;
+  cursor: pointer; position: relative; user-select: none;
+}
+.sidebar .ws-group-chip { margin: 2px 0 2px 2px; }
+.ws-group-chip:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
+.ws-group-chip .ws-group-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--ws-group-color, var(--accent));
+}
+.ws-group-chip .ws-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Namenlose Gruppe: der Chip ist frisch angelegt und wartet auf die Eingabe. */
+.ws-group-chip .ws-group-name:empty::before { content: attr(data-placeholder); opacity: .7; }
+.ws-group-chip .ws-group-count { color: var(--muted); flex: none; }
+.ws-group-chip .ws-group-input {
+  min-width: 0; width: 92px; padding: 1px 4px;
+  background: var(--input); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  font: inherit; font-size: 11px;
+}
+/* Eine eingeklappte Gruppe, die den aktiven Workspace enthält, muss sichtbar
+   bleiben: activeWorkspaceId darf nie „gültig, aber verborgen" sein. */
+.ws-group-chip.active { background: var(--accent-soft); color: var(--text-strong); }
+.ws-group-chip.active .ws-group-count { color: var(--text-strong); }
+
+/* Dritte Drop-Absicht neben drop-before/drop-after: gruppieren. Ring nach
+   INNEN, weil .workspace-tabs horizontal und .sidebar vertikal scrollt — ein
+   äußerer Schein würde beschnitten. Gleiche Begründung wie beim Pane-Drag. */
+.ws-item.drop-into, .workspace-tab.drop-into, .ws-group-chip.drop-into {
+  box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-soft);
+}
+
+/* ---- Laufende Register markieren ----------------------------------------
+   Der Farbpunkt eines Registers zeigt an, dass in dessen Panes noch etwas
+   arbeitet. Woher die App das weiß, steht in pane-busy.ts — hier geht es nur
+   um die Darstellung.
+
+   Die Hausregel aus den Design-Specs lautet „kein transform, keine Animation"
+   (2026-08-12-pane-drag-visuals-design.md). Sie wird hier bewusst aufgeweicht,
+   und das ist kein Versehen, das jemand später „reparieren" sollte: Die Regel
+   schützt den WebGL-Canvas der Panes, auf dem eine Skalierung flimmert. Hier
+   bewegt sich ein 8px-Punkt in der Chrome-Leiste, weit weg von jeder
+   Terminal-Rasterung. Dazu ist der Indikator per Default AUS, die Art wählt der
+   Nutzer selbst, und bewegte Varianten fallen bei prefers-reduced-motion auf
+   den ruhigen Ring zurück — niemand bekommt Bewegung, die er nicht bestellt hat.
+
+   data-busy und die beiden Custom-Properties setzt die Navigation einmal an
+   ihrer Wurzel aus den Einstellungen. */
+.dot.running, .ws-remote-icon.running, .ws-group-dot.running { position: relative; }
+/* Ein Remote-Register traegt statt des Punktes ein Server-Icon. Es bekommt
+   denselben Ring, nur abgerundet statt kreisrund — sonst ginge die Anzeige
+   ausgerechnet dort verloren, wo sie mangels Prompt-Marker ohnehin nur aus
+   der Heuristik kommt. */
+.ws-remote-icon.running { border-radius: 4px; }
+
+/* Alle Varianten teilen denselben Ring und unterscheiden sich nur darin, was
+   sich daran bewegt. Als outline statt border: der Punkt darf seine Größe nicht
+   ändern, sonst springt die Zeile bei jedem Zustandswechsel. Und mit
+   outline-offset statt als box-shadow, weil der Abstand den Ring erst zum Ring
+   macht — direkt am Punkt gelesen wirkt er nur wie ein dickerer Punkt. Dasselbe
+   Muster benutzt .ws-edit-swatch.active weiter unten. */
+[data-busy] .dot.running,
+[data-busy] .ws-remote-icon.running,
+[data-busy] .ws-group-dot.running {
+  outline: 2px solid var(--busy-color, var(--accent));
+  outline-offset: 2px;
+}
+
+[data-busy="pulse"] .dot.running,
+[data-busy="pulse"] .ws-remote-icon.running,
+[data-busy="pulse"] .ws-group-dot.running {
+  animation: dmws-busy-pulse var(--busy-speed, 1200ms) ease-in-out infinite;
+}
+@keyframes dmws-busy-pulse {
+  0%, 100% { outline-offset: 1px; outline-color: var(--busy-color, var(--accent)); }
+  50%      { outline-offset: 5px; outline-color: color-mix(in srgb, var(--busy-color, var(--accent)) 25%, transparent); }
+}
+
+[data-busy="blink"] .dot.running,
+[data-busy="blink"] .ws-remote-icon.running,
+[data-busy="blink"] .ws-group-dot.running {
+  animation: dmws-busy-blink var(--busy-speed, 1200ms) steps(1, end) infinite;
+}
+@keyframes dmws-busy-blink {
+  0%, 49% { opacity: 1; }
+  50%, 99% { opacity: .25; }
+}
+
+/* Der drehende Kreis ist ein eigener Ring auf einem Pseudoelement — der Punkt
+   selbst dreht sich nicht, sonst wäre die Drehung an einem einfarbigen Kreis
+   unsichtbar. */
+[data-busy="spin"] .dot.running,
+[data-busy="spin"] .ws-remote-icon.running,
+[data-busy="spin"] .ws-group-dot.running { outline: none; }
+[data-busy="spin"] .dot.running::after,
+[data-busy="spin"] .ws-remote-icon.running::after,
+[data-busy="spin"] .ws-group-dot.running::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  /* Halber Kreis, nicht ein Viertel: bei 8px Punktgroesse ist ein
+     Viertelbogen so wenig Farbe, dass die Drehung untergeht. */
+  border: 2px solid transparent;
+  border-top-color: var(--busy-color, var(--accent));
+  border-right-color: var(--busy-color, var(--accent));
+  animation: dmws-busy-spin var(--busy-speed, 1200ms) linear infinite;
+  pointer-events: none;
+}
+@keyframes dmws-busy-spin { to { transform: rotate(360deg); } }
+
+/* Ein Nutzer, der auf Betriebssystemebene weniger Bewegung verlangt hat, hat
+   damit auch hier gesprochen: jede Variante fällt auf den ruhigen Ring zurück.
+   Die Anzeige geht nicht verloren, nur ihre Bewegung. */
+@media (prefers-reduced-motion: reduce) {
+  [data-busy] .dot.running,
+  [data-busy] .ws-remote-icon.running,
+  [data-busy] .ws-group-dot.running {
+    animation: none;
+    outline: 2px solid var(--busy-color, var(--accent));
+    outline-offset: 2px;
+  }
+  [data-busy="spin"] .dot.running::after,
+  [data-busy="spin"] .ws-remote-icon.running::after,
+  [data-busy="spin"] .ws-group-dot.running::after { display: none; }
+}
+
+/* Was der Drop bedeutet, in Worten. Steht in einem Portal am body, weil
+   .workspace-tabs 42px hoch ist und overflow-y: hidden trägt — ein Kind würde
+   abgeschnitten. pointer-events: none, sonst schlucken die Kindknoten
+   dragleave/drop; denselben Fehler vermeidet .pane-drop-hint. */
+.ws-drop-hint {
+  position: fixed;
+  z-index: 40;
+  max-width: 320px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* No rule above the footer: it would draw a second edge inside a group whose own
    outline already bounds it. Groups are separated by space. */
 .sidebar-footer { margin-top: auto; display: flex; align-items: center;
@@ -485,6 +669,11 @@ body {
 .setting-row input[type="color"] { width: 42px; height: 26px; padding: 0;
   border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 .setting-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+/* Regler mit Wertanzeige daneben. tabular-nums, damit die Zahl beim Ziehen
+   nicht zappelt — bei proportionalen Ziffern wandert sonst der ganze Regler. */
+.setting-range { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.setting-range-value { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+  min-width: 3.5em; text-align: right; }
 .setting-value { width: 42px; text-align: right; color: var(--muted); font-size: 12px; }
 /* Custom dark-theme checkbox — replaces the native white box across settings/dialogs. */
 input[type="checkbox"] {

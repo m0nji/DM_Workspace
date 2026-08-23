@@ -150,4 +150,46 @@ describe('migrateSettings', () => {
       themeId: DEFAULT_THEME_ID, terminalOpacity: 0.95, servers: 'nope'
     }).servers).toBeUndefined();
   });
+
+  // Der Laufanzeiger: Art, Farbe und Tempo landen in der Oberflaeche direkt in
+  // CSS-Eigenschaften. Was hier durchrutscht, wird nicht noch einmal geprueft.
+  it('preserves the busy indicator settings across a round-trip', () => {
+    const out = migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.9,
+      busyIndicator: 'spin', busyIndicatorColor: '#c97b4a', busyIndicatorSpeedMs: 900
+    });
+    expect(out.busyIndicator).toBe('spin');
+    expect(out.busyIndicatorColor).toBe('#c97b4a');
+    expect(out.busyIndicatorSpeedMs).toBe(900);
+  });
+
+  it('drops an unknown busy indicator kind instead of passing it through', () => {
+    // Ein unbekannter Wert waere in der Oberflaeche ein Klassenname ins Leere.
+    const out = migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicator: 'wobble' });
+    expect(out.busyIndicator).toBeUndefined();
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicator: 7 }).busyIndicator).toBeUndefined();
+  });
+
+  it('clamps the busy indicator speed into the supported range', () => {
+    const fast = migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicatorSpeedMs: 5 });
+    const slow = migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicatorSpeedMs: 999999 });
+    expect(fast.busyIndicatorSpeedMs).toBe(400);
+    expect(slow.busyIndicatorSpeedMs).toBe(4000);
+  });
+
+  it('drops a non-numeric or infinite busy indicator speed', () => {
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicatorSpeedMs: 'schnell' }).busyIndicatorSpeedMs)
+      .toBeUndefined();
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, busyIndicatorSpeedMs: Infinity }).busyIndicatorSpeedMs)
+      .toBeUndefined();
+  });
+
+  it('leaves the busy indicator out entirely when it was never configured', () => {
+    // Fehlt das Feld, bleibt es weg statt als 'off' dazustehen — ein Bestand
+    // vor diesem Feature sieht danach exakt aus wie vorher.
+    const out = migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.9 });
+    expect('busyIndicator' in out).toBe(false);
+    expect('busyIndicatorColor' in out).toBe(false);
+    expect('busyIndicatorSpeedMs' in out).toBe(false);
+  });
 });

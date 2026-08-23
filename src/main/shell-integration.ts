@@ -1,20 +1,41 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { DMWS_PROMPT_OSC, promptPayload, promptSequence } from '../shared/pane-auto-title';
+import { PSREADLINE_HEAL_CHORD } from '../shared/psreadline-heal';
 
 // Raw control bytes for the OSC 7 cwd report. ESC ] 7 ; file://HOST PATH BEL.
 const ESC = '\x1b';
 const BEL = '\x07';
 
+// The renderer's handle on PSReadLine's broken input column: bind
+// InvokePrompt() — the only routine that re-reads it from Console.CursorLeft —
+// to a key nobody can press by accident, so we can press it after a widening
+// resize. See src/shared/psreadline-heal.ts for why this is needed at all.
+//
+// Everything here is defensive because this string also runs where PSReadLine
+// is not: an older host, a stripped-down system, a foreign shell that happens
+// to be named powershell.exe. `Get-Command` (which also triggers the module
+// auto-load) decides, the outer try/catch swallows whatever it misses, and the
+// handler body has its own try/catch — a failing key handler would otherwise
+// paint a red error over the pane on every heal. The `-notcontains` guard keeps
+// a user who already bound F24 in charge of their own key.
+const psReadLineHeal =
+  'try{if(Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue){' +
+  `if((Get-PSReadLineKeyHandler -Bound).Key -notcontains '${PSREADLINE_HEAL_CHORD}'){` +
+  `Set-PSReadLineKeyHandler -Chord '${PSREADLINE_HEAL_CHORD}' -ScriptBlock ` +
+  '{try{[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()}catch{}}}}}catch{}';
+
 // PowerShell bootstrap that makes every prompt emit OSC 9;9 with the current
 // filesystem path, so the renderer can show the live cwd in the pane title. It
 // wraps (rather than replaces) the existing prompt, so a custom prompt is kept.
 // $([char]27) = ESC, $([char]7) = BEL (the OSC terminator). Passed as a single
-// argv element, so no extra shell-quoting is needed.
+// argv element, so no extra shell-quoting is needed — which is also why this
+// has to stay a single line with no embedded newlines.
 export function psCwdBootstrap(nonce: string): string {
   return "if(-not $global:__dmwsPrompt){$global:__dmwsPrompt=$function:prompt};" +
     "function global:prompt{$o=& $global:__dmwsPrompt;" +
-    `"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${promptPayload(nonce)}$([char]7)$o"}`;
+    `"$([char]27)]9;9;$($PWD.ProviderPath)$([char]7)$([char]27)]${DMWS_PROMPT_OSC};${promptPayload(nonce)}$([char]7)$o"};` +
+    psReadLineHeal;
 }
 
 // Shells we know accept `-l` (login shell). POSIX shells get `-l` so

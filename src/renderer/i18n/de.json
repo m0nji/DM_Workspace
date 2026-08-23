@@ -32,14 +32,24 @@
     "closeConfirm": "Workspace schließen",
     "remoteServerRemoved": "Server entfernt",
     "remoteTitle": "Remote-Workspace auf {{server}}",
-    "remoteTitleUnknown": "Remote-Workspace — Server entfernt"
+    "remoteTitleUnknown": "Remote-Workspace — Server entfernt",
+    "group": {
+      "unnamed": "Gruppe",
+      "hintGroupWith": "Gruppieren mit „{{name}}“",
+      "hintJoin": "Zu Gruppe „{{name}}“ hinzufügen",
+      "hintLeave": "Aus Gruppe „{{name}}“ herauslösen",
+      "rename": "Gruppe umbenennen"
+    }
   },
   "tooltip": {
     "editWorkspace": "Workspace bearbeiten",
     "deleteWorkspace": "Workspace schließen",
     "terminalsReady": "Terminals bereit",
     "addWorkspace": "Workspace hinzufügen",
-    "whatsNewChangelog": "Was ist neu – Changelog anzeigen"
+    "whatsNewChangelog": "Was ist neu – Changelog anzeigen",
+    "collapseGroup": "Gruppe einklappen",
+    "expandGroup": "Gruppe ausklappen",
+    "dissolveGroup": "Gruppe auflösen"
   },
   "settings": {
     "title": "Einstellungen",
@@ -152,7 +162,22 @@
       "showReadyBadgeHint": "Zeigt eine grüne Anzahl auf inaktiven Workspaces an, wenn deren Terminals fertig sind.",
       "title": "Benachrichtigungen",
       "desktopNotifications": "Desktop-Benachrichtigungen",
-      "desktopNotificationsHint": "Zeigt eine Systembenachrichtigung an, wenn ein Terminal in einem Hintergrund-Workspace fertig ist. Standardmäßig aus."
+      "desktopNotificationsHint": "Zeigt eine Systembenachrichtigung an, wenn ein Terminal in einem Hintergrund-Workspace fertig ist. Standardmäßig aus.",
+      "busy": {
+        "title": "Laufende Register",
+        "hint": "Markiert den Farbpunkt eines Registers, solange in einer seiner Panes Ausgabe entsteht — also solange dort noch etwas passiert. Steht die Shell wieder an ihrem Prompt, meldet sie das selbst, und die Markierung geht verlässlich aus. Zwei Grenzen: ein Kommando, das mehrere Sekunden lang gar nichts ausgibt, gilt als fertig. Und ein Programm, das seine Anzeige regelmäßig neu zeichnet, kann kurz aufblitzen, obwohl es auf Eingabe wartet.",
+        "kind": "Art",
+        "kindOff": "Aus",
+        "kindRing": "Ring",
+        "kindPulse": "Pulsieren",
+        "kindBlink": "Blinken",
+        "kindSpin": "Drehen",
+        "color": "Farbe",
+        "colorDefault": "Akzentfarbe",
+        "speed": "Tempo",
+        "speedValue": "{{seconds}} s",
+        "reducedMotion": "Bei systemweit reduzierter Bewegung zeigen alle Arten den ruhigen Ring."
+      }
     },
     "updates": {
       "title": "Updates",
@@ -200,7 +225,15 @@
       "newFromTemplate": "Neuer Workspace aus Vorlage: {{name}}",
       "editTemplate": "Vorlage bearbeiten: {{name}}",
       "deleteTemplate": "Vorlage löschen: {{name}}",
-      "openTasks": "Geplante Tasks öffnen"
+      "openTasks": "Geplante Tasks öffnen",
+      "collapseGroup": "Gruppe „{{name}}“ einklappen",
+      "expandGroup": "Gruppe „{{name}}“ ausklappen",
+      "leaveGroup": "Aus Gruppe „{{name}}“ herauslösen",
+      "leaveGroupHint": "Der Workspace rückt hinter die Gruppe",
+      "dissolveGroup": "Gruppe „{{name}}“ auflösen",
+      "joinGroup": "Zu Gruppe „{{name}}“ hinzufügen",
+      "inGroup": "Gruppe „{{name}}“",
+      "renameGroup": "Gruppe „{{name}}“ umbenennen"
     }
   },
   "welcome": {
@@ -536,7 +569,11 @@
         "skipped": "übersprungen",
         "interrupted": "unterbrochen"
       },
-      "role": { "owner": "Projektleitung", "editor": "Bearbeiter", "viewer": "Leser" }
+      "role": {
+        "owner": "Projektleitung",
+        "editor": "Bearbeiter",
+        "viewer": "Leser"
+      }
     }
   },
   "terminal": {

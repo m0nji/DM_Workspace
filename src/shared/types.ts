@@ -40,6 +40,21 @@ export interface Workspace {
   // frei (Entscheidung E8).
   kind?: 'local' | 'remote';
   remote?: RemoteWorkspaceRef;
+  // Register-Gruppen: fehlt groupId, gehört der Workspace keiner Gruppe an.
+  // Bewusst ein Seitenband statt einer Verschachtelung — `workspaces` muss eine
+  // flache Liste bleiben, weil main/ipc.ts bei JEDEM state:save den Scrollback
+  // gegen genau dieses Array prunt. Ein Workspace, der es auch nur
+  // vorübergehend verlässt, verliert seinen Terminal-Verlauf endgültig.
+  groupId?: string;
+}
+
+// Eine benannte Gruppe von Registern. Der Name darf leer sein — dann zeigt der
+// Chip nur die Farbe, was der Zustand direkt nach dem Anlegen ist.
+export interface WorkspaceGroup {
+  id: string;
+  name: string;
+  color?: string;
+  collapsed?: boolean; // fehlt => ausgeklappt
 }
 
 // Verweis eines Remote-Workspace auf seine Server-Verbindung. Bestände aus
@@ -65,12 +80,43 @@ export interface WorkspaceTemplate {
 
 export type PaneStatus = 'idle' | 'busy' | 'done';
 
+// Was die Shell einer Pane gerade tut — abgeleitet aus dem privaten
+// Prompt-Marker (pane-auto-title.ts), den unsere Shell-Integration bei JEDEM
+// Prompt druckt. Anders als PaneStatus ist das keine Heuristik auf dem
+// Ausgabestrom, sondern die Auskunft der Shell selbst: sie meldet, wann sie
+// wieder am Prompt steht.
+//
+// 'unknown' ist der ehrliche Fall und nicht selten: Remote-Panes und Shells
+// ohne unsere Integration (cmd.exe) senden nie einen Marker. Dort bleibt nur
+// die Heuristik — siehe isPaneRunning in shared/pane-busy.ts.
+export type PaneShellState =
+  | 'unknown'   // noch kein Marker gesehen
+  | 'atPrompt'  // Shell wartet auf Eingabe
+  | 'running';  // Zeile abgeschickt, noch kein neuer Prompt
+
+// Wie ein Register anzeigt, dass in ihm noch etwas arbeitet. 'off' ist der
+// Default: niemand bekommt ungefragt Bewegung ins Bild.
+export const BUSY_INDICATOR_KINDS = ['off', 'ring', 'pulse', 'blink', 'spin'] as const;
+export type BusyIndicator = typeof BUSY_INDICATOR_KINDS[number];
+
+// Grenzen fuer die Geschwindigkeit. Zu schnell flackert, zu langsam liest sich
+// als Stillstand; ausserdem landet der Wert direkt in einer CSS-Eigenschaft und
+// darf deshalb nichts Beliebiges aus der Zustandsdatei durchreichen.
+export const BUSY_INDICATOR_SPEED_MIN_MS = 400;
+export const BUSY_INDICATOR_SPEED_MAX_MS = 4000;
+export const BUSY_INDICATOR_SPEED_DEFAULT_MS = 1200;
+
 export interface Settings {
   themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
   terminalOpacity: number;     // 0..1 (1 = fully opaque)
   terminalBackground?: string; // optional hex override of the theme's background color
   clickMovesCursor?: boolean;  // a plain click (no modifier) moves the input cursor to the clicked cell; Option/Alt+click always does (default off)
   showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
+  // Anzeige laufender Sessions am Register-Punkt. Die Gegenrichtung zum
+  // showDoneBadge: das zeigt, was fertig ist, dies zeigt, was noch arbeitet.
+  busyIndicator?: BusyIndicator;   // fehlt => 'off'
+  busyIndicatorColor?: string;     // fehlt => var(--accent)
+  busyIndicatorSpeedMs?: number;   // fehlt => BUSY_INDICATOR_SPEED_DEFAULT_MS
   notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
   restoreTerminalHistory?: boolean; // Terminal-Verlauf nach einem Neustart wiederherstellen (default an); aus => es wird gar kein Verlauf gespeichert
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
@@ -102,6 +148,11 @@ export interface AppState {
   version: 1;
   workspaces: Workspace[];
   workspaceTemplates?: WorkspaceTemplate[];
+  // Fehlt bei jedem Bestand vor den Register-Gruppen. Additiv eingeführt, ohne
+  // `version` anzufassen: das Feld ist ein Gültigkeits-Gate, kein Zähler —
+  // alles außer `version === 1` liefert defaultState() und damit den Verlust
+  // aller Workspaces, auch bei einem Downgrade.
+  workspaceGroups?: WorkspaceGroup[];
   activeWorkspaceId: string | null;
   settings: Settings;
   windowBounds?: WindowBounds; // vom Main-Prozess verwaltet; fehlt beim Erststart

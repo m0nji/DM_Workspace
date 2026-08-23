@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, psCwdBootstrap } from '../src/main/shell-integration';
 import { DMWS_PROMPT_OSC, promptPayload } from '../src/shared/pane-auto-title';
+import { PSREADLINE_HEAL_CHORD, PSREADLINE_HEAL_SEQUENCE } from '../src/shared/psreadline-heal';
 
 // Every hook embeds this launch's nonce, so the marker it prints cannot be
 // reproduced by a program that only sees the terminal's output stream.
@@ -28,6 +29,69 @@ describe('shellArgs', () => {
   it('passes no flags to cmd.exe', () => {
     expect(shellArgs('cmd.exe', NONCE)).toEqual([]);
     expect(shellArgs('C:\\Windows\\System32\\cmd.exe', NONCE)).toEqual([]);
+  });
+
+  it('keeps the PowerShell-only bootstrap away from every other shell', () => {
+    for (const shell of ['cmd.exe', 'C:\\Windows\\System32\\cmd.exe', '/bin/zsh', '/usr/bin/bash', 'fish']) {
+      const args = shellArgs(shell, NONCE).join(' ');
+      expect(args).not.toContain(PSREADLINE_HEAL_CHORD);
+      expect(args).not.toContain('PSConsoleReadLine');
+      expect(args).not.toContain(MARKER);
+    }
+  });
+});
+
+describe('psCwdBootstrap', () => {
+  const boot = psCwdBootstrap(NONCE);
+
+  it('still reports the cwd via OSC 9;9 and marks the prompt with the nonce', () => {
+    expect(boot).toContain(']9;9;');
+    expect(boot).toContain('$($PWD.ProviderPath)');
+    expect(boot).toContain(MARKER);
+    // the wrapper must keep calling the user's own prompt, not replace it
+    expect(boot).toContain('$global:__dmwsPrompt');
+  });
+
+  it('binds InvokePrompt to the heal chord (PSReadLine resize repair)', () => {
+    expect(boot).toContain(`-Chord '${PSREADLINE_HEAL_CHORD}'`);
+    expect(boot).toContain('[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()');
+  });
+
+  it('skips the binding without PSReadLine and never steals an existing one', () => {
+    expect(boot).toContain('Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue');
+    expect(boot).toContain(`(Get-PSReadLineKeyHandler -Bound).Key -notcontains '${PSREADLINE_HEAL_CHORD}'`);
+    // a failing binding — or a failing handler — must not paint the pane red
+    expect(boot).toContain('catch{}');
+  });
+
+  it('stays a single argv element: one line, no stray quoting', () => {
+    expect(boot).not.toMatch(/[\r\n]/);
+    // the string is handed to powershell.exe as-is; a lone " would end the
+    // prompt's expandable string and swallow the rest of the bootstrap
+    expect(boot.split('"').length % 2).toBe(1);
+  });
+
+  it('is a balanced one-liner (the flattened braces are easy to miscount)', () => {
+    const count = (ch: string) => boot.split(ch).length - 1;
+    expect(count('{')).toBe(count('}'));
+    expect(count('(')).toBe(count(')'));
+  });
+});
+
+describe('PSReadLine heal key', () => {
+  it('names a chord that exists in ConsoleKey but on no keyboard', () => {
+    expect(PSREADLINE_HEAL_CHORD).toBe('F24');
+  });
+
+  it('encodes VK_F24 as a win32-input-mode press and release', () => {
+    // CSI Vk ; Sc ; Uc ; Kd ; Cs ; Rc _ — ConPTY has no ~-style code for F13..F24
+    expect(PSREADLINE_HEAL_SEQUENCE).toBe('\x1b[135;0;0;1;0;1_\x1b[135;0;0;0;0;1_');
+  });
+
+  it('carries nothing a shell could mistake for typed input', () => {
+    // every byte belongs to a CSI ending in the win32 final byte `_`; a terminal
+    // that does not implement the mode drops it instead of echoing it (conhost only)
+    expect(PSREADLINE_HEAL_SEQUENCE.replace(/\x1b\[[0-9;]*_/g, '')).toBe('');
   });
 });
 
@@ -108,3 +172,4 @@ describe('screenrcContent', () => {
     expect(rc).toContain('source "/tmp/a\\"b\\\\c/.screenrc"');
   });
 });
+
