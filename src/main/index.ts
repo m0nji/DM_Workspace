@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { registerIpc } from './ipc';
 import { isBoundsVisible } from './window-bounds';
+import { wireWindowShow } from './window-show';
 import { registerUpdater } from './updater';
 import { installAppMenu } from './menu';
 import { windowIconFile } from './window-icon';
@@ -156,17 +157,13 @@ function createWindow(): void {
   // Prompt lang ist, zeichnet es die Eingabe fortan mitten in den Prompt.
   // Siehe docs/superpowers/plans/2026-08-22-psreadline-initialx-fix.md.
   //
-  // maximize() zeigt ein verstecktes Fenster (ShowWindow(SW_MAXIMIZE)), also
-  // direkt wieder verstecken — Anzeige bleibt Sache von 'ready-to-show'.
-  // getNormalBounds() überlebt das unverändert, die gespeicherte Normalgröße
-  // geht also nicht verloren.
-  if (saved?.isMaximized) {
-    mainWindow.maximize();
-    mainWindow.hide();
-  }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+  // Das Wiederherstellen des maximierten Zustands und das anschliessende Zeigen
+  // hängen zusammen — maximize() zeigt ein verstecktes Fenster und bringt damit
+  // 'ready-to-show' um. Beides liegt deshalb in window-show.ts, wo es ohne
+  // echtes BrowserWindow geprüft werden kann.
+  const cancelShowFallback = wireWindowShow(mainWindow, {
+    restoreMaximized: Boolean(saved?.isMaximized),
+    onFallback: (message) => console.warn(`[main] ${message}`)
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -183,6 +180,7 @@ function createWindow(): void {
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   mainWindow.on('closed', () => {
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
+    cancelShowFallback();
     mainWindow = null;
   });
   mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));

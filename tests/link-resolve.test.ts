@@ -10,6 +10,14 @@ vi.mock('electron', () => ({
   clipboard: { readText: vi.fn(), writeText: vi.fn() },
 }));
 
+// ipc.ts also reaches node-pty, through PtyManager. Its native binary is not
+// built in CI, which installs with --ignore-scripts and so skips the
+// electron-rebuild postinstall — on Linux there is no prebuilt pty.node either,
+// so loading it throws and takes this whole file down before a single test runs.
+// pty-manager.test.ts guards itself against exactly that and skips; here nothing
+// touches a terminal, so a stub keeps the import chain loadable instead.
+vi.mock('node-pty', () => ({ spawn: vi.fn(), default: { spawn: vi.fn() } }));
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
