@@ -38,12 +38,15 @@ describe('pane-activity', () => {
     expect(h.changes).toEqual(['busy', 'done', 'idle']);
   });
 
-  it('input before the silence timer fires cancels the pending done', () => {
+  it('input while busy keeps the visible state stable and restarts the silence window', () => {
     const h = harness();
     h.act.onOutput();
     h.act.onInput();
+    // No busy -> idle -> busy transition: a running CSS animation therefore
+    // remains attached instead of visibly restarting for every typed key.
+    expect(h.changes).toEqual(['busy']);
     h.tick();
-    expect(h.changes).toEqual(['busy', 'idle']);
+    expect(h.changes).toEqual(['busy', 'done']);
   });
 
   it('does not emit duplicate statuses', () => {

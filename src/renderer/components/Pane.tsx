@@ -186,6 +186,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   return (
     <div
       className={['pane',
+        `status-${status}`,
         focused ? 'focused' : '',
         dragOver ? 'drop-target' : '',
         isDragSource ? 'drag-source' : '',

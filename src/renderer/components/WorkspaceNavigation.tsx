@@ -311,6 +311,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
         className={[
           'ws-group-chip',
           activeMember ? 'active' : '',
+          groupRunning ? 'running' : '',
           isDropTarget('group', g.id, 'into') ? 'drop-into' : ''
         ].filter(Boolean).join(' ')}
         title={collapsed ? t('tooltip.expandGroup') : t('tooltip.collapseGroup')}
@@ -326,7 +327,9 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
         // Drittel zu teilen hiesse, zwei Bedeutungen auf wenige Pixel zu legen.
         {...dragOverHandlers({ kind: 'group', id: g.id }, 'into')}
       >
-        <span className={['ws-group-dot', groupRunning ? 'running' : ''].filter(Boolean).join(' ')} />
+        <span className={['ws-group-disclosure', collapsed ? 'collapsed' : ''].filter(Boolean).join(' ')} aria-hidden="true">
+          <Icon name="chevron-down" size={12} />
+        </span>
         {editing ? (
           <input
             className="ws-group-input"

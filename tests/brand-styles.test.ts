@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const styles = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8');
+const navigation = readFileSync(resolve(__dirname, '../src/renderer/components/WorkspaceNavigation.tsx'), 'utf8');
 const accentValues = ['var(--accent)', 'var(--dm-accent-orange)', '#c97b4a', '#ee9a5d'];
 
 function ruleBodies(selector: string): string[] {
@@ -158,6 +159,20 @@ describe('DM brand styles', () => {
     expect(ruleBodies('.workspace-tabs .ws-group::before')).toHaveLength(1);
   });
 
+  it('presents a group as a typographic section heading without a duplicate colour dot', () => {
+    expect(navigation).not.toContain('ws-group-dot');
+    expect(navigation).toContain('ws-group-disclosure');
+
+    const chip = ruleBodies('.ws-group-chip').find((rule) => rule.includes('display: flex'));
+    const name = ruleBodies('.ws-group-chip .ws-group-name').find((rule) => rule.includes('letter-spacing'));
+    const count = ruleBodies('.ws-group-chip .ws-group-count')[0];
+    expect(chip).toContain('font-size: 12px');
+    expect(chip).toContain('font-weight: 600');
+    expect(name).toContain('flex: 1 1 auto');
+    expect(count).toContain('font-size: 10px');
+    expect(count).toContain('border-radius: 999px');
+  });
+
   it('rings the grouping drop target inwards, so a scrolling bar cannot clip it', () => {
     const into = ruleBodies('.ws-item.drop-into, .workspace-tab.drop-into, .ws-group-chip.drop-into');
 
@@ -182,7 +197,7 @@ describe('DM brand styles', () => {
     // The rule lists both dots; ruleBodies matches on the selector text right
     // before the brace, so query the last one in the group. Two rules carry it:
     // the base one and its reduced-motion counterpart.
-    const rules = ruleBodies('[data-busy] .ws-group-dot.running');
+    const rules = ruleBodies('[data-busy] .ws-remote-icon.running');
     expect(rules).toHaveLength(2);
     rules.forEach((rule) => {
       expect(rule).toContain('outline: 2px solid var(--busy-color, var(--accent));');
@@ -191,6 +206,12 @@ describe('DM brand styles', () => {
     });
     // The quiet ring is the base rule, and nothing about it moves.
     expect(rules[0]).not.toContain('animation:');
+
+    const groupRules = ruleBodies('[data-busy] .ws-group-chip.running');
+    expect(groupRules).toHaveLength(2);
+    groupRules.forEach((rule) => {
+      expect(rule).toContain('outline: 1px solid var(--busy-color, var(--accent));');
+    });
   });
 
   it('offers every busy variant the settings can select', () => {
@@ -202,8 +223,27 @@ describe('DM brand styles', () => {
     for (const frames of ['dmws-busy-pulse', 'dmws-busy-blink', 'dmws-busy-spin']) {
       expect(styles, `keyframes ${frames} missing`).toContain(`@keyframes ${frames}`);
     }
+    expect(styles).toContain('@keyframes dmws-busy-group-scan');
     // Speed and colour come from the settings, never hard-coded.
     expect(styles).toContain('var(--busy-speed, 1200ms)');
+  });
+
+  it('hands a ready workspace badge off to an unmistakable finished pane', () => {
+    const donePane = ruleBodies('.pane.status-done:not(.drag-source):not(.drop-target)');
+    const doneHeader = ruleBodies('.pane.status-done .pane-header');
+    const doneDot = ruleBodies('.status-dot.done');
+
+    expect(donePane).toHaveLength(1);
+    expect(donePane[0]).toContain('inset 0 0 0 1px');
+    expect(donePane[0]).toContain('var(--success)');
+    expect(doneHeader).toHaveLength(1);
+    expect(doneHeader[0]).toContain('var(--success) 8%');
+    expect(doneDot).toHaveLength(1);
+    expect(doneDot[0]).toContain('box-shadow: 0 0 0 2px');
+    expect(donePane[0]).not.toContain('animation:');
+    expect(doneHeader[0]).not.toContain('animation:');
+    // Pane drag feedback has priority over the ready edge while rearranging.
+    expect(styles).not.toContain('.pane.status-done {');
   });
 
   it('falls back to the quiet ring when the user asked for less motion', () => {

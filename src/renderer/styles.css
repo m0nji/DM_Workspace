@@ -410,27 +410,39 @@ body {
    .ws-group-name und nicht .name — sechs e2e-Specs lesen .locator('.name') der
    Reihe nach aus und würden einen zusätzlichen Treffer als Register zählen. */
 .ws-group-chip {
-  display: flex; align-items: center; gap: 6px;
-  flex: 0 0 auto; max-width: 160px; min-width: 0;
-  padding: 3px 7px; border-radius: 6px;
-  color: var(--muted); font-size: 11px;
+  display: flex; align-items: center; gap: 7px;
+  flex: 0 0 auto; min-width: 0;
+  padding: 5px 7px 4px 5px; border-radius: 6px;
+  color: var(--text); font-size: 12px; font-weight: 600;
   cursor: pointer; position: relative; user-select: none;
 }
-.sidebar .ws-group-chip { margin: 2px 0 2px 2px; }
+.sidebar .ws-group-chip { margin: 3px 5px 3px 1px; max-width: none; }
+.workspace-tabs .ws-group-chip { max-width: 180px; padding: 3px 6px; }
 .ws-group-chip:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
-.ws-group-chip .ws-group-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex: none;
-  background: var(--ws-group-color, var(--accent));
+.ws-group-chip .ws-group-disclosure {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  color: var(--muted); transition: transform .12s ease;
 }
-.ws-group-chip .ws-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-group-chip .ws-group-disclosure.collapsed { transform: rotate(-90deg); }
+.ws-group-chip .ws-group-name {
+  min-width: 0; flex: 1 1 auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  letter-spacing: .01em;
+}
 /* Namenlose Gruppe: der Chip ist frisch angelegt und wartet auf die Eingabe. */
 .ws-group-chip .ws-group-name:empty::before { content: attr(data-placeholder); opacity: .7; }
-.ws-group-chip .ws-group-count { color: var(--muted); flex: none; }
+.ws-group-chip .ws-group-count {
+  min-width: 18px; max-width: 88px; flex: none; margin-left: auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 1px 5px; border-radius: 999px; text-align: center;
+  color: var(--muted); background: var(--chrome-action-hover-bg);
+  font-size: 10px; font-weight: 500;
+}
 .ws-group-chip .ws-group-input {
-  min-width: 0; width: 92px; padding: 1px 4px;
+  min-width: 0; width: 104px; padding: 1px 4px;
   background: var(--input); color: var(--text);
   border: 1px solid var(--border); border-radius: 4px;
-  font: inherit; font-size: 11px;
+  font: inherit; font-size: 12px;
 }
 /* Eine eingeklappte Gruppe, die den aktiven Workspace enthält, muss sichtbar
    bleiben: activeWorkspaceId darf nie „gültig, aber verborgen" sein. */
@@ -460,7 +472,7 @@ body {
 
    data-busy und die beiden Custom-Properties setzt die Navigation einmal an
    ihrer Wurzel aus den Einstellungen. */
-.dot.running, .ws-remote-icon.running, .ws-group-dot.running { position: relative; }
+.dot.running, .ws-remote-icon.running { position: relative; }
 /* Ein Remote-Register traegt statt des Punktes ein Server-Icon. Es bekommt
    denselben Ring, nur abgerundet statt kreisrund — sonst ginge die Anzeige
    ausgerechnet dort verloren, wo sie mangels Prompt-Marker ohnehin nur aus
@@ -474,15 +486,20 @@ body {
    macht — direkt am Punkt gelesen wirkt er nur wie ein dickerer Punkt. Dasselbe
    Muster benutzt .ws-edit-swatch.active weiter unten. */
 [data-busy] .dot.running,
-[data-busy] .ws-remote-icon.running,
-[data-busy] .ws-group-dot.running {
+[data-busy] .ws-remote-icon.running {
   outline: 2px solid var(--busy-color, var(--accent));
   outline-offset: 2px;
 }
 
+/* A group already owns a coloured rail, so running state marks the heading
+   itself instead of recreating that colour as another dot. */
+[data-busy] .ws-group-chip.running {
+  outline: 1px solid var(--busy-color, var(--accent));
+  outline-offset: -1px;
+}
+
 [data-busy="pulse"] .dot.running,
-[data-busy="pulse"] .ws-remote-icon.running,
-[data-busy="pulse"] .ws-group-dot.running {
+[data-busy="pulse"] .ws-remote-icon.running {
   animation: dmws-busy-pulse var(--busy-speed, 1200ms) ease-in-out infinite;
 }
 @keyframes dmws-busy-pulse {
@@ -490,9 +507,16 @@ body {
   50%      { outline-offset: 5px; outline-color: color-mix(in srgb, var(--busy-color, var(--accent)) 25%, transparent); }
 }
 
+[data-busy="pulse"] .ws-group-chip.running {
+  animation: dmws-busy-group-pulse var(--busy-speed, 1200ms) ease-in-out infinite;
+}
+@keyframes dmws-busy-group-pulse {
+  0%, 100% { outline-color: var(--busy-color, var(--accent)); }
+  50% { outline-color: color-mix(in srgb, var(--busy-color, var(--accent)) 24%, transparent); }
+}
+
 [data-busy="blink"] .dot.running,
-[data-busy="blink"] .ws-remote-icon.running,
-[data-busy="blink"] .ws-group-dot.running {
+[data-busy="blink"] .ws-remote-icon.running {
   animation: dmws-busy-blink var(--busy-speed, 1200ms) steps(1, end) infinite;
 }
 @keyframes dmws-busy-blink {
@@ -500,15 +524,21 @@ body {
   50%, 99% { opacity: .25; }
 }
 
+[data-busy="blink"] .ws-group-chip.running {
+  animation: dmws-busy-group-blink var(--busy-speed, 1200ms) steps(1, end) infinite;
+}
+@keyframes dmws-busy-group-blink {
+  0%, 49% { outline-color: var(--busy-color, var(--accent)); }
+  50%, 99% { outline-color: transparent; }
+}
+
 /* Der drehende Kreis ist ein eigener Ring auf einem Pseudoelement — der Punkt
    selbst dreht sich nicht, sonst wäre die Drehung an einem einfarbigen Kreis
    unsichtbar. */
 [data-busy="spin"] .dot.running,
-[data-busy="spin"] .ws-remote-icon.running,
-[data-busy="spin"] .ws-group-dot.running { outline: none; }
+[data-busy="spin"] .ws-remote-icon.running { outline: none; }
 [data-busy="spin"] .dot.running::after,
-[data-busy="spin"] .ws-remote-icon.running::after,
-[data-busy="spin"] .ws-group-dot.running::after {
+[data-busy="spin"] .ws-remote-icon.running::after {
   content: '';
   position: absolute;
   inset: -4px;
@@ -523,20 +553,36 @@ body {
 }
 @keyframes dmws-busy-spin { to { transform: rotate(360deg); } }
 
+/* A rotating rectangular frame would make the heading noisy. The spin choice
+   becomes one continuous activity stroke along its lower edge instead. */
+[data-busy="spin"] .ws-group-chip.running { overflow: hidden; }
+[data-busy="spin"] .ws-group-chip.running::after {
+  content: '';
+  position: absolute; left: -18px; bottom: 0; width: 18px; height: 2px;
+  border-radius: 2px; background: var(--busy-color, var(--accent));
+  animation: dmws-busy-group-scan var(--busy-speed, 1200ms) linear infinite;
+  pointer-events: none;
+}
+@keyframes dmws-busy-group-scan { to { left: 100%; } }
+
 /* Ein Nutzer, der auf Betriebssystemebene weniger Bewegung verlangt hat, hat
    damit auch hier gesprochen: jede Variante fällt auf den ruhigen Ring zurück.
    Die Anzeige geht nicht verloren, nur ihre Bewegung. */
 @media (prefers-reduced-motion: reduce) {
   [data-busy] .dot.running,
-  [data-busy] .ws-remote-icon.running,
-  [data-busy] .ws-group-dot.running {
+  [data-busy] .ws-remote-icon.running {
     animation: none;
     outline: 2px solid var(--busy-color, var(--accent));
     outline-offset: 2px;
   }
+  [data-busy] .ws-group-chip.running {
+    animation: none;
+    outline: 1px solid var(--busy-color, var(--accent));
+    outline-offset: -1px;
+  }
   [data-busy="spin"] .dot.running::after,
   [data-busy="spin"] .ws-remote-icon.running::after,
-  [data-busy="spin"] .ws-group-dot.running::after { display: none; }
+  [data-busy="spin"] .ws-group-chip.running::after { display: none; }
 }
 
 /* Was der Drop bedeutet, in Worten. Steht in einem Portal am body, weil
@@ -983,8 +1029,26 @@ input[type="checkbox"]:checked::after {
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
 .status-dot.idle { background: var(--disabled); }
 .status-dot.busy { background: var(--warning); animation: status-pulse 1.2s ease-in-out infinite; }
-.status-dot.done { background: var(--success); }
+.status-dot.done {
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 28%, transparent);
+}
 @keyframes status-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* The workspace badge hands the ready state off to the pane when the user
+   opens that workspace. A dot alone is too easy to miss in a four-pane grid,
+   so the finished pane keeps a quiet semantic edge and header tint until the
+   user types in it. No motion: ready is a state to find, not another alarm. */
+.pane.status-done:not(.drag-source):not(.drop-target) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 58%, transparent);
+}
+.pane.status-done.focused:not(.drag-source):not(.drop-target) {
+  box-shadow: var(--shadow-focus),
+              inset 0 0 0 1px color-mix(in srgb, var(--success) 58%, transparent);
+}
+.pane.status-done .pane-header {
+  background: color-mix(in srgb, var(--success) 8%, var(--dm-pane-header));
+}
 
 /* Sidebar "terminals ready" badge */
 .ws-item .done-badge {
