@@ -228,7 +228,7 @@ describe('DM brand styles', () => {
     expect(styles).toContain('var(--busy-speed, 1200ms)');
   });
 
-  it('hands a ready workspace badge off to an unmistakable finished pane', () => {
+  it('hands a ready workspace badge off without tinting the whole pane header', () => {
     const donePane = ruleBodies('.pane.status-done:not(.drag-source):not(.drop-target)');
     const doneHeader = ruleBodies('.pane.status-done .pane-header');
     const doneDot = ruleBodies('.status-dot.done');
@@ -236,12 +236,10 @@ describe('DM brand styles', () => {
     expect(donePane).toHaveLength(1);
     expect(donePane[0]).toContain('inset 0 0 0 1px');
     expect(donePane[0]).toContain('var(--success)');
-    expect(doneHeader).toHaveLength(1);
-    expect(doneHeader[0]).toContain('var(--success) 8%');
+    expect(doneHeader).toHaveLength(0);
     expect(doneDot).toHaveLength(1);
     expect(doneDot[0]).toContain('box-shadow: 0 0 0 2px');
     expect(donePane[0]).not.toContain('animation:');
-    expect(doneHeader[0]).not.toContain('animation:');
     // Pane drag feedback has priority over the ready edge while rearranging.
     expect(styles).not.toContain('.pane.status-done {');
   });

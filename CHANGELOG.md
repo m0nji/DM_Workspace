@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.14.4 – 2026-08-24
+- fix: Finished terminals keep their normal neutral title bar instead of tinting the entire header green. The green status dot and the thin inner edge still identify the pane that is ready, without making every completed pane look selected
+
 ## 0.14.3 – 2026-08-23
 - fix: The app starts with a window again after you last closed it maximized. Since 0.14.0 the saved maximized state was restored before the renderer loaded, so that the panes would size their terminals correctly the first time — but restoring it means calling `maximize()`, and on a window created hidden that briefly shows it. Electron only announces "ready to show" for a window it has never shown, so that announcement never came, the call that reveals the window was never made, and the app ended up as a running process with no window at all: nothing on the desktop, nothing in the taskbar, only four entries in the task manager. The state did not heal by itself either, because reaching the setting that causes it needs the window you cannot see. Restoring a maximized window now waits for the renderer to finish loading instead, and any start that produces no window within ten seconds shows it anyway and says so in the log — an invisible window cannot be rescued from outside, so it is worth a late window over none. Affected 0.14.0, 0.14.1 and 0.14.2; a workaround for an installation that still has one of those is to close the app, set `"isMaximized": false` in `state.json` and start it again
 
