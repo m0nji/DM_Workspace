@@ -1,4 +1,32 @@
 {
+  "agent": {
+    "title": "Agentenstatus",
+    "short": "Agent",
+    "unknownHint": "Agentenzustand unbekannt. Claude-Statusmeldungen einrichten.",
+    "lastReported": "Zuletzt gemeldet: {{state}} ({{time}})",
+    "setupHint": "Starte eine neue Claude-Code-Sitzung in diesem Terminal mit dem folgenden Befehl. Kopiere ihn, füge ihn an einem freien Shell-Prompt ein und drücke Enter. Benötigt eine aktuelle Claude-Code-Installation mit HTTP-Hooks.",
+    "limitations": "Nur neue lokale Sitzungen ab dem ersten Prompt; bestehende und /resume-Sitzungen werden noch nicht unterstützt. „Antwort beendet“ bedeutet nicht, dass das Projekt geprüft ist. Ohne Hooks bleibt der zuletzt gemeldete Zustand sichtbar.",
+    "remoteHint": "Expliziter Agentenstatus ist zunächst nur für lokale Claude-Code-Sitzungen verfügbar. Diese Remote-Sitzung hat keine unterstützte Ereignisquelle.",
+    "setupError": "Status-Einrichtung nicht verfügbar. Warte auf den Start des lokalen Terminals und versuche es erneut. Unterstützte Shells: zsh, bash und PowerShell. Vor einem Anbieterwechsel die aktive Agentensitzung beenden.",
+    "copy": "Startbefehl kopieren",
+    "state": {
+      "unknown": "Unbekannt",
+      "working": "Arbeitet",
+      "needs-input": "Eingabe erforderlich",
+      "completed": "Antwort beendet",
+      "error": "Fehler"
+    },
+    "provider": "Agent",
+    "codexHint": "Benötigt eine aktuelle Codex-CLI mit Hooks und Node.js im PATH. Den Befehl in diesem Pane an einer freien Shell ausführen. In Codex die DM-Workspace-Befehle über /hooks prüfen und freigeben, dann den ersten Prompt senden. Konfiguration und Freigaberegeln bleiben erhalten.",
+    "codexLimits": "Bei Codex können Freigabewartezustände bis zum Antwortende sichtbar bleiben. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",
+    "overview": {
+      "title": "Agentenübersicht",
+      "attention": "Agenten mit Aufmerksamkeitsbedarf: {{count}}",
+      "hint": "Alle verbundenen Agenten. Wartezustände und Fehler stehen oben. Ein Eintrag öffnet das Terminal. Der Status zeigt das zuletzt gemeldete Ereignis.",
+      "empty": "Noch keine Agenten verbunden. Über Agent am Pane-Kopf Claude oder Codex mit Statusmeldungen starten.",
+      "reported": "Letzte Meldung: {{time}}"
+    }
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",

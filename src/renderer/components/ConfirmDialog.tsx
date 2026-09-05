@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogProps {
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
-  cancelLabel?: string;
+  cancelLabel?: string | null;
   tone?: 'brand' | 'danger';
   onConfirm: () => void;
   onCancel: () => void;
@@ -71,9 +71,11 @@ export function ConfirmDialog({
       } else if (e.key === 'Tab') {
         e.preventDefault();
         e.stopImmediatePropagation();
-        const buttons = [cancelRef.current!, confirmRef.current!];
-        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        buttons[(index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length].focus();
+        const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
+          'button, select, input, textarea, a[href], [tabindex]'
+        )).filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+        const index = controls.indexOf(document.activeElement as HTMLElement);
+        controls[(index + (e.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
       }
     };
     const onFocus = (e: FocusEvent) => {
@@ -105,9 +107,9 @@ export function ConfirmDialog({
         <div id={titleId} className="modal-header confirm-title">{title}</div>
         <p id={messageId} className="confirm-message">{message}</p>
         <div className="confirm-actions">
-          <button type="button" ref={cancelRef} className="confirm-btn" onClick={onCancel}>
+          {cancelLabel !== null && <button type="button" ref={cancelRef} className="confirm-btn" onClick={onCancel}>
             {cancelText}
-          </button>
+          </button>}
           <button
             type="button"
             ref={confirmRef}

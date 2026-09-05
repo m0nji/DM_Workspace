@@ -1,3 +1,4 @@
+import type { AgentState, AgentStateEvent } from '../shared/agent-state';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { promptNonceFromArgv } from '../shared/prompt-nonce';
 import type {
@@ -14,6 +15,10 @@ import type {
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
 // listener per channel. Registering one ipcRenderer listener per terminal would
 // exceed EventEmitter's default max (10) and re-broadcast every chunk to all panes.
+const agentSubs = new Map<string, Set<(state: AgentState | null) => void>>();
+ipcRenderer.on('agent:state', (_e, p: AgentStateEvent) => {
+  agentSubs.get(p.paneId)?.forEach(cb => cb(p.state));
+});
 const dataSubs = new Map<string, Set<(data: string) => void>>();
 const exitSubs = new Map<string, Set<(exitCode: number) => void>>();
 
@@ -40,6 +45,10 @@ function subscribe<T>(map: Map<string, Set<T>>, paneId: string, cb: T): () => vo
 }
 
 const api: RendererApi = {
+  prepareAgentStatus: (paneId, provider) => ipcRenderer.invoke('agent:prepare', paneId, provider),
+  getAgentState: paneId => ipcRenderer.invoke('agent:get', paneId),
+  onAgentState: (paneId, cb) => subscribe(agentSubs, paneId, cb),
+  agentShellReturned: paneId => ipcRenderer.send('agent:shell-returned', paneId),
   spawn: (req: PtySpawnRequest) => ipcRenderer.invoke('pty:spawn', req),
   input: (req: PtyInputRequest) => ipcRenderer.send('pty:input', req),
   resize: (req: PtyResizeRequest) => ipcRenderer.send('pty:resize', req),

@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { tasksAvailable, useStore } from '../store';
 import { Icon } from './Icon';
+import { AgentOverview } from './AgentOverview';
 import { UpdateBadge } from './UpdateBadge';
 
 export function TitlebarActions(): React.JSX.Element {
@@ -24,6 +25,7 @@ export function TitlebarActions(): React.JSX.Element {
   return (
     <div className="titlebar-actions">
       <UpdateBadge />
+      <AgentOverview />
       {tasksEnabled && (
         <div className="view-toggle" role="tablist" aria-label={t('titlebar.view')}>
           <button type="button" role="tab" aria-selected={!taskView}

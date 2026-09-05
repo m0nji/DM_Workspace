@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStora
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
+import { AgentStatusBridge } from './agent-status-bridge';
 import { PtyManager } from './pty-manager';
 import { BackendRouter, type TerminalBackend } from './terminal-backend';
 import { createPtyDataBatcher } from './pty-data-batcher';
@@ -215,7 +216,26 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // vollständig im Main-Prozess (safeStorage), der Renderer sieht nur Status.
   // Alles unter dem Router — Batcher, Kanäle, Shutdown — arbeitet nur gegen
   // das Interface.
-  const router = new BackendRouter(new PtyManager());
+  const localPty = new PtyManager();
+  const router = new BackendRouter(localPty);
+  const agents = new AgentStatusBridge(join(app.getPath('userData'), 'agent-status', randomUUID()),
+    event => getWindow()?.webContents.send('agent:state', event));
+  handle('agent:prepare', async (_e, paneId: unknown, provider: unknown = 'claude') => {
+    if (provider !== 'claude' && provider !== 'codex') throw new Error('Invalid agent provider');
+    if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
+    const session = localPty.sessionInfo(paneId);
+    if (!session) throw new Error('No local terminal session');
+    const setup = await agents.prepare(paneId, session.shell, session.nonce, provider);
+    if (localPty.sessionInfo(paneId) !== session) {
+      agents.release(paneId);
+      throw new Error('Terminal session changed');
+    }
+    return setup;
+  });
+  handle('agent:get', (_e, paneId: unknown) => isNonEmptyString(paneId) ? agents.snapshot(paneId) : null);
+  on('agent:shell-returned', (_e, paneId: unknown) => {
+    if (isNonEmptyString(paneId) && localPty.sessionInfo(paneId)) agents.shellReturned(paneId);
+  });
   const pty: TerminalBackend = router;
   const auth = new AuthManager({
     file: join(app.getPath('userData'), 'remote-auth.json'),
@@ -243,6 +263,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // session. Also release the task watcher and its pending debounce (declared
   // below; the handler runs at quit time, long after they exist).
   app.on('will-quit', () => {
+    void agents.close();
     scrollback.flush();
     taskWatcher?.close();
     if (watchDebounce) clearTimeout(watchDebounce);
@@ -259,6 +280,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
   pty.onData((paneId, data) => dataBatcher.push(paneId, data));
   pty.onExit((paneId, exitCode) => {
+    agents.release(paneId);
     // The exit event must never outrun still-buffered output for this pane.
     dataBatcher.flushPane(paneId);
     const payload: PtyExitEvent = { paneId, exitCode };
@@ -273,6 +295,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   on('pty:input', (_e, raw: unknown) => {
     const req = parsePtyInput(raw);
     if (!req) { rejectPayload('pty:input', raw); return; }
+    if (req.data === '\x03' || req.data === '\x1b') agents.interrupt(req.paneId);
     pty.write(req.paneId, req.data);
   });
   on('pty:resize', (_e, raw: unknown) => {
@@ -282,6 +305,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
   on('pty:kill', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) { rejectPayload('pty:kill', paneId); return; }
+    agents.release(paneId);
     pty.kill(paneId);
   });
 

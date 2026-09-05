@@ -1,3 +1,4 @@
+import type { AgentState } from '../shared/agent-state';
 import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceGroup, WorkspaceTemplate, Settings, UpdateEvent,
@@ -352,6 +353,8 @@ export interface StoreState extends AppState {
   // Fluechtig wie paneStatus: persistSnapshot ist eine Whitelist, die es nicht fuehrt.
   paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
+  agentStates: Record<string, AgentState>;
+  setAgentState: (paneId: string, state: AgentState | null) => void;
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
   focusedPaneId: string | null;
   // Am Kopf gegriffenes Pane, solange ein Drag läuft — sonst null. Global statt
@@ -679,6 +682,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneStatus: {},
   paneShell: {},
   paneCwd: {},
+  agentStates: {},
   paneAutoTitles: {},
   focusedPaneId: null,
   draggingPaneId: null,
@@ -1105,6 +1109,14 @@ export const useStore = create<StoreState>((set, get) => ({
   setPaneCwd: (paneId, cwd) => set((s) => {
     if (s.paneCwd[paneId] === cwd) return s;
     return { ...s, paneCwd: { ...s.paneCwd, [paneId]: cwd } };
+  }),
+
+  setAgentState: (paneId, state) => set((s) => {
+    if (state && !s.workspaces.some(w => collectPaneIds(w.layout).includes(paneId))) return s;
+    const agentStates = { ...s.agentStates };
+    if (state) agentStates[paneId] = state;
+    else delete agentStates[paneId];
+    return { agentStates };
   }),
 
   setPaneAutoTitle: (paneId, title) => set((s) => {

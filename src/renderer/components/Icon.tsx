@@ -7,11 +7,12 @@ export type IconName =
   | 'back' | 'forward' | 'reload' | 'folder' | 'close'
   | 'folder-open' | 'file-code' | 'file-text' | 'file-config'
   | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit' | 'server' | 'clock'
-  | 'keyboard' | 'undo' | 'play';
+  | 'keyboard' | 'undo' | 'play' | 'agents';
 
 // Every icon authored on a 24×24 canvas as stroked paths so they share weight,
 // scale and optical size. Values are arrays of SVG path `d` strings.
 export const ICON_PATHS: Record<IconName, string[]> = {
+  agents: ['M9 8a3 3 0 1 0 6 0a3 3 0 1 0 -6 0', 'M5 20v-2a7 7 0 0 1 14 0v2', 'M3 5v4', 'M21 5v4'],
   'command-palette': [
     'M7 9a2 2 0 1 1 2 -2v10a2 2 0 1 1 -2 -2h10a2 2 0 1 1 -2 2v-10a2 2 0 1 1 2 2h-10'
   ],

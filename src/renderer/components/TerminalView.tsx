@@ -341,6 +341,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // capture for the next line the user types (a sudo password).
       if (isPromptPayload(data, window.api.promptNonce)) {
         autoTitleTracker.onShellPrompt();
+        window.api.agentShellReturned(paneId);
         // Ab hier steht ein leerer lokaler Prompt — der einzige Zustand, in dem
         // die Heilung gefahrlos gesendet werden darf.
         promptArmed = true;

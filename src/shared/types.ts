@@ -524,6 +524,10 @@ export type UpdateEvent =
 
 // Shape exposed on window.api by the preload script
 export interface RendererApi {
+  prepareAgentStatus(paneId: string, provider?: 'claude' | 'codex'): Promise<{ command: string; settingsPath: string }>;
+  getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;
+  onAgentState(paneId: string, cb: (state: import('./agent-state').AgentState | null) => void): () => void;
+  agentShellReturned(paneId: string): void;
   spawn(req: PtySpawnRequest): Promise<void>;
   input(req: PtyInputRequest): void;
   resize(req: PtyResizeRequest): void;

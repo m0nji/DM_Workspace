@@ -4,6 +4,7 @@ import {
   useStore, remotePaneCloseBlock, remotePaneCreateBlock, REMOTE_MAX_PANES,
   type RemoteBlockReason
 } from '../store';
+import { AgentStatus } from './AgentStatus';
 import { TerminalView } from './TerminalView';
 import { SearchBar } from './SearchBar';
 import { basename } from '../../shared/fs-path';
@@ -266,6 +267,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
             </>
           ) : null}
         </div>
+        <AgentStatus paneId={paneId} remote={isRemote} />
         <button
           className={`pane-btn pane-label-btn ${manualLabel ? 'active' : ''}`}
           title={t(manualLabel ? 'pane.editLabel' : automatic ? 'pane.overrideLabel' : 'pane.addLabel')}

@@ -1,4 +1,32 @@
 {
+  "agent": {
+    "title": "Agent status",
+    "short": "Agent",
+    "unknownHint": "Agent state unknown. Set up Claude status reporting.",
+    "lastReported": "Last reported: {{state}} ({{time}})",
+    "setupHint": "Start a new Claude Code session in this terminal with the command below. Copy it, paste it at an idle shell prompt and press Enter. Requires a current Claude Code installation with HTTP hooks.",
+    "limitations": "New local sessions only, from the first prompt; existing and /resume sessions are not supported yet. “Response ended” does not mean the project is verified. Missing hooks leave the last reported state visible.",
+    "remoteHint": "Explicit agent status is currently available for local Claude Code sessions only. This remote session has no supported event source.",
+    "setupError": "Status setup is unavailable. Wait for the local terminal to start and try again. Supported shells: zsh, bash and PowerShell. End an active agent session before switching providers.",
+    "copy": "Copy start command",
+    "state": {
+      "unknown": "Unknown",
+      "working": "Working",
+      "needs-input": "Needs input",
+      "completed": "Response ended",
+      "error": "Error"
+    },
+    "provider": "Agent",
+    "codexHint": "Requires a current Codex CLI with hooks and Node.js in PATH. Copy this command into this pane at an idle shell. In Codex, review and trust the DM Workspace commands with /hooks, then send your first prompt. Your config and approval policy stay unchanged.",
+    "codexLimits": "Codex approval waits can remain visible until the response ends. General failures and all user-question tools are not covered by its hooks.",
+    "overview": {
+      "title": "Agent overview",
+      "attention": "Agents needing attention: {{count}}",
+      "hint": "All connected agents. Waiting and errors appear first. Select an entry to open its terminal. Status reflects the last reported event.",
+      "empty": "No agents connected yet. Use Agent in a pane header to start Claude or Codex with status reporting.",
+      "reported": "Last report: {{time}}"
+    }
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",

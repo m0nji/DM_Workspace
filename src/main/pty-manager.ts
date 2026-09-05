@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import * as pty from 'node-pty';
 import { killAndWait } from './pty-shutdown';
 import { existsSync, accessSync, constants, statSync } from 'fs';
@@ -138,6 +139,8 @@ function cwdHookEnv(shell: string): Record<string, string> {
 // Oberfläche ist als TerminalBackend extrahiert (terminal-backend.ts), damit
 // B2 ein Remote-Backend mit identischer Schnittstelle daneben stellen kann.
 export class PtyManager implements TerminalBackend {
+  private sessions = new Map<string, { shell: string; nonce: string }>();
+  sessionInfo(paneId: string): { shell: string; nonce: string } | undefined { return this.sessions.get(paneId); }
   private procs = new Map<string, pty.IPty>();
   // Last size requested per pane — kept for panes that have no process yet, so
   // a resize arriving before the spawn survives instead of vanishing, and used
@@ -159,6 +162,7 @@ export class PtyManager implements TerminalBackend {
       accessSync(shell, constants.X_OK);
       if (!statSync(shell).isFile()) throw new Error(`Shell is not a file: ${shell}`);
     }
+    const nonce = randomBytes(32).toString('hex');
     const proc = pty.spawn(shell, shellArgs(shell, promptNonce()), {
       // xterm-256color + COLORTERM=truecolor so programs render full color (e.g.
       // Claude Code's logo shows orange instead of the 16-color red fallback).
@@ -166,15 +170,17 @@ export class PtyManager implements TerminalBackend {
       cols: opts.cols,
       rows: opts.rows,
       cwd: resolveCwd(opts.cwd),
-      env: cwdHookEnv(shell)
+      env: { ...cwdHookEnv(shell), DMWS_AGENT_NONCE: nonce }
     });
     proc.onData((data) => this.dataListeners.forEach((l) => l(paneId, data)));
     proc.onExit(({ exitCode }) => {
       this.procs.delete(paneId);
+      this.sessions.delete(paneId);
       this.dims.delete(paneId);
       this.exitListeners.forEach((l) => l(paneId, exitCode));
     });
     this.procs.set(paneId, proc);
+    this.sessions.set(paneId, { shell, nonce });
     // A resize for a pane that had no process yet was remembered instead of
     // dropped (see resize). Apply it now, so a pane whose resize overtook its
     // spawn doesn't keep running at the size it was spawned with — the shell
@@ -208,6 +214,7 @@ export class PtyManager implements TerminalBackend {
     if (proc) {
       proc.kill();
       this.procs.delete(paneId);
+      this.sessions.delete(paneId);
     }
     // Also drops a remembered size for a pane that never spawned, so a later
     // pane reusing the id doesn't inherit it.
@@ -224,6 +231,7 @@ export class PtyManager implements TerminalBackend {
   killAllAndWait(timeoutMs = 1500): Promise<void> {
     const procs = [...this.procs.values()];
     this.procs.clear();
+    this.sessions.clear();
     this.dims.clear();
     return killAndWait(procs, timeoutMs);
   }

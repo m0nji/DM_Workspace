@@ -2,6 +2,12 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.16.0 – 2026-09-05
+- feat: Connect new local Claude Code and Codex sessions to explicit pane status reporting. The Agent button provides a temporary start command; badges distinguish working, needs input, response ended and unknown, with failure reporting where supported. Output silence never implies completion.
+- feat: Open the new Agent overview from the top-right toolbar to see connected agents across all workspaces. Waiting agents and errors appear first, an attention counter highlights them, and selecting an entry reveals and focuses its terminal. The list updates live and shows the last report time.
+- fix: Agent dialogs support keyboard navigation through provider selection and overview entries. The overview follows the selected app theme and excludes closed panes.
+- note: Status reporting requires current agent CLIs and new local sessions. Codex additionally needs Node.js in PATH and hook trust through /hooks. Existing, resumed and remote sessions are not supported yet. Codex approval waits can remain visible until the response ends; its hooks do not cover general failures or every user-question tool. Response ended does not mean the project has passed verification.
+
 ## 0.15.0 – 2026-09-05
 - feat: Find terminals across all workspaces by title, workspace, group or working directory. The new search icon in the top-right corner opens a terminal-only search; the command palette also includes terminal results. Selecting a result reveals its workspace and pane and moves keyboard focus into the existing terminal. Results update live while keeping the selected terminal stable.
 - feat: Adjust terminal font size independently of app zoom, from 10 to 32 pixels. Changes apply to running terminals immediately and survive a restart.

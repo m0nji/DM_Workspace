@@ -72,3 +72,43 @@ four panes.
 ## Platforms
 
 Available for **macOS** and **Windows**.
+
+## Claude and Codex agent status
+
+Click **Agent** in a pane header, select Claude or Codex, copy the start command, and run it at an idle
+prompt in that same terminal. This starts Claude with session-only status hooks;
+your personal Claude settings remain unchanged. Requires a current Claude Code
+installation supporting HTTP hooks and `PostToolBatch` (verified with 2.1.251),
+and zsh, bash or PowerShell.
+
+The badge shows the last explicit event: **Working**, **Needs input**, **Response
+ended**, **Error**, or **Unknown**. Output silence never completes an agent turn.
+“Response ended” means the agent finished responding, not that its changes passed
+verification. Missing or policy-blocked hooks leave the badge unknown or at its
+last reported state; hover to see the report time.
+
+This first integration supports new local sessions from their first submitted
+prompt. Existing, remote and `/resume` sessions are not supported yet. The
+configuration is temporary and bound to the terminal that created it; obtain a
+new command after restarting the terminal or the app. No automatic permissions
+or task actions are performed by the status integration.
+
+For **Codex**, install a current CLI supporting command hooks (configuration checked
+with 0.153.4) and Node.js in PATH. The generated command adds temporary hooks using
+`-c`; it does not edit your config. Review and trust the DM Workspace commands in
+Codex with `/hooks`, then submit your first prompt. Repeat this after generating
+a new setup. See the [official Codex hooks documentation](https://learn.chatgpt.com/docs/hooks).
+The local helper forwards only lifecycle identifiers, never prompts, tool inputs
+or responses. It returns no approval decisions or model context.
+
+Codex does not provide a general failure hook, so it does not report **Error**.
+Its permission events do not identify a tool invocation: **Needs input** may stay
+visible until the response ends, even after approval. User-question tools are
+not consistently covered by hooks. Interruptions return to **Unknown**; late events
+from older turns cannot finish a newer turn. End an active agent session before
+switching providers in the same pane.
+
+Open **Agent overview** in the top-right toolbar to see connected agents across
+all workspaces. Waiting agents and errors appear first; the badge counts those
+needing attention. Select a row to reveal and focus its terminal. The list
+updates live, includes the last report time, and removes closed panes.

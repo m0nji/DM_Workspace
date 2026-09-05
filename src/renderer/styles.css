@@ -1625,3 +1625,32 @@ body.drag-active webview { pointer-events: none; }
 .terminal-start-error strong, .terminal-start-error details { width: 100%; }
 .terminal-start-error pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; }
 .terminal-start-error summary { cursor: pointer; }
+
+/* Explicit agent evidence is separate from terminal-output activity. */
+.pane-agent-status { flex: 0 1 auto; max-width: 190px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px;
+  background: transparent; color: var(--muted); font: inherit; font-size: 10px; cursor: pointer; }
+.pane-agent-status:hover { color: var(--text); background: var(--accent-soft); }
+.pane-agent-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pane-agent-status.agent-working { color: var(--accent); }
+.pane-agent-status.agent-needs-input, .pane-agent-status.agent-error { color: var(--text); font-weight: 700; }
+.agent-help { display: block; margin-bottom: 12px; }
+.agent-command { max-height: 160px; overflow-y: auto; display: block; overflow-wrap: anywhere; user-select: text; padding: 10px;
+  margin-bottom: 12px; background: var(--bg); color: var(--text); border-radius: 6px; }
+
+.agent-help select { color: var(--text); background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 8px; font: inherit; }
+.agent-help select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.agent-overview-trigger { position: relative; }
+.agent-overview-trigger.has-attention { color: var(--accent); }
+.agent-attention-count { position: absolute; top: -3px; right: -5px; min-width: 14px; padding: 0 3px;
+  border-radius: 8px; background: var(--accent); color: var(--bg); font-size: 10px; line-height: 14px; }
+.agent-overview-list { display: flex; flex-direction: column; gap: 8px; max-height: 45vh; overflow-y: auto; }
+.agent-overview-row { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--muted); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.agent-overview-row:hover { background: var(--accent-soft); }
+.agent-overview-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.agent-overview-name, .agent-overview-state { color: var(--text); }
+.agent-overview-row.agent-needs-input, .agent-overview-row.agent-error { border-left: 3px solid var(--accent); }
+.agent-overview-row.agent-needs-input .agent-overview-state, .agent-overview-row.agent-error .agent-overview-state { font-weight: 700; }
