@@ -44,7 +44,7 @@
   "tooltip": {
     "editWorkspace": "Workspace bearbeiten",
     "deleteWorkspace": "Workspace schließen",
-    "terminalsReady": "Terminals bereit",
+    "terminalsReady": "Terminals ohne neue Ausgabe",
     "addWorkspace": "Workspace hinzufügen",
     "whatsNewChangelog": "Was ist neu – Changelog anzeigen",
     "collapseGroup": "Gruppe einklappen",
@@ -114,7 +114,9 @@
         "lightGray": "Hellgrau",
         "white": "Weiß",
         "darkPurple": "Dunkelviolett"
-      }
+      },
+      "fontSize": "Terminalschriftgröße",
+      "fontSizeHint": "Gilt sofort für alle Terminals. Laufende Programme bleiben geöffnet."
     },
     "shortcuts": {
       "title": "Tastenkürzel",
@@ -154,18 +156,18 @@
     "session": {
       "title": "Terminal-Sitzung",
       "restoreHistory": "Terminal-Verlauf wiederherstellen",
-      "restoreHistoryHint": "Stellt den Inhalt der Terminals nach einem Neustart wieder her. Ausgeschaltet beginnt jeder Neustart mit leeren Terminals, und es wird kein Terminal-Inhalt auf die Festplatte geschrieben."
+      "restoreHistoryHint": "Stellt lokal Layout und Terminalverlauf wieder her und startet neue Shells. Vorherige Programme werden nicht fortgesetzt. Remote-Sitzungen werden mit dem Server wieder verbunden. Wenn ausgeschaltet, wird lokal kein Terminalverlauf gespeichert oder wiederhergestellt."
     },
     "notifications": {
       "sidebar": "Seitenleiste",
-      "showReadyBadge": "Badge „Terminals bereit“ anzeigen",
-      "showReadyBadgeHint": "Zeigt eine grüne Anzahl auf inaktiven Workspaces an, wenn deren Terminals fertig sind.",
+      "showReadyBadge": "Terminals mit Ausgabepause zählen",
+      "showReadyBadgeHint": "Zeigt auf inaktiven Workspaces, wie viele Terminals seit mindestens zwei Sekunden keine neue Ausgabe senden. Das bedeutet nicht, dass ihre Arbeit beendet ist.",
       "title": "Benachrichtigungen",
       "desktopNotifications": "Desktop-Benachrichtigungen",
-      "desktopNotificationsHint": "Zeigt eine Systembenachrichtigung an, wenn ein Terminal in einem Hintergrund-Workspace fertig ist. Standardmäßig aus.",
+      "desktopNotificationsHint": "Meldet Ausgabepausen in Terminals, die du gerade nicht siehst. Eine Pause bestätigt weder Abschluss noch Erfolg. Standardmäßig aus.",
       "busy": {
-        "title": "Laufende Register",
-        "hint": "Markiert den Farbpunkt eines Registers, solange in einer seiner Panes Ausgabe entsteht — also solange dort noch etwas passiert. Steht die Shell wieder an ihrem Prompt, meldet sie das selbst, und die Markierung geht verlässlich aus. Zwei Grenzen: ein Kommando, das mehrere Sekunden lang gar nichts ausgibt, gilt als fertig. Und ein Programm, das seine Anzeige regelmäßig neu zeichnet, kann kurz aufblitzen, obwohl es auf Eingabe wartet.",
+        "title": "Ausgabeaktivität",
+        "hint": "Markiert ein Register, solange eines seiner Terminals neue Ausgabe sendet. Nach zwei Sekunden ohne Ausgabe endet die Markierung. Stille Programme können weiterarbeiten; wartende Programme können ihre Anzeige neu zeichnen. Die Markierung erkennt keinen Aufgabenabschluss.",
         "kind": "Art",
         "kindOff": "Aus",
         "kindRing": "Ring",
@@ -196,12 +198,15 @@
     }
   },
   "palette": {
-    "placeholder": "Befehl eingeben oder suchen…",
-    "empty": "Keine passenden Befehle",
+    "panePlaceholder": "Alle Terminals durchsuchen…",
+    "placeholder": "Befehle, Workspaces und Terminals suchen…",
+    "empty": "Keine passenden Ergebnisse",
+    "paneNumber": "Pane {{number}}",
     "group": {
       "actions": "Aktionen",
       "templates": "Vorlagen",
-      "workspaces": "Workspaces"
+      "workspaces": "Workspaces",
+      "panes": "Terminals"
     },
     "cmd": {
       "newWorkspace": "Neuer Workspace",
@@ -254,6 +259,7 @@
     }
   },
   "titlebar": {
+    "globalSearch": "Alle Terminals durchsuchen",
     "commandPalette": "Befehlspalette",
     "togglePreview": "Vorschau / Browser umschalten",
     "view": "Ansicht",
@@ -391,8 +397,8 @@
     "closeRemoteConfirm": "Für alle schließen",
     "status": {
       "idle": "untätig",
-      "busy": "beschäftigt",
-      "done": "fertig"
+      "busy": "Ausgabe aktiv",
+      "done": "Ausgabe pausiert"
     },
     "pos": {
       "top": "oben",
@@ -583,7 +589,16 @@
     "scrollToBottom": "Nach unten scrollen",
     "clearAllTitle": "Alle Fenster leeren?",
     "clearAllMessage": "Alle Bereiche in diesem Workspace werden geleert und ihr Scrollback-Verlauf geht verloren.",
-    "clearAllConfirm": "Alle leeren"
+    "clearAllConfirm": "Alle leeren",
+    "startFailed": "Terminal konnte nicht gestartet werden",
+    "startFailedHint": "Prüfe, ob deine Shell installiert und der Arbeitsordner erreichbar ist. Versuche es dann erneut.",
+    "startFailedRemoteHint": "Prüfe oben die Serververbindung und versuche es dann erneut.",
+    "errorDetails": "Fehlerdetails",
+    "retryStart": "Erneut versuchen",
+    "starting": "Terminal wird gestartet…",
+    "historyRestored": "Verlauf wiederhergestellt. Dies ist eine neue Shell; vorherige Programme wurden nicht fortgesetzt.",
+    "dismissNotice": "Ausblenden",
+    "restartShell": "Neue Shell starten"
   },
   "remote": {
     "dialogTitle": "Neuer Remote-Workspace",

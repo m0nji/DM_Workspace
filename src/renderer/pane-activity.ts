@@ -1,7 +1,7 @@
 import type { PaneStatus } from '../shared/types';
 
 export interface PaneActivityOptions {
-  silenceMs?: number; // how long output must stop before a pane counts as "done"
+  silenceMs?: number; // output-silence threshold; legacy "done" means quiet, not completion
   onChange: (status: PaneStatus) => void;
   setTimer: (fn: () => void, ms: number) => unknown;
   clearTimer: (handle: unknown) => void;
@@ -11,11 +11,12 @@ export interface PaneActivity {
   onOutput(): void;
   onInput(): void;
   getStatus(): PaneStatus;
+  reset(): void;
   dispose(): void;
 }
 
 // Pure status machine derived from the raw PTY stream (we cannot inspect the
-// process itself): output -> busy; activity + silence -> done; input after done
+// process itself): output -> busy; activity + silence -> done (quiet, not finished); input after done
 // -> idle. Input during busy extends that activity instead of toggling state.
 export function createPaneActivity(opts: PaneActivityOptions): PaneActivity {
   const silenceMs = opts.silenceMs ?? 2000;
@@ -54,6 +55,7 @@ export function createPaneActivity(opts: PaneActivityOptions): PaneActivity {
       setStatus('idle');
     },
     getStatus(): PaneStatus { return status; },
+    reset(): void { clear(); setStatus('idle'); },
     dispose(): void { clear(); }
   };
 }

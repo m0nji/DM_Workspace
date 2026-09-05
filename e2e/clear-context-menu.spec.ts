@@ -31,7 +31,9 @@ test('context menu has Clear Window / Clear All Windows with confirmation', asyn
   await expect(win.locator('.confirm-btn', { hasText: 'Clear all' })).toBeVisible();
 
   // Cancel leaves the dialog dismissed.
-  await win.locator('.confirm-btn', { hasText: 'Cancel' }).click();
+  await expect(win.locator('.confirm-btn', { hasText: 'Cancel' })).toBeFocused();
+  await win.keyboard.press('Enter');
+  await expect(win.locator('.pane').first().getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
   await expect(win.locator('.confirm-modal')).toHaveCount(0);
 
   // Re-open and confirm — dialog closes, app stays alive with all panes.

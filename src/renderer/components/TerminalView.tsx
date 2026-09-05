@@ -12,7 +12,7 @@ import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
 import {
-  registerTerminal, unregisterTerminal, clearTerminal, clearTerminals,
+  registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, refreshTerminalLayoutAfterCommit,
   registerTerminalFocus, unregisterTerminalFocus,
   registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh,
   registerTerminalInputTracking, unregisterTerminalInputTracking
@@ -36,9 +36,11 @@ import {
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RemotePaneBar } from './RemotePaneBar';
+import { describeIpcError } from '../ipc-error';
 import { parseRemotePaneKey, remoteScopeFromKey } from '../../shared/remote-pane-key';
 import { isPaneWritable } from '../store';
 import type { SpawnTarget } from '../../shared/types';
+import { TERMINAL_FONT_SIZE_DEFAULT } from '../../shared/types';
 import { createResizeScheduler } from '../resize-scheduler';
 import { createSaveScheduler, type SaveScheduler } from '../save-scheduler';
 import {
@@ -52,6 +54,7 @@ interface Props { paneId: string; cwd: string; active?: boolean; }
 // would silently drop restorable history). Also caps scrollback.json growth.
 const SCROLLBACK_LINES = 1000;
 
+// Remove the legacy in-buffer notice; new notices live in the translated UI.
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
 
@@ -137,6 +140,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const activeRef = useRef(active);
   // The mount effect owns the scheduler; the active effect steers its cadence.
   const saveSchedulerRef = useRef<SaveScheduler | null>(null);
+  const fontSize = useStore((s) => s.settings.terminalFontSize ?? TERMINAL_FONT_SIZE_DEFAULT);
   const themeId = useStore((s) => s.settings.themeId);
   const opacity = useStore((s) => s.settings.terminalOpacity);
   const customBg = useStore((s) => s.settings.terminalBackground);
@@ -144,6 +148,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const setSearchOpen = useStore((s) => s.setSearchOpen);
   const requestClosePane = useStore((s) => s.requestClosePane);
   const [atBottom, setAtBottom] = useState(true);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [exited, setExited] = useState<number | null>(null);
+  const [historyRestored, setHistoryRestored] = useState(false);
+  const retryStartRef = useRef<(() => void) | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
 
@@ -192,13 +201,16 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
   useEffect(() => {
     const host = hostRef.current!;
+    let disposed = false;
+    let historyLoaded = false;
+    let processEnded = false;
     // Im Effect neu abgeleitet (statt remoteRef aus dem Render zu schließen):
     // der Effect hängt bewusst nur an paneId, und der Schlüssel bestimmt das
     // Ziel vollständig.
     const remote = parseRemotePaneKey(paneId);
     const term = new Terminal({
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
-      fontSize: 13,
+      fontSize: useStore.getState().settings.terminalFontSize ?? TERMINAL_FONT_SIZE_DEFAULT,
       allowTransparency: true,
       theme: buildTheme(
         useStore.getState().settings.themeId,
@@ -407,7 +419,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const doSave = (): void => {
       // Vor dem serialize(): der Aufruf läuft den kompletten Puffer ab, und das
       // Ergebnis würde im Main-Prozess ohnehin verworfen.
-      if (!historyEnabled()) return;
+      if (!historyEnabled() || !historyLoaded) return;
       const data = serializeAddon.serialize({
         scrollback: SCROLLBACK_LINES,
         excludeModes: true,
@@ -444,6 +456,14 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       activity.onOutput();
     });
     const offExit = window.api.onExit(paneId, (exitCode) => {
+      processEnded = true;
+      // Remote session lifecycle remains server-owned; a later server restart
+      // must not leave its reattached terminal with input disabled locally.
+      if (!remote) {
+        setExited(exitCode);
+        term.options.disableStdin = true;
+      }
+      activity.reset();
       useStore.getState().setPaneAutoTitle(paneId, '');
       // Eine tote Pane arbeitet nicht mehr. Ohne das bliebe der zuletzt
       // gemeldete Zustand stehen — bei einem Prozess, der mitten in einem
@@ -494,22 +514,29 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // Main liefert bei ausgeschalteter Option ohnehin null; die Prüfung spart
         // den IPC-Round-Trip und verhindert den Restore-Separator im leeren Pane.
         if (!historyEnabled()) {
+          historyLoaded = true;
           restorePromise = Promise.resolve();
           return restorePromise;
         }
         restorePromise = window.api.getScrollback(paneId).then((saved) => {
+          if (disposed) return;
+          historyLoaded = true;
           if (saved) {
             // Sanitize first: saves from versions ≤ 0.9.30 embed the terminal
             // modes and alt-screen frame active at save time, which would put
             // the fresh pane straight back into the stuck state they came from.
-            term.write(sanitizeRestoredScrollback(saved));
-            term.write(`\r\n\x1b[2m── ${RESTORE_MARKER_TEXT} ──\x1b[0m\r\n`);
+            term.write(sanitizeRestoredScrollback(saved).split('\n')
+              .filter((line) => !line.includes(RESTORE_MARKER_TEXT)).join('\n'));
+            setHistoryRestored(true);
             // Hand the shell an empty viewport. Everything above is now in the
             // scrollback, out of reach of the full repaints the shell performs
             // at its first prompt and on every resize — those address the
             // viewport absolutely and would otherwise paint over this history.
             term.write(parkRestoredHistory(term.rows));
           }
+        }).catch((error: unknown) => {
+          restorePromise = null; // A transient read failure can be retried.
+          throw error;
         });
       }
       return restorePromise;
@@ -523,14 +550,18 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     let sentCols = 0;
     let sentRows = 0;
     const spawnNow = (): void => {
-      if (spawned) return;
+      if (spawned || disposed) return;
       spawned = true;
+      setStarting(true);
+      setExited(null);
+      processEnded = false;
       // Unmittelbar vor dem Spawn noch einmal fitten: zwischen dem letzten Fit
       // und dem Ablauf des Breiten-Debounce (siehe spawnOnce) kann sich die
       // Pane bewegt haben, und die Spawn-Dimensionen sind genau die, mit denen
       // die Shell ihren ersten Prompt zeichnet.
       safeFit();
-      void restoreOnce().then(() => {
+      void restoreOnce().then(async () => {
+        if (disposed) return;
         // Remote-Panes spawnen mit target: der BackendRouter reicht sie an das
         // RemotePtyBackend weiter (Subscribe statt lokalem PTY). Der scopeKey
         // aus dem Pane-Schlüssel bestimmt Projekt- vs. User-Scope.
@@ -546,8 +577,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // statt als stillen Rejection verpuffen zu lassen.
         const cols = term.cols || 80;
         const rows = term.rows || 24;
-        void window.api.spawn({ paneId, cwd, cols, rows, ...(target ? { target } : {}) })
-          .catch((err: unknown) => console.error(`[pane ${paneId}] spawn failed:`, err));
+        await window.api.spawn({ paneId, cwd, cols, rows, ...(target ? { target } : {}) });
+        if (disposed || processEnded) return;
+        setStartError(null);
+        term.options.disableStdin = false;
         sentCols = cols;
         sentRows = rows;
         spawnSent = true;
@@ -561,7 +594,19 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           window.api.input({ paneId, data });
           activity.onInput();
         }
+      }).catch((error: unknown) => {
+        if (!disposed) setStartError(describeIpcError(error));
+      }).finally(() => {
+        retrying = false;
+        if (!disposed) setStarting(false);
       });
+    };
+    let retrying = false;
+    retryStartRef.current = () => {
+      if (retrying || disposed) return;
+      retrying = true;
+      spawned = false;
+      spawnNow();
     };
 
     // Spawnen erst, wenn die Panebreite stabil ist.
@@ -680,6 +725,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     pinWhenReady();
 
     return () => {
+      disposed = true;
+      retryStartRef.current = null;
       flushSave();
       saveSchedulerRef.current = null;
       saveScheduler.dispose();
@@ -712,6 +759,14 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // paneId is stable for the component's lifetime; cwd only matters at spawn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paneId]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (term && term.options.fontSize !== fontSize) {
+      term.options.fontSize = fontSize;
+      refreshTerminalLayoutAfterCommit(paneId);
+    }
+  }, [fontSize, paneId]);
 
   // Apply theme changes live (theme / opacity / background override) without
   // recreating the terminal.
@@ -785,7 +840,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: t('menu.selectAll'), onClick: () => { term?.selectAll(); term?.focus(); } },
       { label: '-' },
       { label: t('menu.clearWindow'), onClick: () => { clearTerminal(paneId); term?.focus(); } },
-      { label: t('menu.clearAllWindows'), onClick: () => setConfirmClearAll(true) },
+      { label: t('menu.clearAllWindows'), onClick: () => { term?.focus(); setConfirmClearAll(true); } },
       // Unstick the terminal's input/mouse modes without wiping its contents — e.g.
       // after a TUI crashed and left mouse tracking on, hijacking the wheel.
       { label: t('menu.resetTerminal'), onClick: () => { term?.write(STUCK_MODE_RESET); term?.focus(); } },
@@ -793,7 +848,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       { label: t('menu.search'), onClick: () => setSearchOpen(paneId) },
       // Auch für Remote-Panes: requestClosePane entscheidet im Store zwischen
       // lokalem Layout und pane.close und stellt in beiden Fällen die Rückfrage.
-      { label: t('menu.closeTerminal'), onClick: () => requestClosePane(paneId) }
+      { label: t('menu.closeTerminal'), onClick: () => { term?.focus(); requestClosePane(paneId); } }
     ];
   };
 
@@ -847,13 +902,31 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     </div>
   );
 
-  // Lokale Panes behalten exakt die bisherige DOM-Struktur; Remote-Panes
-  // bekommen darüber die schmale Status-/Driver-Leiste. remoteRef ist für die
-  // Lebenszeit der Pane konstant, die Struktur wechselt also nie zur Laufzeit.
-  if (!remoteRef) return hostWrap;
   return (
-    <div className="remote-pane-stack">
-      <RemotePaneBar paneId={paneId} />
+    <div className="terminal-pane-stack">
+      {remoteRef && <RemotePaneBar paneId={paneId} />}
+      {startError && (
+        <div className="terminal-notice terminal-start-error" role="alert">
+          <strong>{t('terminal.startFailed')}</strong>
+          <span>{t(remoteRef ? 'terminal.startFailedRemoteHint' : 'terminal.startFailedHint')}</span>
+          <details><summary>{t('terminal.errorDetails')}</summary><pre>{startError}</pre></details>
+          <button type="button" className="cwd-btn" disabled={starting} onClick={() => retryStartRef.current?.()}>
+            {t(starting ? 'terminal.starting' : 'terminal.retryStart')}
+          </button>
+        </div>
+      )}
+      {exited !== null && !startError && (
+        <div className="terminal-notice" role="status">
+          <span>{t('terminal.processExited', { code: exited })}</span>
+          {!remoteRef && <button type="button" className="cwd-btn" disabled={starting} onClick={() => retryStartRef.current?.()}>{t('terminal.restartShell')}</button>}
+        </div>
+      )}
+      {historyRestored && !startError && !starting && exited === null && (
+        <div className="terminal-notice" role="status">
+          <span>{t('terminal.historyRestored')}</span>
+          <button type="button" className="cwd-btn" onClick={() => setHistoryRestored(false)}>{t('terminal.dismissNotice')}</button>
+        </div>
+      )}
       {hostWrap}
     </div>
   );

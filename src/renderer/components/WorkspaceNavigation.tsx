@@ -452,6 +452,7 @@ export function WorkspaceNavigation({ placement }: WorkspaceNavigationProps): Re
 
       {pendingWs && (
         <ConfirmDialog
+          tone="danger"
           title={t('workspace.deleteTitle')}
           message={t('workspace.deleteMessage', { name: pendingWs.name })}
           confirmLabel={t('workspace.closeConfirm')}

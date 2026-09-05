@@ -9,6 +9,13 @@ import { join } from 'path';
 
 const mocks = vi.hoisted(() => ({ spawned: [] as string[] }));
 
+// These tests exercise shell selection / resize bookkeeping with a fake PTY.
+// The selected shell need not be installed on the host running the tests.
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, accessSync: vi.fn(), statSync: vi.fn(() => ({ isFile: () => true })) };
+});
+
 vi.mock('node-pty', () => ({
   spawn: (file: string) => {
     mocks.spawned.push(file);

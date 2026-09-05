@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { Icon } from './Icon';
 import type { BusyIndicator, RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
 import {
+  TERMINAL_FONT_SIZE_DEFAULT, TERMINAL_FONT_SIZE_MIN, TERMINAL_FONT_SIZE_MAX,
   BUSY_INDICATOR_KINDS,
   BUSY_INDICATOR_SPEED_DEFAULT_MS,
   BUSY_INDICATOR_SPEED_MAX_MS,
@@ -574,6 +575,21 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
 
                 <p className="modal-hint">{t('settings.appearance.backgroundHint')}</p>
+
+                <div className="setting-row">
+                  <label htmlFor="terminal-font-size">{t('settings.appearance.fontSize')}</label>
+                  <input
+                    id="terminal-font-size"
+                    type="range"
+                    min={TERMINAL_FONT_SIZE_MIN}
+                    max={TERMINAL_FONT_SIZE_MAX}
+                    step={1}
+                    value={settings.terminalFontSize ?? TERMINAL_FONT_SIZE_DEFAULT}
+                    onChange={(e) => updateSettings({ terminalFontSize: Number(e.target.value) })}
+                  />
+                  <output className="setting-value" htmlFor="terminal-font-size">{settings.terminalFontSize ?? TERMINAL_FONT_SIZE_DEFAULT} px</output>
+                </div>
+                <p className="modal-hint">{t('settings.appearance.fontSizeHint')}</p>
 
                 <div className="setting-row">
                   <label>{t('settings.appearance.opacity')}</label>

@@ -2,6 +2,13 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.15.0 – 2026-09-05
+- feat: Find terminals across all workspaces by title, workspace, group or working directory. The new search icon in the top-right corner opens a terminal-only search; the command palette also includes terminal results. Selecting a result reveals its workspace and pane and moves keyboard focus into the existing terminal. Results update live while keeping the selected terminal stable.
+- feat: Adjust terminal font size independently of app zoom, from 10 to 32 pixels. Changes apply to running terminals immediately and survive a restart.
+- fix: Confirmation dialogs keep keyboard focus inside the dialog, start on the safe cancel action and respect the focused button when Enter is pressed. Welcome-screen layout presets are now keyboard-accessible buttons.
+- fix: Terminal startup failures are visible in the pane and offer retry and shell recovery actions. Restored local history clearly explains that a new shell has started.
+- fix: A pause in terminal output no longer claims that work has successfully completed. Quiet-state indicators and notifications distinguish output inactivity from a confirmed result.
+
 ## 0.14.4 – 2026-08-24
 - fix: Finished terminals keep their normal neutral title bar instead of tinting the entire header green. The green status dot and the thin inner edge still identify the pane that is ready, without making every completed pane look selected
 

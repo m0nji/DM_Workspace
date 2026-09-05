@@ -36,7 +36,7 @@ test('split and close move the surviving terminal instead of remounting it', asy
   // The original terminal survived the split…
   await expect(win.locator('.pane').first().locator('.xterm-host[data-probe="alive"]')).toHaveCount(1);
   // …and nothing replayed saved scrollback into a live pane.
-  await expect(win.locator('.xterm-rows').first()).not.toContainText('wiederhergestellt');
+  await expect(win.getByRole('status').filter({ hasText: 'History restored.' })).toHaveCount(0);
   await expect(win.locator('.xterm-rows').first()).toContainText('SPLIT_PROBE_4242');
 
   // Closing the new sibling collapses the split node — the survivor must move,
@@ -48,7 +48,7 @@ test('split and close move the surviving terminal instead of remounting it', asy
   await win.waitForTimeout(1200);
 
   await expect(win.locator('.pane .xterm-host[data-probe="alive"]')).toHaveCount(1);
-  await expect(win.locator('.xterm-rows').first()).not.toContainText('wiederhergestellt');
+  await expect(win.getByRole('status').filter({ hasText: 'History restored.' })).toHaveCount(0);
 
   await app.close();
 });

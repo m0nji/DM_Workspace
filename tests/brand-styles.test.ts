@@ -228,14 +228,14 @@ describe('DM brand styles', () => {
     expect(styles).toContain('var(--busy-speed, 1200ms)');
   });
 
-  it('hands a ready workspace badge off without tinting the whole pane header', () => {
+  it('hands an output-pause badge off without implying success or tinting the header', () => {
     const donePane = ruleBodies('.pane.status-done:not(.drag-source):not(.drop-target)');
     const doneHeader = ruleBodies('.pane.status-done .pane-header');
     const doneDot = ruleBodies('.status-dot.done');
 
     expect(donePane).toHaveLength(1);
     expect(donePane[0]).toContain('inset 0 0 0 1px');
-    expect(donePane[0]).toContain('var(--success)');
+    expect(donePane[0]).toContain('var(--muted)');
     expect(doneHeader).toHaveLength(0);
     expect(doneDot).toHaveLength(1);
     expect(doneDot[0]).toContain('box-shadow: 0 0 0 2px');

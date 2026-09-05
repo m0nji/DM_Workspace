@@ -64,13 +64,15 @@ test('swapping panes moves the terminals, and the focus shortcut takes typing al
   await expect(rows(0)).toContainText('SWAP_PROBE_1');
   await expect(rows(1)).toContainText('SWAP_PROBE_0');
   // Nothing replayed saved scrollback into a live pane.
-  await expect(rows(0)).not.toContainText('wiederhergestellt');
-  await expect(rows(1)).not.toContainText('wiederhergestellt');
+  await expect(win.getByRole('status').filter({ hasText: 'History restored.' })).toHaveCount(0);
 
   // Focus the left pane by clicking its terminal, then move the focus right with
   // the keyboard only and type without clicking anywhere.
   await win.locator('.pane').nth(0).locator('.xterm-screen').click();
   await win.keyboard.press(`${MOD}+Shift+ArrowRight`);
+  // The store applies focus after React commits the active pane. Wait for the
+  // actual input target, not an arbitrary delay or just the highlighted frame.
+  await expect(win.locator('.pane').nth(1).getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
   await win.keyboard.type('echo FOCUS_MOVED_5150');
   await win.keyboard.press('Enter');
 

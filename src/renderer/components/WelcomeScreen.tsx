@@ -46,7 +46,7 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
       </label>
       <div className="preset-row">
         {PRESETS.map((p) => (
-          <div key={p.kind} className="preset" onClick={() => applyPreset(p.kind)}>
+          <button type="button" key={p.kind} className="preset" onClick={() => applyPreset(p.kind)}>
             <div
               className="glyph"
               style={{
@@ -58,7 +58,7 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
               {Array.from({ length: p.cells }).map((_, i) => <div key={i} className="cell" />)}
             </div>
             <div className="label">{t(p.labelKey)}</div>
-          </div>
+          </button>
         ))}
       </div>
 

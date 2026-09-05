@@ -12,6 +12,7 @@ export function ClosePaneConfirmDialog({ remote, onConfirm, onCancel }: Props): 
 
   return (
     <ConfirmDialog
+      tone="danger"
       title={t(remote ? 'pane.closeRemoteTitle' : 'pane.closeTitle')}
       message={t(remote ? 'pane.closeRemoteMessage' : 'pane.closeMessage')}
       confirmLabel={t(remote ? 'pane.closeRemoteConfirm' : 'pane.closeConfirm')}

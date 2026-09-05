@@ -1,3 +1,5 @@
+import { collectPaneIds } from '../shared/layout-tree';
+import { paneDisplayName } from './pane-display-name';
 import type { TFunction } from 'i18next';
 import { resolveShortcuts, formatShortcut, type ShortcutAction } from '../shared/shortcuts';
 import { isRemotePaneKey } from '../shared/remote-pane-key';
@@ -28,6 +30,8 @@ export interface CommandListInput {
   actions: StoreState;               // die Aktionen, die run() auslöst
   workspaces: Workspace[];
   templates: WorkspaceTemplate[];
+  paneCwd: Record<string, string>;
+  paneAutoTitles: Record<string, string>;
   workspaceGroups: WorkspaceGroup[];
   activeWorkspaceId: string | null;
   focusedPaneId: string | null;
@@ -43,7 +47,7 @@ export interface CommandListInput {
 // die einzige Verzweigung dieses Arbeitspakets ohne Test.
 export function buildCommandList({
   actions: s, workspaces, templates, workspaceGroups, activeWorkspaceId, focusedPaneId,
-  shortcutBindings, remote, t, isMac, close
+  shortcutBindings, remote, paneCwd, paneAutoTitles, t, isMac, close
 }: CommandListInput): CommandItem[] {
   const bindings = resolveShortcuts(shortcutBindings, isMac);
   const hint = (a: ShortcutAction): string => formatShortcut(bindings[a], isMac);
@@ -227,6 +231,24 @@ export function buildCommandList({
       hint: idx < 9 ? formatShortcut(`Mod+${idx + 1}`, isMac) : undefined,
       keywords: group ? `${w.cwd} ${groupLabel(group)}` : w.cwd,
       run: act(() => s.selectWorkspace(w.id))
+    });
+  });
+
+  workspaces.forEach((w) => {
+    const group = groupOf(w);
+    collectPaneIds(w.layout).forEach((paneId, index) => {
+      const cwd = paneCwd[paneId] ?? w.cwd;
+      const manual = w.paneTitles?.[paneId] ?? '';
+      const automatic = paneAutoTitles[paneId] ?? '';
+      const position = t('palette.paneNumber', { number: index + 1 });
+      list.push({
+        id: `pane-${w.id}-${paneId}`,
+        title: paneDisplayName(manual || automatic, cwd) || position,
+        subtitle: [w.name, group ? groupLabel(group) : '', position, cwd].filter(Boolean).join(' · '),
+        category: t('palette.group.panes'),
+        keywords: `${automatic} ${w.cwd}`,
+        run: act(() => s.revealPane(w.id, paneId))
+      });
     });
   });
 

@@ -19,7 +19,7 @@ function env(): Record<string, string> {
   return { ...process.env, DMWS_USERDATA: USERDATA, DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1' } as Record<string, string>;
 }
 
-test('separator does not accumulate across multiple restarts; fresh pane stays clean', async () => {
+test('restore notice stays singular across restarts and never appears on a fresh pane', async () => {
   // Launch 1: one pane, one command.
   const a1 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w1 = await a1.firstWindow();
@@ -33,19 +33,19 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   await waitForScrollbackOnDisk(USERDATA, MARKER);
   await a1.close();
 
-  // Launch 2: restore (1 separator expected).
+  // Launch 2: restore with one UI notice.
   const savedAfterLaunch1 = scrollbackMtime(USERDATA);
   const a2 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w2 = await a2.firstWindow();
   await expect(w2.locator('.pane .xterm-screen').first()).toBeVisible();
   await waitForShellPrompt(w2);
-  // The restored buffer is re-saved (again without the separator, which is
-  // filtered before saving); launch 3 must read THAT version, so wait for the
+  // The restored buffer is re-saved without the UI notice; launch 3 must
+  // read THAT version, so wait for the
   // file to be rewritten rather than for a fixed span.
   await waitForScrollbackRewrite(USERDATA, savedAfterLaunch1);
   await a2.close();
 
-  // Launch 3: restore again. Probe: still exactly ONE separator, marker still present.
+  // Launch 3: restore again. Still one notice, and the marker remains present.
   const a3 = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: env() });
   const w3 = await a3.firstWindow();
   await expect(w3.locator('.pane .xterm-screen').first()).toBeVisible();
@@ -54,10 +54,9 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
   // scrollback so the shell's opening repaint cannot reach it.
   const text = await paneBufferText(w3);
   console.log('--- after 2 restarts ---\n' + text + '\n--- end ---');
-  const separators = (text.match(/wiederhergestellt/g) || []).length;
-  console.log('separator count after 2 restarts =', separators);
   expect(text).toContain(MARKER);
-  expect(separators).toBe(1);
+  await expect(w3.getByRole('status').filter({ hasText: 'History restored.' })).toHaveCount(1);
+  expect(text).not.toContain('History restored.');
 
   // Probe: add a brand-new pane (split) — it has no saved scrollback, so exactly
   // one of the two panes must show the restored history and the other must be clean.
@@ -70,9 +69,8 @@ test('separator does not accumulate across multiple restarts; fresh pane stays c
     paneTexts.push(await paneBufferText(w3, i));
   }
   console.log('--- pane 0 ---\n' + paneTexts[0] + '\n--- pane 1 ---\n' + paneTexts[1] + '\n--- end ---');
-  const withHistory = paneTexts.filter((t) => t.includes('wiederhergestellt')).length;
   const withMarker = paneTexts.filter((t) => t.includes(MARKER)).length;
-  expect(withHistory).toBe(1); // only the restored pane, never the fresh one
+  await expect(w3.locator('.pane').filter({ has: w3.getByRole('status').filter({ hasText: 'History restored.' }) })).toHaveCount(1);
   expect(withMarker).toBe(1);
 
   await a3.close();

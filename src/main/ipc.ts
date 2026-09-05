@@ -657,9 +657,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     const payload = parseAgentDone(raw);
     if (!payload) { rejectPayload('notify:agentDone', raw); return; }
     if (!Notification.isSupported()) return;
+    const locale = loadStateFromFile(STATE_FILE()).settings.locale ?? app.getLocale();
     const n = new Notification({
       title: payload.workspaceName,
-      body: `A terminal is ready: ${payload.paneTitle}`
+      body: locale.startsWith('de')
+        ? `Keine neue Terminalausgabe (Abschluss unbekannt): ${payload.paneTitle}`
+        : `No recent terminal output (completion unknown): ${payload.paneTitle}`
     });
     n.on('click', () => {
       const win = getWindow();

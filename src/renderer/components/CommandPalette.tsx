@@ -25,6 +25,7 @@ function score(haystack: string, query: string): number {
 export function CommandPalette(): React.JSX.Element | null {
   const { t } = useTranslation();
   const open = useStore((s) => s.commandPaletteOpen);
+  const scope = useStore((s) => s.commandPaletteScope);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const workspaces = useStore((s) => s.workspaces);
   // Eigenes Abo, nicht aus actions gelesen: renameWorkspaceGroup und
@@ -34,13 +35,15 @@ export function CommandPalette(): React.JSX.Element | null {
   const workspaceGroups = useStore((s) => s.workspaceGroups);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
+  const paneCwd = useStore((s) => s.paneCwd);
+  const paneAutoTitles = useStore((s) => s.paneAutoTitles);
   const focusedPaneId = useStore((s) => s.focusedPaneId);
   const shortcutBindings = useStore((s) => s.settings.shortcutBindings);
   // Der Remote-Zustand entscheidet, ob ein Eintrag seinen Sperrgrund nennt.
   const remote = useStore((s) => s.remote);
 
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const lastMouse = useRef<{ x: number; y: number } | null>(null);
@@ -50,33 +53,41 @@ export function CommandPalette(): React.JSX.Element | null {
   const commands = useMemo(
     () => buildCommandList({
       actions: useStore.getState(),
-      workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote,
+      workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles,
       t,
       isMac,
       close: () => setOpen(false)
     }),
-    [workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, setOpen, t]
+    [workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles, setOpen, t]
   );
 
   const filtered = useMemo(() => {
     return commands
+      .filter((c) => scope !== 'panes' || c.id.startsWith('pane-'))
       .map((c) => ({ c, s: score(`${c.title} ${c.subtitle ?? ''} ${c.keywords ?? ''} ${c.category}`, query) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .map((x) => x.c);
-  }, [commands, query]);
+  }, [commands, query, scope]);
+
+  const active = Math.max(0, filtered.findIndex((c) => c.id === selectedId));
 
   // Reset query/selection each time the palette opens, and focus the input.
   useEffect(() => {
     if (open) {
       setQuery('');
-      setActive(0);
+      setSelectedId(null);
       // focus after the element mounts
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [open]);
+  }, [open, scope]);
 
-  useEffect(() => { setActive(0); }, [query]);
+  // Anchor even the default highlight to an ID: live metadata can reorder rows.
+  useEffect(() => {
+    if (!filtered.some((c) => c.id === selectedId)) {
+      setSelectedId(filtered[0]?.id ?? null);
+    }
+  }, [filtered, selectedId]);
 
   // Keep the highlighted row scrolled into view.
   useEffect(() => {
@@ -88,8 +99,8 @@ export function CommandPalette(): React.JSX.Element | null {
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Escape') { e.preventDefault(); setOpen(false); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => (i + 1) % Math.max(filtered.length, 1)); return; }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => (i - 1 + filtered.length) % Math.max(filtered.length, 1)); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedId(filtered[(active + 1) % Math.max(filtered.length, 1)]?.id ?? null); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedId(filtered[(active - 1 + filtered.length) % Math.max(filtered.length, 1)]?.id ?? null); return; }
     if (e.key === 'Enter') { e.preventDefault(); filtered[active]?.run(); return; }
   };
 
@@ -104,9 +115,10 @@ export function CommandPalette(): React.JSX.Element | null {
           <input
             ref={inputRef}
             className="command-input"
-            placeholder={t('palette.placeholder')}
+            placeholder={t(scope === 'panes' ? 'palette.panePlaceholder' : 'palette.placeholder')}
+            aria-label={t(scope === 'panes' ? 'titlebar.globalSearch' : 'titlebar.commandPalette')}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setSelectedId(null); }}
             spellCheck={false}
             autoComplete="off"
           />
@@ -131,7 +143,7 @@ export function CommandPalette(): React.JSX.Element | null {
                     const last = lastMouse.current;
                     if (last && last.x === e.clientX && last.y === e.clientY) return;
                     lastMouse.current = { x: e.clientX, y: e.clientY };
-                    setActive(i);
+                    setSelectedId(c.id);
                   }}
                   onClick={() => c.run()}
                 >

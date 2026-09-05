@@ -55,6 +55,6 @@ test('scrollback is replayed after a restart', async () => {
   const text = await paneBufferText(win2);
   console.log('--- restored terminal buffer ---\n' + text + '\n--- end ---');
   expect(text).toContain(MARKER);
-  expect(text).toContain('wiederhergestellt');
+  await expect(win2.getByRole('status')).toContainText('History restored. This is a new shell; previous programs were not resumed.');
   await app2.close();
 });

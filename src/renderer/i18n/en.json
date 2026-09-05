@@ -44,7 +44,7 @@
   "tooltip": {
     "editWorkspace": "Edit workspace",
     "deleteWorkspace": "Close workspace",
-    "terminalsReady": "Terminals ready",
+    "terminalsReady": "Terminals with no recent output",
     "addWorkspace": "Add workspace",
     "whatsNewChangelog": "What's new – show changelog",
     "collapseGroup": "Collapse group",
@@ -114,7 +114,9 @@
         "lightGray": "Light gray",
         "white": "White",
         "darkPurple": "Dark purple"
-      }
+      },
+      "fontSize": "Terminal font size",
+      "fontSizeHint": "Applies immediately to all terminals. Running programs stay open."
     },
     "shortcuts": {
       "title": "Keyboard shortcuts",
@@ -154,18 +156,18 @@
     "session": {
       "title": "Terminal session",
       "restoreHistory": "Restore terminal history",
-      "restoreHistoryHint": "Restores terminal contents after a restart. When off, every restart begins with empty terminals and no terminal content is written to disk."
+      "restoreHistoryHint": "Restores local layouts and terminal history and starts new shells. Previous programs are not resumed. Remote sessions reconnect to the server. When off, local terminal history is neither saved nor restored."
     },
     "notifications": {
       "sidebar": "Sidebar",
-      "showReadyBadge": "Show \"terminals ready\" badge",
-      "showReadyBadgeHint": "Shows a green count on inactive workspaces when their terminals finish working.",
+      "showReadyBadge": "Count terminals with paused output",
+      "showReadyBadgeHint": "Counts terminals in inactive workspaces with no new output for at least two seconds. This does not mean their work has finished.",
       "title": "Notifications",
       "desktopNotifications": "Desktop notifications",
-      "desktopNotificationsHint": "Show an OS notification when a terminal finishes in a background workspace. Off by default.",
+      "desktopNotificationsHint": "Notifies you when output pauses in a terminal you are not viewing. A pause confirms neither completion nor success. Off by default.",
       "busy": {
-        "title": "Running registers",
-        "hint": "Marks a register’s colour dot while one of its panes is producing output — that is, while something is still happening there. Once the shell is back at its prompt it reports that itself, and the mark reliably clears. Two limits: a command that stays completely silent for several seconds counts as finished. And a program that repaints its display regularly can flash briefly even while it waits for input.",
+        "title": "Output activity",
+        "hint": "Marks a workspace while one of its terminals produces output. The mark clears after two seconds without output. Silent programs may still be working; waiting programs may redraw their display. This indicator does not detect task completion.",
         "kind": "Style",
         "kindOff": "Off",
         "kindRing": "Ring",
@@ -196,12 +198,15 @@
     }
   },
   "palette": {
-    "placeholder": "Type a command or search…",
-    "empty": "No matching commands",
+    "panePlaceholder": "Search all terminals…",
+    "placeholder": "Search commands, workspaces and terminals…",
+    "empty": "No matching results",
+    "paneNumber": "Pane {{number}}",
     "group": {
       "actions": "Actions",
       "templates": "Templates",
-      "workspaces": "Workspaces"
+      "workspaces": "Workspaces",
+      "panes": "Terminals"
     },
     "cmd": {
       "newWorkspace": "New workspace",
@@ -254,6 +259,7 @@
     }
   },
   "titlebar": {
+    "globalSearch": "Search all terminals",
     "commandPalette": "Command palette",
     "togglePreview": "Toggle preview / browser",
     "view": "View",
@@ -391,8 +397,8 @@
     "closeRemoteConfirm": "Close for everyone",
     "status": {
       "idle": "idle",
-      "busy": "busy",
-      "done": "done"
+      "busy": "output active",
+      "done": "output paused"
     },
     "pos": {
       "top": "top",
@@ -583,7 +589,16 @@
     "scrollToBottom": "Scroll to bottom",
     "clearAllTitle": "Clear all windows?",
     "clearAllMessage": "All panes in this workspace will be cleared and their scrollback history lost.",
-    "clearAllConfirm": "Clear all"
+    "clearAllConfirm": "Clear all",
+    "startFailed": "Terminal could not start",
+    "startFailedHint": "Check that your shell is installed and the working folder is accessible, then try again.",
+    "startFailedRemoteHint": "Check the server connection above, then try again.",
+    "errorDetails": "Error details",
+    "retryStart": "Try again",
+    "starting": "Starting terminal…",
+    "historyRestored": "History restored. This is a new shell; previous programs were not resumed.",
+    "dismissNotice": "Dismiss",
+    "restartShell": "Start new shell"
   },
   "remote": {
     "dialogTitle": "New remote workspace",

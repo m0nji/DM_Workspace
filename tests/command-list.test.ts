@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCommandList, type CommandItem, type Translate } from '../src/renderer/command-list';
 import { useStore, remoteConnKey } from '../src/renderer/store';
 import { remotePaneKey } from '../src/shared/remote-pane-key';
@@ -47,6 +47,8 @@ function build(): CommandItem[] {
     focusedPaneId: s.focusedPaneId,
     shortcutBindings: s.settings.shortcutBindings,
     remote: s.remote,
+    paneCwd: s.paneCwd,
+    paneAutoTitles: s.paneAutoTitles,
     t,
     isMac: false,
     close: () => undefined
@@ -359,5 +361,61 @@ describe('buildCommandList: Register-Gruppen', () => {
   it('bietet das Umbenennen nicht an, wenn der aktive Workspace gruppenlos ist', () => {
     useStore.setState({ activeWorkspaceId: 'w3' });
     expect(ids()).not.toContain('group-rename');
+  });
+});
+
+describe('global pane search', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(() => {
+    vi.stubGlobal('window', { api: { saveState } });
+    vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => { fn(0); return 0; });
+    useStore.setState({
+      workspaces: [
+        { id: 'a', name: 'Frontend', cwd: '/src/web', layout: { type: 'pane', id: 'a1' } },
+        { id: 'b', name: 'Services', cwd: '/src/api', groupId: 'g', paneTitles: { b2: 'Logs' }, layout: {
+          type: 'split', id: 'split', direction: 'h', ratio: 0.5,
+          children: [{ type: 'pane', id: 'b1' }, { type: 'pane', id: 'b2' }]
+        } }
+      ],
+      workspaceGroups: [{ id: 'g', name: 'Backend', collapsed: true }],
+      workspaceTemplates: [], remote: {}, activeWorkspaceId: 'a', focusedPaneId: 'a1',
+      maximizedPaneId: 'a1', taskView: true,
+      paneAutoTitles: { b1: 'Claude', b2: 'npm run dev', stale: 'Ghost' },
+      paneCwd: { b2: '/src/api/logs' }
+    });
+  });
+
+  it('lists all live panes with titles, workspace, group and live directory', () => {
+    const panes = build().filter(c => c.id.startsWith('pane-'));
+    expect(panes).toHaveLength(3);
+    expect(panes.map(c => c.title)).toEqual(['web', 'Claude', 'Logs']);
+    expect(panes[2].subtitle).toContain('Services');
+    expect(panes[2].subtitle).toContain('Backend');
+    expect(panes[2].subtitle).toContain('/src/api/logs');
+    expect(panes[2].keywords).toContain('npm run dev');
+  });
+
+  it('reveals a pane across workspaces, expands its group and leaves the board', () => {
+    const command = build().find(c => c.id === 'pane-b-b2');
+    expect(command).toBeDefined();
+    command!.run();
+    expect(useStore.getState()).toMatchObject({
+      activeWorkspaceId: 'b', focusedPaneId: 'b2', maximizedPaneId: null, taskView: false,
+      workspaceGroups: [{ id: 'g', collapsed: false }]
+    });
+  });
+
+  it('ignores a result whose pane has since closed', () => {
+    const command = build().find(c => c.id === 'pane-b-b2');
+    expect(command).toBeDefined();
+    useStore.setState({ workspaces: useStore.getState().workspaces.filter(w => w.id !== 'b') });
+    command!.run();
+    expect(useStore.getState().activeWorkspaceId).toBe('a');
+    expect(useStore.getState().focusedPaneId).toBe('a1');
+  });
+
+  it('includes remote panes without requiring an active connection', () => {
+    useStore.setState({ workspaces: [remoteWorkspace()], remote: {} });
+    expect(build().filter(c => c.id.startsWith('pane-'))).toHaveLength(2);
   });
 });

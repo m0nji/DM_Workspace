@@ -91,7 +91,7 @@ test('disabling the history empties the file and starts the next launch clean', 
 
   const text = await win2.locator('.xterm-rows').first().innerText();
   expect(text).not.toContain(MARKER);
-  expect(text).not.toContain('wiederhergestellt'); // kein Restore-Separator
+  await expect(win2.getByText('History restored.', { exact: false })).not.toBeVisible();
   expect(readFileSync(file, 'utf8')).toBe('{}');
 
   await app2.close();

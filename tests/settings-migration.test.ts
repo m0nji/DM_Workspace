@@ -193,3 +193,18 @@ describe('migrateSettings', () => {
     expect('busyIndicatorSpeedMs' in out).toBe(false);
   });
 });
+
+
+describe('terminal font size migration', () => {
+  it('preserves a chosen size and clamps finite sizes to a readable range', () => {
+    expect(migrateSettings({ terminalFontSize: 18 }).terminalFontSize).toBe(18);
+    expect(migrateSettings({ terminalFontSize: 0 }).terminalFontSize).toBe(10);
+    expect(migrateSettings({ terminalFontSize: 100 }).terminalFontSize).toBe(32);
+    expect(migrateSettings({ terminalFontSize: 15.7 }).terminalFontSize).toBe(16);
+  });
+  it('omits malformed sizes so the default applies', () => {
+    for (const terminalFontSize of [undefined, null, '18', Infinity, NaN]) {
+      expect(migrateSettings({ terminalFontSize }).terminalFontSize).toBeUndefined();
+    }
+  });
+});

@@ -43,6 +43,10 @@ export function TitlebarActions(): React.JSX.Element {
           <Icon name="clock" />
         </button>
       )}
+      <button type="button" className="icon-btn" title={t('titlebar.globalSearch')}
+              aria-label={t('titlebar.globalSearch')} onClick={() => setCommandPaletteOpen(true, 'panes')}>
+        <Icon name="search" />
+      </button>
       <button type="button" className="icon-btn" title={t('titlebar.commandPalette')} onClick={() => setCommandPaletteOpen(true)}>
         <Icon name="command-palette" />
       </button>

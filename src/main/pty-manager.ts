@@ -1,9 +1,9 @@
 import * as pty from 'node-pty';
 import { killAndWait } from './pty-shutdown';
-import { existsSync } from 'fs';
+import { existsSync, accessSync, constants, statSync } from 'fs';
 import { resolveCwd } from './resolve-cwd';
 import { app } from 'electron';
-import { join } from 'path';
+import { join, isAbsolute } from 'path';
 import { bashPromptCommand, shellArgs, writeZshIntegrationDir, writeScreenIntegration } from './shell-integration';
 import { promptNonce } from './prompt-nonce';
 import type { TerminalBackend, TerminalDataListener, TerminalExitListener } from './terminal-backend';
@@ -152,6 +152,13 @@ export class PtyManager implements TerminalBackend {
   spawn(paneId: string, opts: SpawnOptions): void {
     if (this.procs.has(paneId)) return;
     const shell = opts.shell || defaultShell();
+    // POSIX node-pty can create its helper successfully and report a missing
+    // executable only as a later exit. Fail before acknowledging the spawn so
+    // the renderer keeps a template's one-shot command available for retry.
+    if (process.platform !== 'win32' && isAbsolute(shell)) {
+      accessSync(shell, constants.X_OK);
+      if (!statSync(shell).isFile()) throw new Error(`Shell is not a file: ${shell}`);
+    }
     const proc = pty.spawn(shell, shellArgs(shell, promptNonce()), {
       // xterm-256color + COLORTERM=truecolor so programs render full color (e.g.
       // Claude Code's logo shows orange instead of the 16-color red fallback).

@@ -20,6 +20,13 @@ interface FakePty {
 
 const mocks = vi.hoisted(() => ({ spawned: [] as FakePty[] }));
 
+// These tests exercise shell selection / resize bookkeeping with a fake PTY.
+// The selected shell need not be installed on the host running the tests.
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, accessSync: vi.fn(), statSync: vi.fn(() => ({ isFile: () => true })) };
+});
+
 vi.mock('node-pty', () => ({
   spawn: (_file: string, _args: string[], opts: { cols: number; rows: number }): FakePty => {
     const proc: FakePty = {

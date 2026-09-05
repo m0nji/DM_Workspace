@@ -78,6 +78,7 @@ export interface WorkspaceTemplate {
   confirmStartupCommands: boolean; // ask before running startup commands when creating from this template
 }
 
+// `done` is the legacy name for an output pause, not a successful task completion.
 export type PaneStatus = 'idle' | 'busy' | 'done';
 
 // Was die Shell einer Pane gerade tut — abgeleitet aus dem privaten
@@ -106,18 +107,23 @@ export const BUSY_INDICATOR_SPEED_MIN_MS = 400;
 export const BUSY_INDICATOR_SPEED_MAX_MS = 4000;
 export const BUSY_INDICATOR_SPEED_DEFAULT_MS = 1200;
 
+export const TERMINAL_FONT_SIZE_DEFAULT = 13;
+export const TERMINAL_FONT_SIZE_MIN = 10;
+export const TERMINAL_FONT_SIZE_MAX = 32;
+
 export interface Settings {
+  terminalFontSize?: number;   // px; absent => 13, changed live without restarting shells
   themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
   terminalOpacity: number;     // 0..1 (1 = fully opaque)
   terminalBackground?: string; // optional hex override of the theme's background color
   clickMovesCursor?: boolean;  // a plain click (no modifier) moves the input cursor to the clicked cell; Option/Alt+click always does (default off)
-  showDoneBadge?: boolean;     // show the green "terminals ready" badge in the sidebar (default off)
+  showDoneBadge?: boolean;     // count panes with an output pause in the sidebar (default off)
   // Anzeige laufender Sessions am Register-Punkt. Die Gegenrichtung zum
   // showDoneBadge: das zeigt, was fertig ist, dies zeigt, was noch arbeitet.
   busyIndicator?: BusyIndicator;   // fehlt => 'off'
   busyIndicatorColor?: string;     // fehlt => var(--accent)
   busyIndicatorSpeedMs?: number;   // fehlt => BUSY_INDICATOR_SPEED_DEFAULT_MS
-  notificationsEnabled?: boolean; // show OS desktop notifications when a terminal is ready (default off)
+  notificationsEnabled?: boolean; // show OS desktop notifications when terminal output pauses (default off)
   restoreTerminalHistory?: boolean; // Terminal-Verlauf nach einem Neustart wiederherstellen (default an); aus => es wird gar kein Verlauf gespeichert
   workspaceNavigationPlacement?: WorkspaceNavigationPlacement; // workspace navigation placement (default left)
   shortcutBindings?: Partial<Record<ShortcutAction, string>>; // user overrides; defaults live in shared/shortcuts.ts

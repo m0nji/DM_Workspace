@@ -22,7 +22,8 @@
 DM Workspace lets you open many terminals at once in a single, tidy window. Instead of
 juggling tabs, you pick a layout and get a grid of **real system shells** — zsh on macOS,
 PowerShell on Windows — each one a fully working terminal. Group them into **workspaces**
-you can name, switch between, and come back to later exactly as you left them.
+you can name and switch between. Layouts and terminal history can be restored after
+a restart; local programs stop when the app closes and are not resumed automatically.
 
 It's built for anyone who runs several things in parallel: a dev server here, a build
 watcher there, logs in a third pane, and a free shell in a fourth.
@@ -46,12 +47,26 @@ four panes.
   4 (2×2) or 8 (2×4) panes.
 - **Real tiling terminals** — every pane is a genuine system shell. Split any pane
   left/right or top/bottom, drag the dividers to resize, maximize and restore, or close it —
-  all with the mouse.
+  with the mouse or configurable keyboard shortcuts. Layout choices also support the keyboard.
 - **Per-workspace starting folder** — choose the directory new terminals open in.
-- **Your own look** — set the terminal background color and opacity; turn the opacity down
-  and a blurred backdrop shows through, like the native Terminal app.
-- **Remembers everything** — workspaces, names, layouts, pane sizes and your settings are all
-  restored the next time you open the app.
+- **Your own look** — choose a theme, background and opacity, and adjust the terminal
+  font size from 10–32 px in Settings → Appearance. Font changes apply immediately
+  without restarting running shells.
+- **Restore with clear context** — workspaces, names, layouts, pane sizes and settings
+  return when you reopen the app. Optional terminal history returns alongside a visible
+  reminder that local shells are new. Remote workspaces reconnect to their server sessions.
+- **Recover from terminal errors** — a failed start shows details and a retry button.
+  A closed local shell can be started again; template commands are consumed only after
+  the terminal backend accepts the start.
+- **Output activity** — optional indicators and desktop notifications tell you when
+  terminal output pauses. A pause does not mean a task has finished or succeeded.
+- **Workspaces at scale** — organise workspaces into groups and use the command palette
+  to find actions, workspaces and saved launch templates.
+- **Files, preview and tasks** — browse and edit text files, preview content and keep a
+  task board beside your terminals. Connected workspace servers also support shared
+  terminals and scheduled agent tasks when the server provides these features.
+- **Safer keyboard confirmation** — destructive confirmations start on Cancel; Tab stays
+  within the dialog and Enter activates the focused button.
 - **Stays up to date** — checks for new versions on startup and updates itself in one click.
 
 ## Platforms

@@ -375,6 +375,7 @@ export interface StoreState extends AppState {
   runTaskInPane: (paneId: string, text: string) => void;
   runTaskInNewPane: (text: string) => void;
   commandPaletteOpen: boolean;
+  commandPaletteScope: 'all' | 'panes';
   templateWizard: TemplateWizardState;
   pendingTemplateLaunch: { templateId: string; workspaceId?: string } | null;
   shortcutRecordingAction: ShortcutAction | null; // set while the editor captures a key; gates global shortcuts
@@ -440,13 +441,14 @@ export interface StoreState extends AppState {
   setPaneCwd: (paneId: string, cwd: string) => void;
   setPaneAutoTitle: (paneId: string, title: string) => void;
   setFocusedPane: (paneId: string) => void;
+  revealPane: (workspaceId: string, paneId: string) => void;
   setDraggingPane: (paneId: string | null) => void;
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
   setWorkspaceColor: (id: string, color: string) => void;
   setTasksEnabled: (id: string, enabled: boolean) => void;
   // command palette
-  setCommandPaletteOpen: (open: boolean) => void;
+  setCommandPaletteOpen: (open: boolean, scope?: 'all' | 'panes') => void;
   // templates
   setTemplateWizard: (state: TemplateWizardState) => void;
   setPendingTemplateLaunch: (value: { templateId: string; workspaceId?: string } | null) => void;
@@ -687,6 +689,7 @@ export const useStore = create<StoreState>((set, get) => ({
   tasks: null,
   tasksDir: null,
   commandPaletteOpen: false,
+  commandPaletteScope: 'all',
   templateWizard: { open: false, templateId: null },
   pendingTemplateLaunch: null,
   shortcutRecordingAction: null,
@@ -1083,7 +1086,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus, [paneId]: status };
     // Notify only when the pane is NOT visible (inactive workspace) OR the window
     // is unfocused — otherwise the user is already looking at it. The transition
-    // into 'done' happens once until the user reacts (input resets to idle), which
+    // into the legacy 'done' (output paused) happens once until new activity, which
     // debounces repeat notifications for the same pane. Gated on an opt-in setting
     // (default off) since OS notifications can be noisy.
     if (status === 'done' && s.settings.notificationsEnabled) {
@@ -1114,6 +1117,34 @@ export const useStore = create<StoreState>((set, get) => ({
   }),
 
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+
+  revealPane: (workspaceId, paneId) => {
+    const s = get();
+    const ws = s.workspaces.find((w) => w.id === workspaceId);
+    // Palette results can outlive a remote layout update or a closed pane.
+    if (!ws || !collectPaneIds(ws.layout).includes(paneId)) return;
+    const next = {
+      ...s,
+      activeWorkspaceId: workspaceId,
+      focusedPaneId: paneId,
+      maximizedPaneId: null,
+      taskView: false,
+      workspaceGroups: s.workspaceGroups.map((g) =>
+        g.id === ws.groupId && g.collapsed ? { ...g, collapsed: false } : g),
+      previewPanel: { ...s.previewPanel, browseRoot: null }
+    };
+    set(next);
+    persist(next);
+    refreshTerminalLayoutAfterCommit(paneId);
+    requestAnimationFrame(() => {
+      const current = get();
+      if (current.activeWorkspaceId === workspaceId && current.focusedPaneId === paneId &&
+          !current.commandPaletteOpen && !current.taskView &&
+          collectPaneIds(current.activeWorkspace()?.layout ?? null).includes(paneId)) {
+        focusTerminal(paneId);
+      }
+    });
+  },
 
   // Gesetzt im dragstart des Pane-Kopfes, geräumt im dragend. dragend feuert
   // immer auf der Quelle — auch bei Abbruch per Escape und auch, wenn der
@@ -1269,7 +1300,7 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+  setCommandPaletteOpen: (open, scope = 'all') => set({ commandPaletteOpen: open, commandPaletteScope: scope }),
 
   setTemplateWizard: (state) => set({ templateWizard: state }),
 

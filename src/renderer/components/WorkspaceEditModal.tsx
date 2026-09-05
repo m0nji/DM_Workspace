@@ -155,6 +155,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
         own backdrop must not bubble into the editor's backdrop and close it. */}
     {pendingDir && (
       <ConfirmDialog
+          tone="danger"
         title={t('workspace.folderRestartTitle')}
         message={t('workspace.folderRestartConfirm')}
         confirmLabel={t('workspace.folderRestartAction')}

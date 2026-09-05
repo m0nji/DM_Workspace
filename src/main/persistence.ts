@@ -6,7 +6,8 @@ import type {
   WorkspaceGroup, WorkspaceTemplate, WorkspaceNavigationPlacement
 } from '../shared/types';
 import {
-  BUSY_INDICATOR_KINDS, BUSY_INDICATOR_SPEED_MAX_MS, BUSY_INDICATOR_SPEED_MIN_MS
+  BUSY_INDICATOR_KINDS, BUSY_INDICATOR_SPEED_MAX_MS, BUSY_INDICATOR_SPEED_MIN_MS,
+  TERMINAL_FONT_SIZE_MIN, TERMINAL_FONT_SIZE_MAX
 } from '../shared/types';
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 import { normalizeGroups } from '../shared/workspace-groups';
@@ -89,6 +90,9 @@ export function migrateSettings(raw: unknown): Settings {
     ? Math.min(1, Math.max(0, r.terminalOpacity))
     : d.terminalOpacity;
   const out: Settings = { themeId, terminalOpacity, workspaceNavigationPlacement: d.workspaceNavigationPlacement };
+  if (typeof r.terminalFontSize === 'number' && Number.isFinite(r.terminalFontSize)) {
+    out.terminalFontSize = Math.min(TERMINAL_FONT_SIZE_MAX, Math.max(TERMINAL_FONT_SIZE_MIN, Math.round(r.terminalFontSize)));
+  }
   if (typeof r.terminalBackground === 'string') out.terminalBackground = r.terminalBackground;
   if (typeof r.clickMovesCursor === 'boolean') out.clickMovesCursor = r.clickMovesCursor;
   if (typeof r.showDoneBadge === 'boolean') out.showDoneBadge = r.showDoneBadge;

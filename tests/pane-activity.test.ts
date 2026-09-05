@@ -55,3 +55,13 @@ describe('pane-activity', () => {
     expect(h.changes).toEqual([]);
   });
 });
+
+it('clears activity on process exit and reports output from a restarted shell', () => {
+  const h = harness();
+  h.act.onOutput();
+  h.act.reset();
+  h.tick();
+  expect(h.act.getStatus()).toBe('idle');
+  h.act.onOutput();
+  expect(h.changes).toEqual(['busy', 'idle', 'busy']);
+});
