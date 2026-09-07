@@ -91,7 +91,9 @@ const cp = require('node:child_process');
       await original.getByRole('button', { name: 'Agent status', exact: true }).click();
       const dialog = win.getByRole('alertdialog');
       await dialog.getByRole('combobox').selectOption(provider);
-      await expect(dialog).toContainText(project);
+      // The shell's first cwd report can replace an 8.3 Windows path (and
+      // backslashes) while the dialog is open. Compare the actual directory.
+      await expect.poll(async () => realpathSync.native((await dialog.locator('.agent-folder').innerText()).replace('New pane in folder: ', ''))).toBe(realpathSync.native(project));
       await expect(dialog.locator('code')).toHaveCount(0);
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}.png`) });
       await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
@@ -104,7 +106,6 @@ const cp = require('node:child_process');
       expect((await buffers()).original).toContain('unfinished-input');
       await expect(win.locator('.pane').nth(1).getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}-running.png`) });
-
     } finally {
       // Stop our stand-in explicitly. On Linux a PTY child can retain inherited
       // descriptors after Electron exits, which Playwright waits to close.
