@@ -59,6 +59,26 @@ describe('agent status bridge', () => {
     bridge.release('p1');
     expect(existsSync(result.settingsPath)).toBe(false);
   });
+  it('disconnects the overview while keeping live hook scripts usable and revoking old events', async () => {
+    const { result, post } = await setup();
+    bridge.disconnect('p1');
+    expect(bridge.snapshot('p1')).toBeNull();
+    expect(events.at(-1)).toEqual({ paneId: 'p1', state: null });
+    expect(existsSync(result.settingsPath)).toBe(true);
+    expect((await post({ session_id: 'late', hook_event_name: 'UserPromptSubmit' })).status).toBe(401);
+    expect(bridge.snapshot('p1')).toBeNull();
+    await bridge.close();
+    expect(existsSync(result.settingsPath)).toBe(false);
+  });
+  it('starts OpenCode without claiming hook status or needing a loopback server', async () => {
+    const result = await bridge.prepare('open', '/bin/sh', 'a'.repeat(64), 'opencode');
+    expect(result.command).toBe('opencode');
+    expect(bridge.snapshot('open')).toMatchObject({ provider: 'opencode', status: 'unknown', sessionId: null });
+    bridge.shellReturned('open');
+    expect(bridge.snapshot('open')?.status).toBe('unknown');
+    bridge.release('open');
+    expect(existsSync(`${result.settingsPath}.start`)).toBe(false);
+  });
   it('receives authenticated lifecycle events without storing prompt or transcript data', async () => {
     const { post } = await setup();
     expect((await post({ session_id: 's1', hook_event_name: 'UserPromptSubmit' })).status).toBe(200);

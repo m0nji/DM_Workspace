@@ -1,0 +1,49 @@
+name: Agent startup
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        shell: bash
+        run: |
+          ok=
+          for i in 1 2 3; do
+            if npm ci; then ok=1; break; fi
+            rm -rf node_modules
+            sleep 10
+          done
+          [ "$ok" = 1 ]
+      - name: Install Linux display dependencies
+        if: runner.os == 'Linux'
+        run: npx playwright install-deps chromium
+      - name: Build
+        run: npm run build
+      - name: Verify Windows agent startup
+        if: runner.os == 'Windows'
+        run: npx playwright test e2e/agent-start.spec.ts --workers=1
+      - name: Verify Linux agent startup
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts --workers=1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: agent-start-${{ runner.os }}
+          path: test-results/

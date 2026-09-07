@@ -1,3 +1,4 @@
+import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync, type FSWatcher } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -220,8 +221,20 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   const router = new BackendRouter(localPty);
   const agents = new AgentStatusBridge(join(app.getPath('userData'), 'agent-status', randomUUID()),
     event => getWindow()?.webContents.send('agent:state', event));
+  handle('agent:stop-status', (_e, paneId: unknown) => {
+    if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
+    agents.disconnect(paneId);
+  });
+  handle('agent:check-start', async (_e, paneId: unknown, provider: unknown, cwd: unknown) => {
+    if (!isNonEmptyString(paneId) || (provider !== 'claude' && provider !== 'codex' && provider !== 'opencode')) throw new Error('Invalid agent start');
+    const session = localPty.sessionInfo(paneId);
+    if (!session) return 'check-failed';
+    if (cwd !== undefined && !isNonEmptyString(cwd)) throw new Error('Invalid agent folder');
+    const result = await checkAgentRequirements(session.shell, provider, process.env, expandTilde(cwd as string | undefined ?? session.cwd));
+    return localPty.sessionInfo(paneId) === session ? result : 'check-failed';
+  });
   handle('agent:prepare', async (_e, paneId: unknown, provider: unknown = 'claude') => {
-    if (provider !== 'claude' && provider !== 'codex') throw new Error('Invalid agent provider');
+    if (provider !== 'claude' && provider !== 'codex' && provider !== 'opencode') throw new Error('Invalid agent provider');
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
     const session = localPty.sessionInfo(paneId);
     if (!session) throw new Error('No local terminal session');
@@ -287,14 +300,36 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     getWindow()?.webContents.send('pty:exit', payload);
   });
 
-  handle('pty:spawn', (_e, raw: unknown) => {
+  const agentStarting = new Map<string, object>();
+  handle('pty:spawn', async (_e, raw: unknown) => {
     const req = parsePtySpawn(raw);
     if (!req) { rejectPayload('pty:spawn', raw); return; }
+    if (req.agent && localPty.sessionInfo(req.paneId)) throw new Error('Agent start requires a new terminal');
     pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows, target: req.target });
+    if (req.agent) {
+      const session = localPty.sessionInfo(req.paneId);
+      if (session) agentStarting.set(req.paneId, session);
+      try {
+        if (!session) throw new Error('No local terminal session');
+        const check = await checkAgentRequirements(session.shell, req.agent, process.env, session.cwd);
+        if (localPty.sessionInfo(req.paneId) !== session) throw new Error('Terminal session changed');
+        if (check !== 'ready') throw new Error(`Agent start: ${check}`);
+        await launchPreparedAgent(req.paneId, req.agent, localPty, agents);
+      } catch (error) {
+        if (localPty.sessionInfo(req.paneId) === session) {
+          agents.release(req.paneId);
+          localPty.kill(req.paneId);
+        }
+        throw error;
+      } finally {
+        if (agentStarting.get(req.paneId) === session) agentStarting.delete(req.paneId);
+      }
+    }
   });
   on('pty:input', (_e, raw: unknown) => {
     const req = parsePtyInput(raw);
     if (!req) { rejectPayload('pty:input', raw); return; }
+    if (agentStarting.has(req.paneId)) return;
     if (req.data === '\x03' || req.data === '\x1b') agents.interrupt(req.paneId);
     pty.write(req.paneId, req.data);
   });
@@ -305,6 +340,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
   on('pty:kill', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) { rejectPayload('pty:kill', paneId); return; }
+    agentStarting.delete(paneId);
     agents.release(paneId);
     pty.kill(paneId);
   });

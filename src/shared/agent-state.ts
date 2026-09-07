@@ -1,6 +1,8 @@
+export type AgentProvider = 'claude' | 'codex' | 'opencode';
+export const AGENT_NAMES: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
 export type AgentStatus = 'unknown' | 'working' | 'needs-input' | 'completed' | 'error';
 export interface AgentState {
-  provider: 'claude' | 'codex';
+  provider: AgentProvider;
   status: AgentStatus;
   sessionId: string | null;
   event: string;

@@ -33,6 +33,7 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     const dialog = win.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
     await win.screenshot({ path: '/tmp/dmws-agent-setup.png' });
+    await dialog.getByRole('button', { name: 'Show start command (manual)' }).click();
     const command = await dialog.locator('code').textContent();
     expect(command).toMatch(/^claude --settings '/);
     const settingsPath = command!.slice("claude --settings '".length, -1).replace(/'\\''/g, "'");
@@ -46,35 +47,37 @@ test('Claude setup and explicit events drive only the target pane, with no silen
       expect(response.status).toBe(200);
     };
     await emit('UserPromptSubmit');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
     await win.waitForTimeout(2500); // Deliberately exceed the terminal-output silence window.
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
     await emit('PermissionRequest');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Needs input');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
     await emit('PostToolUse');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Needs input');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
     await emit('PostToolBatch');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
     await win.screenshot({ path: '/tmp/dmws-agent-panes.png' });
     await emit('Stop');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Response ended');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Response ended');
     await emit('StopFailure');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Error');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Error');
     await emit('SessionEnd');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude · Unknown');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Unknown');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
-    await expect(dialog.getByRole('button', { name: 'Copy start command' })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Start agent', exact: true })).toBeFocused();
     await win.keyboard.press('Tab');
     await expect(dialog.getByRole('combobox', { name: 'Agent', exact: true })).toBeFocused();
     await dialog.getByRole('combobox', { name: 'Agent', exact: true }).selectOption('codex');
+    await dialog.getByRole('button', { name: 'Show start command (manual)' }).click();
     await expect(dialog.locator('code')).toContainText('codex -c');
     await expect(dialog).toContainText('/hooks');
     await win.screenshot({ path: '/tmp/dmws-codex-setup.png' });
     const setup = await win.evaluate(() => window.api.prepareAgentStatus('agent1', 'codex'));
     await dialog.getByRole('button', { name: 'Copy start command' }).click();
+    const codexHookScript = readFileSync(setup.settingsPath, 'utf8');
     const postCodex = async (hook_event_name: string) => {
-      const child = spawn(process.execPath, [setup.settingsPath], { env: { ...process.env, DMWS_AGENT_NONCE: nonce! }, stdio: ['pipe', 'pipe', 'pipe'] });
+      const child = spawn(process.execPath, ['-e', codexHookScript], { env: { ...process.env, DMWS_AGENT_NONCE: nonce! }, stdio: ['pipe', 'pipe', 'pipe'] });
       child.stdin.end(JSON.stringify({ session_id: 'codex-e2e', turn_id: 'turn1', hook_event_name }));
       const [code] = await once(child, 'close');
       expect(code).toBe(0);
@@ -86,5 +89,16 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await postCodex('Stop');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Response ended');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
+    await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
+    await dialog.getByRole('button', { name: 'End agent mode', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Agent');
+    await expect(panes).toHaveCount(2);
+    await win.getByRole('button', { name: 'Agent overview', exact: true }).click();
+    await expect(win.locator('.agent-overview-row')).toHaveCount(0);
+    await win.getByRole('alertdialog').getByRole('button', { name: 'Close', exact: true }).click();
+    // Retired hook commands cannot put the removed pane back in the overview.
+    await postCodex('UserPromptSubmit');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Agent');
   } finally { await app.close(); }
 });

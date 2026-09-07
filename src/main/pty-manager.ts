@@ -139,8 +139,8 @@ function cwdHookEnv(shell: string): Record<string, string> {
 // Oberfläche ist als TerminalBackend extrahiert (terminal-backend.ts), damit
 // B2 ein Remote-Backend mit identischer Schnittstelle daneben stellen kann.
 export class PtyManager implements TerminalBackend {
-  private sessions = new Map<string, { shell: string; nonce: string }>();
-  sessionInfo(paneId: string): { shell: string; nonce: string } | undefined { return this.sessions.get(paneId); }
+  private sessions = new Map<string, { shell: string; nonce: string; cwd: string }>();
+  sessionInfo(paneId: string): { shell: string; nonce: string; cwd: string } | undefined { return this.sessions.get(paneId); }
   private procs = new Map<string, pty.IPty>();
   // Last size requested per pane — kept for panes that have no process yet, so
   // a resize arriving before the spawn survives instead of vanishing, and used
@@ -162,6 +162,7 @@ export class PtyManager implements TerminalBackend {
       accessSync(shell, constants.X_OK);
       if (!statSync(shell).isFile()) throw new Error(`Shell is not a file: ${shell}`);
     }
+    const cwd = resolveCwd(opts.cwd);
     const nonce = randomBytes(32).toString('hex');
     const proc = pty.spawn(shell, shellArgs(shell, promptNonce()), {
       // xterm-256color + COLORTERM=truecolor so programs render full color (e.g.
@@ -169,18 +170,23 @@ export class PtyManager implements TerminalBackend {
       name: 'xterm-256color',
       cols: opts.cols,
       rows: opts.rows,
-      cwd: resolveCwd(opts.cwd),
+      cwd,
       env: { ...cwdHookEnv(shell), DMWS_AGENT_NONCE: nonce }
     });
-    proc.onData((data) => this.dataListeners.forEach((l) => l(paneId, data)));
+    proc.onData((data) => {
+      if (this.procs.get(paneId) === proc) this.dataListeners.forEach((l) => l(paneId, data));
+    });
     proc.onExit(({ exitCode }) => {
+      // A killed terminal can report its exit after a retry reused the pane ID.
+      // Only the current process may clear the session or notify the renderer.
+      if (this.procs.get(paneId) !== proc) return;
       this.procs.delete(paneId);
       this.sessions.delete(paneId);
       this.dims.delete(paneId);
       this.exitListeners.forEach((l) => l(paneId, exitCode));
     });
     this.procs.set(paneId, proc);
-    this.sessions.set(paneId, { shell, nonce });
+    this.sessions.set(paneId, { shell, nonce, cwd });
     // A resize for a pane that had no process yet was remembered instead of
     // dropped (see resize). Apply it now, so a pane whose resize overtook its
     // spawn doesn't keep running at the size it was spawned with — the shell

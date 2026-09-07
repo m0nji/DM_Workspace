@@ -1,3 +1,4 @@
+import type { AgentProvider } from './agent-state';
 import type { ShortcutAction } from './shortcuts';
 export type { Task, TaskColumn, TaskBoard } from './tasks-markdown';
 
@@ -387,7 +388,7 @@ export interface RemoteTask {
   name: string;
   description: string;
   ownerId: string | null;
-  agent: 'claude' | 'codex' | 'opencode';
+  agent: AgentProvider;
   prompt: string;
   workdir: string;
   scheduleKind: 'cron' | 'interval' | 'manual';
@@ -488,6 +489,7 @@ export type SpawnTarget =
   | { kind: 'remote'; serverId: string; scope: SpawnTargetScope; remotePaneId: string };
 
 export interface PtySpawnRequest {
+  agent?: AgentProvider;
   paneId: string;
   cwd: string;
   cols: number;
@@ -524,7 +526,9 @@ export type UpdateEvent =
 
 // Shape exposed on window.api by the preload script
 export interface RendererApi {
-  prepareAgentStatus(paneId: string, provider?: 'claude' | 'codex'): Promise<{ command: string; settingsPath: string }>;
+  stopAgentStatus(paneId: string): Promise<void>;
+  checkAgentStart(paneId: string, provider: AgentProvider, cwd?: string): Promise<'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'check-failed'>;
+  prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string }>;
   getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;
   onAgentState(paneId: string, cb: (state: import('./agent-state').AgentState | null) => void): () => void;
   agentShellReturned(paneId: string): void;

@@ -4,7 +4,7 @@
     "short": "Agent",
     "unknownHint": "Agentenzustand unbekannt. Claude-Statusmeldungen einrichten.",
     "lastReported": "Zuletzt gemeldet: {{state}} ({{time}})",
-    "setupHint": "Starte eine neue Claude-Code-Sitzung in diesem Terminal mit dem folgenden Befehl. Kopiere ihn, füge ihn an einem freien Shell-Prompt ein und drücke Enter. Benötigt eine aktuelle Claude-Code-Installation mit HTTP-Hooks.",
+    "setupHint": "Startet Claude Code mit Statusanbindung in einer neuen Pane. Benötigt eine aktuelle Claude-Code-Installation.",
     "limitations": "Nur neue lokale Sitzungen ab dem ersten Prompt; bestehende und /resume-Sitzungen werden noch nicht unterstützt. „Antwort beendet“ bedeutet nicht, dass das Projekt geprüft ist. Ohne Hooks bleibt der zuletzt gemeldete Zustand sichtbar.",
     "remoteHint": "Expliziter Agentenstatus ist zunächst nur für lokale Claude-Code-Sitzungen verfügbar. Diese Remote-Sitzung hat keine unterstützte Ereignisquelle.",
     "setupError": "Status-Einrichtung nicht verfügbar. Warte auf den Start des lokalen Terminals und versuche es erneut. Unterstützte Shells: zsh, bash und PowerShell. Vor einem Anbieterwechsel die aktive Agentensitzung beenden.",
@@ -17,7 +17,7 @@
       "error": "Fehler"
     },
     "provider": "Agent",
-    "codexHint": "Benötigt eine aktuelle Codex-CLI mit Hooks und Node.js im PATH. Den Befehl in diesem Pane an einer freien Shell ausführen. In Codex die DM-Workspace-Befehle über /hooks prüfen und freigeben, dann den ersten Prompt senden. Konfiguration und Freigaberegeln bleiben erhalten.",
+    "codexHint": "Startet Codex in einer neuen Pane. Benötigt Codex und Node.js. Beim ersten Start die DM-Workspace-Hooks in Codex mit /hooks prüfen und ihnen vertrauen.",
     "codexLimits": "Bei Codex können Freigabewartezustände bis zum Antwortende sichtbar bleiben. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",
     "overview": {
       "title": "Agentenübersicht",
@@ -25,7 +25,22 @@
       "hint": "Alle verbundenen Agenten. Wartezustände und Fehler stehen oben. Ein Eintrag öffnet das Terminal. Der Status zeigt das zuletzt gemeldete Ereignis.",
       "empty": "Noch keine Agenten verbunden. Über Agent am Pane-Kopf Claude oder Codex mit Statusmeldungen starten.",
       "reported": "Letzte Meldung: {{time}}"
-    }
+    },
+    "start": "Agent starten",
+    "checking": "Installation wird geprüft …",
+    "showCommand": "Startbefehl anzeigen (manuell)",
+    "startFolder": "Neue Pane im Ordner: {{cwd}}",
+    "startErrors": {
+      "missing-cli": "Der gewählte Agent wurde in der Shell nicht gefunden. Installiere Claude Code, Codex bzw. OpenCode oder ergänze den PATH, dann versuche es erneut.",
+      "missing-node": "Codex benötigt Node.js für die Statusanbindung. Installiere Node.js bzw. ergänze den PATH und versuche es erneut.",
+      "unsupported-shell": "Der direkte Start unterstützt zsh, bash, sh und PowerShell. Öffne ein Terminal mit einer dieser Shells.",
+      "check-failed": "Die Installation konnte nicht geprüft werden. Warte, bis das Terminal gestartet ist, und versuche es erneut. Prüfe bei erneutem Fehler auch das Shell-Startprofil."
+    },
+    "stop": "Agentenmodus beenden",
+    "stopHint": "Entfernt diese Pane aus der Agentenübersicht und beendet die Statusanbindung. Das Terminal und ein eventuell laufender Agent bleiben geöffnet.",
+    "stopError": "Die Statusanbindung konnte nicht beendet werden. Bitte erneut versuchen.",
+    "opencodeHint": "Startet OpenCode in einer neuen Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Unbekannt“.",
+    "details": "Hinweise zum Status"
   },
   "common": {
     "close": "Schließen",

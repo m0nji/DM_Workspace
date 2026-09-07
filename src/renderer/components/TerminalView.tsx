@@ -578,7 +578,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // statt als stillen Rejection verpuffen zu lassen.
         const cols = term.cols || 80;
         const rows = term.rows || 24;
-        await window.api.spawn({ paneId, cwd, cols, rows, ...(target ? { target } : {}) });
+        const agentStart = useStore.getState().pendingAgentStarts[paneId];
+        if (agentStart) term.options.disableStdin = true;
+        await window.api.spawn({ paneId, cwd: agentStart?.cwd ?? cwd, cols, rows,
+          ...(target ? { target } : {}), ...(agentStart ? { agent: agentStart.provider } : {}) });
+        if (agentStart) useStore.getState().finishAgentStart(paneId);
         if (disposed || processEnded) return;
         setStartError(null);
         term.options.disableStdin = false;

@@ -1654,3 +1654,6 @@ body.drag-active webview { pointer-events: none; }
 .agent-overview-name, .agent-overview-state { color: var(--text); }
 .agent-overview-row.agent-needs-input, .agent-overview-row.agent-error { border-left: 3px solid var(--accent); }
 .agent-overview-row.agent-needs-input .agent-overview-state, .agent-overview-row.agent-error .agent-overview-state { font-weight: 700; }
+
+.agent-folder { overflow-wrap: anywhere; }
+.agent-secondary-action { margin: 0 8px 8px 0; }

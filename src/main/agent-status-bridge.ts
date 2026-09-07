@@ -9,10 +9,10 @@ import { claudeState, codexState, type AgentState, type AgentStateEvent } from '
 const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
   'PostToolUseFailure', 'PostToolBatch', 'Notification', 'Elicitation', 'ElicitationResult', 'Stop', 'StopFailure', 'SessionEnd'];
 interface Registration {
-  paneId: string; token: string; settingsPath: string; command: string;
+  paneId: string; token: string; settingsPath: string; command: string; launchCommand: string;
   turnId?: string; retiredTurns: Set<string>; state: AgentState; retired: Set<string>; waiting: Set<string>; nonce: string; interrupted: boolean;
 }
-export interface AgentSetup { command: string; settingsPath: string }
+export interface AgentSetup { command: string; settingsPath: string; launchCommand: string }
 
 export class AgentStatusBridge {
   private server: Server | null = null;
@@ -25,7 +25,7 @@ export class AgentStatusBridge {
   private listen(): Promise<number> {
     if (this.closed) return Promise.reject(new Error('Agent bridge is closed'));
     if (this.starting) return this.starting;
-    this.starting = new Promise((resolve, reject) => {
+    this.starting = new Promise<number>((resolve, reject) => {
       const server = createServer((req, res) => this.receive(req, res));
       this.server = server;
       server.requestTimeout = 5000;
@@ -37,6 +37,11 @@ export class AgentStatusBridge {
         if (!address || typeof address === 'string') { reject(new Error('Missing loopback port')); return; }
         resolve(address.port);
       });
+    }).catch((error: unknown) => {
+      this.server?.close(() => {});
+      this.server = null;
+      this.starting = null;
+      throw error;
     });
     return this.starting;
   }
@@ -47,10 +52,10 @@ export class AgentStatusBridge {
       throw new Error('Unsupported shell for agent status setup');
     }
     if (!/^[a-f0-9]{64}$/.test(nonce)) throw new Error('Invalid terminal nonce');
-    const port = await this.listen();
+    const port = provider === 'opencode' ? 0 : await this.listen();
     if (this.closed) throw new Error('Agent bridge is closed');
     const existing = this.registrations.get(paneId);
-    if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath };
+    if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand };
     if (existing) {
       if (existing.state.sessionId) throw new Error('End the active agent session before switching providers');
       this.release(paneId);
@@ -63,16 +68,26 @@ export class AgentStatusBridge {
       allowedEnvVars: ['DMWS_AGENT_NONCE'] };
     const hooks = Object.fromEntries(EVENTS.map(event => [event, [{ hooks: [hook] }]]));
     const codex = provider === 'codex' ? codexSetup(settingsPath, port, token, powershell) : null;
-    writeFileSync(settingsPath, codex?.script ?? JSON.stringify({ hooks }), { mode: 0o600, flag: 'wx' });
+    writeFileSync(settingsPath, codex?.script ?? JSON.stringify(provider === 'opencode' ? {} : { hooks }), { mode: 0o600, flag: 'wx' });
     const quoted = powershell ? settingsPath.replace(/'/g, "''") : settingsPath.replace(/'/g, "'\\''");
+    const command = provider === 'opencode' ? 'opencode' : codex?.command ?? `claude --settings '${quoted}'`;
+    // Keep PTY input below canonical line limits, even before readline is ready.
+    // The full Codex hook configuration stays in a private file, not an input line.
+    const startPath = `${settingsPath}.start`;
+    const startQuoted = powershell ? startPath.replace(/'/g, "''") : startPath.replace(/'/g, "'\\''");
+    try { writeFileSync(startPath, command + '\n', { mode: 0o600, flag: 'wx' }); }
+    catch (error) { rmSync(settingsPath, { force: true }); throw error; }
+    const launchCommand = powershell
+      ? `& ([scriptblock]::Create([IO.File]::ReadAllText('${startQuoted}')))`
+      : `. '${startQuoted}'`;
     const registration: Registration = {
-      paneId, token, settingsPath, nonce, waiting: new Set(), interrupted: false, command: codex?.command ?? `claude --settings '${quoted}'`, retired: new Set(), retiredTurns: new Set(),
+      paneId, token, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
       state: { provider, status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
     };
     this.registrations.set(paneId, registration);
     this.byToken.set(token, registration);
     this.send({ paneId, state: registration.state });
-    return { command: registration.command, settingsPath };
+    return { command: registration.command, launchCommand: registration.launchCommand, settingsPath };
   }
 
   snapshot(paneId: string): AgentState | null { return this.registrations.get(paneId)?.state ?? null; }
@@ -92,12 +107,22 @@ export class AgentStatusBridge {
     r.waiting.clear();
     this.update(r, 'unknown', 'shell', null);
   }
+  disconnect(paneId: string): void {
+    const r = this.registrations.get(paneId);
+    if (!r) return;
+    this.registrations.delete(paneId);
+    this.byToken.delete(r.token);
+    // A live Codex process still calls its hook script. Keep detached artifacts
+    // until app shutdown; their revoked token can no longer report any status.
+    this.send({ paneId, state: null });
+  }
   release(paneId: string): void {
     const r = this.registrations.get(paneId);
     if (!r) return;
     this.registrations.delete(paneId);
     this.byToken.delete(r.token);
     rmSync(r.settingsPath, { force: true });
+    rmSync(`${r.settingsPath}.start`, { force: true });
     this.send({ paneId, state: null });
   }
   async close(): Promise<void> {
@@ -149,7 +174,7 @@ export class AgentStatusBridge {
       if (typeof session !== 'string' || !session || session.length > 256 || typeof event !== 'string') {
         reply(400); return;
       }
-      const status = r.state.provider === 'codex' ? codexState(input) : claudeState(input);
+      const status = r.state.provider === 'codex' ? codexState(input) : r.state.provider === 'claude' ? claudeState(input) : null;
       if (status === null || r.retired.has(session)) { reply(200); return; }
       const turn = input.turn_id;
       if (r.state.provider === 'codex' && event !== 'SessionEnd') {

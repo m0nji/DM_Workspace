@@ -96,6 +96,10 @@ export function parsePtySpawn(raw: unknown): PtySpawnRequest | null {
     if (target === null) return null;
     req.target = target;
   }
+  if (raw.agent !== undefined) {
+    if ((raw.agent !== 'claude' && raw.agent !== 'codex' && raw.agent !== 'opencode') || req.target?.kind === 'remote') return null;
+    req.agent = raw.agent;
+  }
   return req;
 }
 

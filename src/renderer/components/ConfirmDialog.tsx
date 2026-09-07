@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string | null;
   tone?: 'brand' | 'danger';
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -22,6 +23,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   tone = 'brand',
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps): React.JSX.Element {
@@ -113,6 +115,7 @@ export function ConfirmDialog({
           <button
             type="button"
             ref={confirmRef}
+            disabled={confirmDisabled}
             className={`confirm-btn ${tone === 'danger' ? 'confirm-btn-danger' : 'primary'}`}
             onClick={onConfirm}
           >

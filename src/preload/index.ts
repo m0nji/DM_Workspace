@@ -45,6 +45,8 @@ function subscribe<T>(map: Map<string, Set<T>>, paneId: string, cb: T): () => vo
 }
 
 const api: RendererApi = {
+  stopAgentStatus: paneId => ipcRenderer.invoke('agent:stop-status', paneId),
+  checkAgentStart: (paneId, provider, cwd) => ipcRenderer.invoke('agent:check-start', paneId, provider, cwd),
   prepareAgentStatus: (paneId, provider) => ipcRenderer.invoke('agent:prepare', paneId, provider),
   getAgentState: paneId => ipcRenderer.invoke('agent:get', paneId),
   onAgentState: (paneId, cb) => subscribe(agentSubs, paneId, cb),

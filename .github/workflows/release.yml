@@ -130,6 +130,11 @@ jobs:
             sleep 30
           done
           [ "$ok" = 1 ] || { echo "::error::npm ci failed after 5 attempts"; exit 1; }
+      - name: Verify agent startup (Windows)
+        shell: bash
+        run: |
+          npm run build
+          npx playwright test e2e/agent-start.spec.ts --workers=1
       - name: Build (Windows)
         shell: bash
         run: |
@@ -166,6 +171,11 @@ jobs:
             sleep 30
           done
           [ "$ok" = 1 ] || { echo "::error::npm ci failed after 5 attempts"; exit 1; }
+      - name: Verify agent startup (Linux)
+        run: |
+          npx playwright install-deps chromium
+          npm run build
+          xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts --workers=1
       - name: Build (Linux)
         run: |
           npm run build

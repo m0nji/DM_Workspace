@@ -73,13 +73,30 @@ four panes.
 
 Available for **macOS** and **Windows**.
 
-## Claude and Codex agent status
+## Agent mode: Claude Code, Codex and OpenCode
 
-Click **Agent** in a pane header, select Claude or Codex, copy the start command, and run it at an idle
-prompt in that same terminal. This starts Claude with session-only status hooks;
-your personal Claude settings remain unchanged. Requires a current Claude Code
-installation supporting HTTP hooks and `PostToolBatch` (verified with 2.1.251),
-and zsh, bash or PowerShell.
+Click **Agent** in a pane header, choose **Claude Code**, **Codex** or **OpenCode**,
+then click **Start agent**. DM Workspace checks the CLI (and Node.js for Codex)
+and opens a new pane in the source terminal's current folder. Existing programs
+and unfinished input stay untouched. Failed checks stay in the dialog with a
+repair hint; failed terminal starts offer retry. Start requests are one-shot
+and are never replayed after restarting the app.
+
+The start flow supports macOS and Linux with zsh/bash/sh, and Windows with
+PowerShell (PowerShell 7 when installed, otherwise Windows PowerShell).
+**Show start command (manual)** remains available for setting up an existing,
+idle pane. Claude status requires a current Claude Code installation supporting
+HTTP hooks and `PostToolBatch` (verified with 2.1.251).
+
+**OpenCode** starts its normal [CLI interface](https://opencode.ai/docs/cli/).
+Its live status adapter is not implemented yet, so its badge and overview entry
+stay **Unknown**. No working/completed status is inferred from terminal output.
+
+Choose **End agent mode** in an attached pane's Agent dialog to remove it from
+the overview and disconnect status reporting. This also works after the CLI has
+already exited. The terminal and any still-running agent stay open. Revoked
+hooks cannot add the entry back; their temporary files survive until app exit
+so a running CLI does not encounter missing hook scripts.
 
 The badge shows the last explicit event: **Working**, **Needs input**, **Response
 ended**, **Error**, or **Unknown**. Output silence never completes an agent turn.

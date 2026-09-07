@@ -422,3 +422,11 @@ describe('parseRemoteFsRename', () => {
     expect(parseRemoteFsRename({ ...base, from: 'a' })).toBeNull();
   });
 });
+
+ it('validates agent launches as local-only spawn requests', () => {
+  const base = { paneId: 'new', cwd: '/tmp', cols: 80, rows: 24 };
+  expect(parsePtySpawn({ ...base, agent: 'opencode' })).toEqual({ ...base, agent: 'opencode' });
+  expect(parsePtySpawn({ ...base, agent: 'codex' })).toEqual({ ...base, agent: 'codex' });
+  expect(parsePtySpawn({ ...base, agent: 'other' })).toBeNull();
+  expect(parsePtySpawn({ ...base, agent: 'claude', target: { kind: 'remote', serverId: 's', scope: { kind: 'user' }, remotePaneId: 'p' } })).toBeNull();
+});

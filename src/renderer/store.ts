@@ -1,4 +1,4 @@
-import type { AgentState } from '../shared/agent-state';
+import type { AgentState, AgentProvider } from '../shared/agent-state';
 import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceGroup, WorkspaceTemplate, Settings, UpdateEvent,
@@ -353,6 +353,9 @@ export interface StoreState extends AppState {
   // Fluechtig wie paneStatus: persistSnapshot ist eine Whitelist, die es nicht fuehrt.
   paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
+  pendingAgentStarts: Record<string, { provider: AgentProvider; cwd: string }>;
+  startAgentInNewPane: (sourcePaneId: string, provider: AgentProvider) => string | null;
+  finishAgentStart: (paneId: string) => void;
   agentStates: Record<string, AgentState>;
   setAgentState: (paneId: string, state: AgentState | null) => void;
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
@@ -683,6 +686,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneShell: {},
   paneCwd: {},
   agentStates: {},
+  pendingAgentStarts: {},
   paneAutoTitles: {},
   focusedPaneId: null,
   draggingPaneId: null,
@@ -856,10 +860,11 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
+    const pendingAgentStarts = { ...s.pendingAgentStarts };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
     });
     // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
     // pane-keyed metadata has to follow the id change or titles/pending startup
@@ -880,7 +885,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const firstPane = collectPaneIds(layout)[0] ?? null;
     if (firstPane) requestAnimationFrame(() => focusTerminal(firstPane));
     const next = {
-      ...s, workspaces, paneStatus, paneShell, paneCwd, paneAutoTitles,
+      ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles,
       maximizedPaneId: null,
       focusedPaneId: firstPane
     };
@@ -892,10 +897,11 @@ export const useStore = create<StoreState>((set, get) => ({
     const ws = s.workspaces.find((w) => w.id === id);
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
+    const pendingAgentStarts = { ...s.pendingAgentStarts };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
     });
     const remote = { ...s.remote };
     const remoteTasks = { ...s.remoteTasks };
@@ -922,7 +928,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, workspaceGroups: grouped.groups, paneStatus, paneShell, paneCwd, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, workspaceGroups: grouped.groups, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -940,14 +946,15 @@ export const useStore = create<StoreState>((set, get) => ({
     // and drop their pane-keyed metadata, exactly as closeActivePane does.
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
+    const pendingAgentStarts = { ...s.pendingAgentStarts };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws?.layout ?? null).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
     });
     const workspaces = s.workspaces.map((w) =>
       w.id === s.activeWorkspaceId ? { ...w, layout } : w);
-    const next = { ...s, workspaces, paneStatus, paneShell, paneCwd, paneAutoTitles, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -1011,6 +1018,7 @@ export const useStore = create<StoreState>((set, get) => ({
     releasePane(paneId);
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
     const paneShell = { ...s.paneShell }; delete paneShell[paneId];
+    const pendingAgentStarts = { ...s.pendingAgentStarts }; delete pendingAgentStarts[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const paneAutoTitles = { ...s.paneAutoTitles }; delete paneAutoTitles[paneId];
     let successor: string | null = null;
@@ -1044,6 +1052,7 @@ export const useStore = create<StoreState>((set, get) => ({
       paneStatus,
       paneShell,
       paneCwd,
+      pendingAgentStarts,
       paneAutoTitles,
       focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
@@ -1271,6 +1280,29 @@ export const useStore = create<StoreState>((set, get) => ({
     const next = { ...s, workspaces, taskView: false, focusedPaneId: newPaneId };
     persist(next);
     return next;
+  }),
+
+  startAgentInNewPane: (sourcePaneId, provider) => {
+    const s = get();
+    const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(sourcePaneId));
+    if (!ws?.layout || ws.kind === 'remote') return null;
+    const id = nextPaneId();
+    const cwd = s.paneCwd[sourcePaneId] ?? ws.cwd;
+    const next = { ...s,
+      workspaces: s.workspaces.map(w => w.id === ws.id ? { ...w,
+        layout: splitPane(ws.layout!, sourcePaneId, 'h', id, nextSplitId()) } : w),
+      pendingAgentStarts: { ...s.pendingAgentStarts, [id]: { provider, cwd } },
+      paneCwd: { ...s.paneCwd, [id]: cwd },
+      activeWorkspaceId: ws.id, focusedPaneId: id, maximizedPaneId: null, taskView: false
+    };
+    set(next);
+    persist(next);
+    return id;
+  },
+  finishAgentStart: (paneId) => set(s => {
+    const pendingAgentStarts = { ...s.pendingAgentStarts };
+    delete pendingAgentStarts[paneId];
+    return { pendingAgentStarts };
   }),
 
   openPreview: (source) => set((s) => ({
@@ -1559,6 +1591,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // dann den Server samt gespeicherter Session im Main-Prozess entfernen.
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
+    const pendingAgentStarts = { ...s.pendingAgentStarts };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     const remote = { ...s.remote };
@@ -1570,7 +1603,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const workspaces = s.workspaces.filter((w) => {
       if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
       collectPaneIds(w.layout).forEach((pid) => {
-        releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete paneAutoTitles[pid];
+        releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
       });
       const connKey = remoteConnKey(serverId, workspaceScopeKey(w.remote));
       delete remote[connKey];
@@ -1588,7 +1621,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = grouped.workspaces.some((w) => w.id === s.activeWorkspaceId)
       ? s.activeWorkspaceId
       : (grouped.workspaces[0]?.id ?? null);
-    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups, settings, remote, remoteTasks, remoteMembers, paneStatus, paneShell, paneCwd, paneAutoTitles, activeWorkspaceId };
+    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups, settings, remote, remoteTasks, remoteMembers, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, activeWorkspaceId };
     persist(next);
     return next;
   }),
