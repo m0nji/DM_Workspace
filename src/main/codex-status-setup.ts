@@ -28,7 +28,9 @@ process.stdin.on('end', () => {
   // Stop PowerShell's legacy native argument conversion from stripping TOML
   // quotes. Resolve Application explicitly: npm also installs a .ps1 shim,
   // which would interpret --% itself instead of forwarding native arguments.
+  // Legacy mode also prevents pwsh 7.3+ from re-escaping --% for .exe files.
+  // The child scope restores the user's mode once Codex exits.
   // This config contains fixed syntax and a base64 path only (no % expansion).
   const windowsQuoted = config.replace(/(\\*)"/g, '$1$1\\"');
-  return { command: powershell ? `& (Get-Command codex -CommandType Application).Source --% -c "${windowsQuoted}"` : `codex -c '${quoted}'`, script };
+  return { command: powershell ? `& { $PSNativeCommandArgumentPassing = 'Legacy'\n& (Get-Command codex -CommandType Application).Source --% -c "${windowsQuoted}"\n}` : `codex -c '${quoted}'`, script };
 }

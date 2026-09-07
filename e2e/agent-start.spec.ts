@@ -2,6 +2,41 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { codexSetup } from '../src/main/codex-status-setup';
+
+test('Codex arguments survive Windows PowerShell and pwsh with npm and native installs', () => {
+  test.skip(process.platform !== 'win32', 'Windows native argument parsing');
+  const dir = mkdtempSync(join(tmpdir(), 'dmws-codex-argv-'));
+  try {
+    const npmDir = join(dir, 'npm');
+    const nativeDir = join(dir, 'native');
+    mkdirSync(npmDir);
+    mkdirSync(nativeDir);
+    const recorder = join(npmDir, 'record.cjs');
+    writeFileSync(recorder, "process.argv.slice(2).forEach(arg => console.log(Buffer.from(arg).toString('base64')));\n");
+    writeFileSync(join(npmDir, 'codex.cmd'), `@"${process.execPath}" "${recorder}" %*\r\n`);
+    writeFileSync(join(npmDir, 'codex.ps1'), "throw 'Must select native npm shim'\r\n");
+    // Compile a tiny argv recorder with Windows' own .NET compiler. This tests
+    // the EXE branch, which pwsh handles differently from batch files.
+    const source = 'using System; class Recorder { static void Main(string[] args) { foreach (var arg in args) Console.WriteLine(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(arg))); } }';
+    const exe = join(nativeDir, 'codex.exe').replace(/'/g, "''");
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Add-Type -TypeDefinition '${source}' -OutputAssembly '${exe}' -OutputType ConsoleApplication`]);
+    const hookPath = join(dir, "hooks with 'quotes' & %PATH%.cjs");
+    const posix = codexSetup(hookPath, 1234, 'test-token', false).command;
+    const expected = posix.slice("codex -c '".length, -1).replaceAll("'\\''", "'");
+    for (const shell of ['powershell.exe', 'pwsh.exe']) {
+      for (const bin of [npmDir, nativeDir]) {
+        const command = codexSetup(hookPath, 1234, 'test-token', true).command;
+        const output = execFileSync(shell, ['-NoProfile', '-NonInteractive', '-Command', command], {
+          env: { ...process.env, PATH: `${bin};${process.env.PATH ?? ''}` }, encoding: 'utf8', timeout: 10000
+        });
+        const args = output.trim().split(/\r?\n/).map(line => Buffer.from(line, 'base64').toString());
+        expect(args, `${shell} via ${bin}`).toEqual(['-c', expected]);
+      }
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
 
 // Real shell, PTY, hook bridge and UI; stand-in CLIs avoid paid model requests.
 for (const provider of ['claude', 'codex', 'opencode'] as const) {

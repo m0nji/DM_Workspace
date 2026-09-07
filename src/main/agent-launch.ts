@@ -12,7 +12,7 @@ export function checkAgentRequirements(shell: string, provider: Provider, env = 
   const posix = /(?:^|[/\\])(?:bash|zsh|sh)(?:\.exe)?$/i.test(shell);
   if (!powershell && !posix) return Promise.resolve('unsupported-shell');
   const script = powershell
-    ? `if (!(Get-Command ${provider}${provider === 'codex' ? ' -CommandType Application' : ''} -ErrorAction SilentlyContinue)) { Write-Output DMWS_CHECK_missing-cli } ${provider === 'codex' ? 'elseif (!(Get-Command node -ErrorAction SilentlyContinue)) { Write-Output DMWS_CHECK_missing-node } ' : ''}else { Write-Output DMWS_CHECK_ready }`
+    ? `if (!(Get-Command ${provider}${provider === 'codex' ? ' -CommandType Application' : ''} -ErrorAction SilentlyContinue)) { Write-Output DMWS_CHECK_missing-cli } ${provider === 'codex' ? 'elseif (!(Get-Command node -CommandType Application -ErrorAction SilentlyContinue)) { Write-Output DMWS_CHECK_missing-node } ' : ''}else { Write-Output DMWS_CHECK_ready }`
     : `if ! command -v ${provider} >/dev/null 2>&1; then echo DMWS_CHECK_missing-cli; ${provider === 'codex' ? 'elif ! command -v node >/dev/null 2>&1; then echo DMWS_CHECK_missing-node; ' : ''}else echo DMWS_CHECK_ready; fi`;
   const args = powershell ? ['-NoLogo', '-NonInteractive', '-Command', script]
     : ['-ilc', script];

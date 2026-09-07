@@ -5,7 +5,7 @@ All notable changes to DM Workspace. Newest version first. Always written in Eng
 ## 0.17.0 – 2026-09-07
 - feat: Start Claude Code, Codex or OpenCode from the Agent dialog in a new pane using the current folder, with CLI checks and retryable errors. Manual command copying remains available.
 - feat: End agent mode from the pane dialog to remove it from the overview without closing the terminal. OpenCode starts with Unknown status until a live adapter is available.
-- fix: Use short temporary launch scripts for automatic startup to avoid truncating long Codex commands. Ignore stale terminal exit/output events after retry.
+- fix: Use short temporary launch scripts for automatic startup to avoid truncating long Codex commands. Preserve Codex hook arguments through Windows PowerShell and npm shims. Ignore stale terminal exit/output events after retry.
 
 ## 0.16.0 – 2026-09-05
 - feat: Connect new local Claude Code and Codex sessions to explicit pane status reporting. The Agent button provides a temporary start command; badges distinguish working, needs input, response ended and unknown, with failure reporting where supported. Output silence never implies completion.
