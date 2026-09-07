@@ -25,17 +25,18 @@ const cp = require('node:child_process');
     if (!res.ok) process.exit(7);
   } else if (${JSON.stringify(provider)} === 'codex') {
     const config = process.argv[process.argv.indexOf('-c') + 1];
-    console.log('CODEX_ARGS=' + JSON.stringify(process.argv.slice(2)));
+    if (process.argv.length !== 4 || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
     const encoded = config.match(/Buffer.from\\('([^']+)'/)[1];
     const path = Buffer.from(encoded, 'base64').toString();
     const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start', turn_id: 'turn-1' }) });
     if (child.status !== 0) process.exit(8);
   }
   console.log('AGENT_STARTED_IN=' + process.cwd());
-  setInterval(() => {}, 1000);
+  setInterval(() => { if (fs.existsSync(${JSON.stringify(join(dir, 'stop'))})) process.exit(0); }, 50);
 })().catch(e => { console.error(e); process.exit(9); });
 `, { mode: 0o700 });
     if (process.platform === 'win32') writeFileSync(join(dir, `${provider}.cmd`), `@"${process.execPath}" "${fixture}" %*\r\n`);
+    if (process.platform === 'win32' && provider === 'codex') writeFileSync(join(dir, 'codex.ps1'), "throw 'The native Codex shim should be selected'\r\n");
     const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env,
       ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin` }), DMWS_E2E: '1' } });
     try {
@@ -68,8 +69,14 @@ const cp = require('node:child_process');
       expect((await buffers()).original).toContain('unfinished-input');
       await expect(win.locator('.pane').nth(1).getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}-running.png`) });
-      console.log(provider + ': assertions passed');
-    } finally { console.log(provider + ': closing app'); await app.close(); console.log(provider + ': closed app'); rmSync(dir, { recursive: true, force: true }); }
+
+    } finally {
+      // Stop our stand-in explicitly. On Linux a PTY child can retain inherited
+      // descriptors after Electron exits, which Playwright waits to close.
+      writeFileSync(join(dir, 'stop'), '');
+      await app.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 }
 

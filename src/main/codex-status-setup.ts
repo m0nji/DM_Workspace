@@ -5,7 +5,7 @@ export function codexSetup(path: string, port: number, token: string, powershell
   const events = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'PreCompact', 'PostCompact', 'Stop', 'Interrupt', 'SessionEnd'];
   const hook = `{ type = "command", command = ${JSON.stringify(hookCommand)}, timeout = 2 }`;
   const config = `hooks={${events.map(event => `${event}=[{hooks=[${hook}]}]`).join(',')}}`;
-  const quoted = powershell ? config.replace(/'/g, "''") : config.replace(/'/g, "'\\''");
+  const quoted = config.replace(/'/g, "'\\''");
   const script = `// DM Workspace: only lifecycle identifiers leave this process.
 const http = require('node:http');
 let done = false;
@@ -25,5 +25,10 @@ process.stdin.on('end', () => {
   } catch { finish(); }
 });
 `;
-  return { command: `codex -c '${quoted}'`, script };
+  // Stop PowerShell's legacy native argument conversion from stripping TOML
+  // quotes. Resolve Application explicitly: npm also installs a .ps1 shim,
+  // which would interpret --% itself instead of forwarding native arguments.
+  // This config contains fixed syntax and a base64 path only (no % expansion).
+  const windowsQuoted = config.replace(/(\\*)"/g, '$1$1\\"');
+  return { command: powershell ? `& (Get-Command codex -CommandType Application).Source --% -c "${windowsQuoted}"` : `codex -c '${quoted}'`, script };
 }
