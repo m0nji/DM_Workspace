@@ -25,6 +25,7 @@ const cp = require('node:child_process');
     if (!res.ok) process.exit(7);
   } else if (${JSON.stringify(provider)} === 'codex') {
     const config = process.argv[process.argv.indexOf('-c') + 1];
+    console.log('CODEX_ARGS=' + JSON.stringify(process.argv.slice(2)));
     const encoded = config.match(/Buffer.from\\('([^']+)'/)[1];
     const path = Buffer.from(encoded, 'base64').toString();
     const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start', turn_id: 'turn-1' }) });
@@ -61,13 +62,14 @@ const cp = require('node:child_process');
       await expect(dialog).toHaveCount(0);
       await expect(win.locator('.pane-agent-status')).toHaveCount(2);
       const buffers = () => win.evaluate(() => Object.fromEntries([...((window as unknown as { __bufferText: Map<string, () => string> }).__bufferText)].map(([id, read]) => [id, read()])));
-      await expect.poll(async () => Object.entries(await buffers()).filter(([id]) => id !== 'original').map(([, text]) => text).join('\n').replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync(project)}`);
+      await expect.poll(async () => Object.entries(await buffers()).filter(([id]) => id !== 'original').map(([, text]) => text).join('\n').replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);
       await expect(win.locator('.pane-agent-status').filter({ hasText: `${provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode'} · ${provider === 'opencode' ? 'Unknown' : 'Working'}` })).toHaveCount(1);
       expect((await buffers()).original).not.toContain('AGENT_STARTED_IN=');
       expect((await buffers()).original).toContain('unfinished-input');
       await expect(win.locator('.pane').nth(1).getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}-running.png`) });
-    } finally { await app.close(); rmSync(dir, { recursive: true, force: true }); }
+      console.log(provider + ': assertions passed');
+    } finally { console.log(provider + ': closing app'); await app.close(); console.log(provider + ': closed app'); rmSync(dir, { recursive: true, force: true }); }
   });
 }
 
