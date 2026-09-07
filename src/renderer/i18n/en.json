@@ -4,7 +4,7 @@
     "short": "Agent",
     "unknownHint": "Agent state unknown. Set up Claude status reporting.",
     "lastReported": "Last reported: {{state}} ({{time}})",
-    "setupHint": "Starts Claude Code with status reporting in a new pane. Requires a current Claude Code installation.",
+    "setupHint": "Starts Claude Code with status reporting in this pane. Requires a current Claude Code installation.",
     "limitations": "New local sessions only, from the first prompt; existing and /resume sessions are not supported yet. “Response ended” does not mean the project is verified. Missing hooks leave the last reported state visible.",
     "remoteHint": "Explicit agent status is currently available for local Claude Code sessions only. This remote session has no supported event source.",
     "setupError": "Status setup is unavailable. Wait for the local terminal to start and try again. Supported shells: zsh, bash and PowerShell. End an active agent session before switching providers.",
@@ -17,8 +17,8 @@
       "error": "Error"
     },
     "provider": "Agent",
-    "codexHint": "Starts Codex in a new pane. Requires Codex and Node.js. On first start, review and trust the DM Workspace hooks in Codex with /hooks.",
-    "codexLimits": "Codex approval waits can remain visible until the response ends. General failures and all user-question tools are not covered by its hooks.",
+    "codexHint": "Starts Codex in this pane. Requires Codex and Node.js. On first start, review and trust the DM Workspace hooks in Codex with /hooks.",
+    "codexLimits": "Codex approval events do not confirm that user input is needed. They show Unknown until another event arrives. General errors and some question tools are not covered by its hooks.",
     "overview": {
       "title": "Agent overview",
       "attention": "Agents needing attention: {{count}}",
@@ -26,10 +26,13 @@
       "empty": "No agents connected yet. Use Agent in a pane header to start Claude or Codex with status reporting.",
       "reported": "Last report: {{time}}"
     },
+    "goToTerminal": "Go to terminal",
+    "sessionHint": "This agent session is already connected. Enter responses and approvals directly in the terminal. The status shows the last reported event.",
+    "promptRequired": "Start the agent at a free shell prompt in this pane. End the running program first. If shell readiness cannot be detected, use the manual start command.",
     "start": "Start agent",
     "checking": "Checking installation …",
     "showCommand": "Show start command (manual)",
-    "startFolder": "New pane in folder: {{cwd}}",
+    "startFolder": "Current pane in folder: {{cwd}}",
     "startErrors": {
       "missing-cli": "The selected agent was not found in your shell. Install Claude Code, Codex or OpenCode, or add it to PATH, then try again.",
       "missing-node": "Codex needs Node.js for status reporting. Install Node.js or add it to PATH, then try again.",
@@ -39,7 +42,7 @@
     "stop": "End agent mode",
     "stopHint": "Removes this pane from the agent overview and disconnects status reporting. The terminal and any running agent stay open.",
     "stopError": "Could not disconnect status reporting. Please try again.",
-    "opencodeHint": "Starts OpenCode in a new pane. OpenCode must be installed in your shell. Live status reporting is not available yet; the overview shows Unknown.",
+    "opencodeHint": "Starts OpenCode in this pane. OpenCode must be installed in your shell. Live status reporting is not available yet; the overview shows Unknown.",
     "details": "About status reporting"
   },
   "common": {

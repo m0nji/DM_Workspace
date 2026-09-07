@@ -528,7 +528,7 @@ export type UpdateEvent =
 export interface RendererApi {
   stopAgentStatus(paneId: string): Promise<void>;
   checkAgentStart(paneId: string, provider: AgentProvider, cwd?: string): Promise<'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'check-failed'>;
-  prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string }>;
+  prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string; launchCommand: string }>;
   getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;
   onAgentState(paneId: string, cb: (state: import('./agent-state').AgentState | null) => void): () => void;
   agentShellReturned(paneId: string): void;

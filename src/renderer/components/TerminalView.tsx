@@ -245,7 +245,6 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const autoTitleTracker = createPaneAutoTitleTracker({
       onTitle: (title) => useStore.getState().setPaneAutoTitle(paneId, title)
     });
-    registerTerminalInputTracking(paneId, (data) => autoTitleTracker.onInput(data));
 
     // GPU renderer. xterm's default DOM renderer chokes on high-throughput
     // streaming output (e.g. an active Claude Code session) and on scrolling
@@ -317,6 +316,33 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const HEAL_DELAY_MS = 30;
     let promptArmed = false;
     let healTimer: ReturnType<typeof setTimeout> | null = null;
+    // User input and programmatic commands must retire the same prompt state.
+    const trackInput = (data: string): void => {
+      // Erst das Absenden einer Zeile kann ein Programm starten, das die Bytes
+      // der Heilung abbekäme. Eine angefangene Eingabe ist harmlos: dort liegt
+      // PSReadLine noch selbst am Ruder und zeichnet sie nach InvokePrompt an
+      // der korrigierten Spalte neu — genau der Fall, für den die Heilung da
+      // ist. Bis zum nächsten Prompt-Marker bleibt sie danach aus.
+      if (/[\r\n]/.test(data)) {
+        promptArmed = false;
+        if (healTimer !== null) { clearTimeout(healTimer); healTimer = null; }
+        // 'running' heißt nur: seit dem letzten Prompt wurde eine Zeile
+        // abgeschickt. NICHT: hier arbeitet gerade etwas. Der Unterschied ist
+        // gemessen, an echten Claude- und Codex-Sitzungen: startet die Zeile ein
+        // interaktives Unterprogramm — Agent, ssh, REPL, tmux —, druckt das
+        // seinen eigenen Prompt, aber nie unseren Marker (Multiplexer schlucken
+        // den privaten OSC zusätzlich, siehe den Handler oben). Der Zustand
+        // bleibt dann bis zum Ende dieses Programms stehen, obwohl der Agent
+        // längst auf Eingabe wartet.
+        //
+        // Deshalb wertet pane-busy.ts nur 'atPrompt' als Auskunft und lässt
+        // sonst die Ausgabe entscheiden. Wer diesen Melder liest, darf ihn also
+        // nicht als „läuft" verstehen — er ist die Gegenprobe zu 'atPrompt'.
+        useStore.getState().setPaneShell(paneId, 'running');
+      }
+      autoTitleTracker.onInput(data);
+    };
+    registerTerminalInputTracking(paneId, trackInput);
     const scheduleHeal = (): void => {
       if (!healEnabled) return;
       if (healTimer !== null) clearTimeout(healTimer);
@@ -481,28 +507,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // verworfen (der Server lehnt ihn ohnehin ab) — so tippt niemand
       // "ins Leere" mit sichtbarer Verzögerung bis zur Server-Ablehnung.
       if (remote && !isPaneWritable(useStore.getState(), paneId)) return;
-      // Erst das Absenden einer Zeile kann ein Programm starten, das die Bytes
-      // der Heilung abbekäme. Eine angefangene Eingabe ist harmlos: dort liegt
-      // PSReadLine noch selbst am Ruder und zeichnet sie nach InvokePrompt an
-      // der korrigierten Spalte neu — genau der Fall, für den die Heilung da
-      // ist. Bis zum nächsten Prompt-Marker bleibt sie danach aus.
-      if (/[\r\n]/.test(data)) {
-        promptArmed = false;
-        // 'running' heißt nur: seit dem letzten Prompt wurde eine Zeile
-        // abgeschickt. NICHT: hier arbeitet gerade etwas. Der Unterschied ist
-        // gemessen, an echten Claude- und Codex-Sitzungen: startet die Zeile ein
-        // interaktives Unterprogramm — Agent, ssh, REPL, tmux —, druckt das
-        // seinen eigenen Prompt, aber nie unseren Marker (Multiplexer schlucken
-        // den privaten OSC zusätzlich, siehe den Handler oben). Der Zustand
-        // bleibt dann bis zum Ende dieses Programms stehen, obwohl der Agent
-        // längst auf Eingabe wartet.
-        //
-        // Deshalb wertet pane-busy.ts nur 'atPrompt' als Auskunft und lässt
-        // sonst die Ausgabe entscheiden. Wer diesen Melder liest, darf ihn also
-        // nicht als „läuft" verstehen — er ist die Gegenprobe zu 'atPrompt'.
-        useStore.getState().setPaneShell(paneId, 'running');
-      }
-      autoTitleTracker.onInput(data);
+      trackInput(data);
       window.api.input({ paneId, data });
       activity.onInput();
     });

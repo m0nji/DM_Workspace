@@ -40,7 +40,7 @@ test('Codex arguments survive Windows PowerShell and pwsh with npm and native in
 
 // Real shell, PTY, hook bridge and UI; stand-in CLIs avoid paid model requests.
 for (const provider of ['claude', 'codex', 'opencode'] as const) {
-  test(`${provider} starts by button in its own pane and reports status`, async () => {
+  test(`${provider} starts by button in the current pane and reports status`, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-start-'));
     const project = join(dir, "project with 'quotes'");
     mkdirSync(project);
@@ -86,25 +86,25 @@ const cp = require('node:child_process');
       const original = win.locator('.pane').first();
       await expect(original.locator('.xterm')).toBeVisible();
       await expect.poll(() => win.evaluate(provider => window.api.checkAgentStart('original', provider), provider)).toBe('ready');
-      // Preserve even an unfinished input line in the source terminal.
+      // Replace unfinished shell input without executing it as part of the agent command.
       await win.evaluate(() => window.api.input({ paneId: 'original', data: 'unfinished-input' }));
       await original.getByRole('button', { name: 'Agent status', exact: true }).click();
       const dialog = win.getByRole('alertdialog');
       await dialog.getByRole('combobox').selectOption(provider);
       // The shell's first cwd report can replace an 8.3 Windows path (and
       // backslashes) while the dialog is open. Compare the actual directory.
-      await expect.poll(async () => realpathSync.native((await dialog.locator('.agent-folder').innerText()).replace('New pane in folder: ', ''))).toBe(realpathSync.native(project));
+      await expect.poll(async () => realpathSync.native((await dialog.locator('.agent-folder').innerText()).replace(/(?:New|Current) pane in folder: /, ''))).toBe(realpathSync.native(project));
       await expect(dialog.locator('code')).toHaveCount(0);
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}.png`) });
       await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
       await expect(dialog).toHaveCount(0);
-      await expect(win.locator('.pane-agent-status')).toHaveCount(2);
+      await expect(win.locator('.pane-agent-status')).toHaveCount(1);
       const buffers = () => win.evaluate(() => Object.fromEntries([...((window as unknown as { __bufferText: Map<string, () => string> }).__bufferText)].map(([id, read]) => [id, read()])));
-      await expect.poll(async () => Object.entries(await buffers()).filter(([id]) => id !== 'original').map(([, text]) => text).join('\n').replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);
+      await expect.poll(async () => (await buffers()).original.replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);
       await expect(win.locator('.pane-agent-status').filter({ hasText: `${provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode'} · ${provider === 'opencode' ? 'Unknown' : 'Working'}` })).toHaveCount(1);
-      expect((await buffers()).original).not.toContain('AGENT_STARTED_IN=');
-      expect((await buffers()).original).toContain('unfinished-input');
-      await expect(win.locator('.pane').nth(1).getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
+      expect((await buffers()).original).not.toContain('unfinished-input: command not found');
+      await expect(original.locator('.pane-label.automatic')).toHaveText(provider);
+      await expect(original.getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}-running.png`) });
     } finally {
       // Stop our stand-in explicitly. On Linux a PTY child can retain inherited
@@ -167,4 +167,25 @@ exec /bin/bash --noprofile --norc "$@"
     await expect(dialog).toHaveCount(0);
     await expect(win.locator('.pane-agent-status')).toHaveCount(1);
   } finally { await app.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('programmatic commands disarm the shell prompt before another agent can start', async () => {
+  test.skip(process.platform === 'win32', 'POSIX sleep fixture');
+  const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env, DMWS_E2E: '1' } });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator('.welcome')).toBeVisible();
+    await win.evaluate(() => (window as unknown as { __store: { setState(s: unknown): void } }).__store.setState({
+      workspaces: [{ id: 'w', name: 'Programmatic input', cwd: '/tmp', layout: { type: 'pane', id: 'source' } }], activeWorkspaceId: 'w'
+    }));
+    const shell = () => win.evaluate(() => (window as unknown as { __store: { getState(): { paneShell: Record<string, string> } } }).__store.getState().paneShell.source);
+    await expect.poll(shell).toBe('atPrompt');
+    const afterSubmit = await win.evaluate(() => {
+      const store = (window as unknown as { __store: { getState(): { runTaskInPane(id: string, command: string): void; paneShell: Record<string, string> } } }).__store;
+      store.getState().runTaskInPane('source', 'sleep 2');
+      return store.getState().paneShell.source;
+    });
+    expect(afterSubmit).toBe('running');
+    await expect.poll(shell).toBe('atPrompt');
+  } finally { await app.close(); }
 });

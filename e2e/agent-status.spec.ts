@@ -53,6 +53,10 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
     await emit('PermissionRequest');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
+    await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'Start agent', exact: true })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Go to terminal', exact: true }).click();
+    await expect(panes.first().getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
     await emit('PostToolUse');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
     await emit('PostToolBatch');
@@ -85,7 +89,7 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await postCodex('UserPromptSubmit');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Working');
     await postCodex('PermissionRequest');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Needs input');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Unknown');
     await postCodex('Stop');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Response ended');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');

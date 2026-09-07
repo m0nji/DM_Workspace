@@ -36,7 +36,9 @@ export function codexState(input: Record<string, unknown>): AgentStatus | null {
   if (input.agent_id) return null;
   switch (input.hook_event_name) {
     case 'UserPromptSubmit': case 'PreToolUse': case 'PostToolUse': case 'PreCompact': case 'PostCompact': return 'working';
-    case 'PermissionRequest': return 'needs-input';
+    // This hook precedes the approval decision; another hook or automatic
+    // reviewer may resolve it without ever showing a user prompt.
+    case 'PermissionRequest': return 'unknown';
     case 'Stop': return input.stop_hook_active === true ? 'unknown' : 'completed';
     case 'Interrupt': case 'SessionEnd': return 'unknown';
     default: return null;

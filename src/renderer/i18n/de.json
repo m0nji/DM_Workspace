@@ -4,7 +4,7 @@
     "short": "Agent",
     "unknownHint": "Agentenzustand unbekannt. Claude-Statusmeldungen einrichten.",
     "lastReported": "Zuletzt gemeldet: {{state}} ({{time}})",
-    "setupHint": "Startet Claude Code mit Statusanbindung in einer neuen Pane. Benötigt eine aktuelle Claude-Code-Installation.",
+    "setupHint": "Startet Claude Code mit Statusanbindung in dieser Pane. Benötigt eine aktuelle Claude-Code-Installation.",
     "limitations": "Nur neue lokale Sitzungen ab dem ersten Prompt; bestehende und /resume-Sitzungen werden noch nicht unterstützt. „Antwort beendet“ bedeutet nicht, dass das Projekt geprüft ist. Ohne Hooks bleibt der zuletzt gemeldete Zustand sichtbar.",
     "remoteHint": "Expliziter Agentenstatus ist zunächst nur für lokale Claude-Code-Sitzungen verfügbar. Diese Remote-Sitzung hat keine unterstützte Ereignisquelle.",
     "setupError": "Status-Einrichtung nicht verfügbar. Warte auf den Start des lokalen Terminals und versuche es erneut. Unterstützte Shells: zsh, bash und PowerShell. Vor einem Anbieterwechsel die aktive Agentensitzung beenden.",
@@ -17,8 +17,8 @@
       "error": "Fehler"
     },
     "provider": "Agent",
-    "codexHint": "Startet Codex in einer neuen Pane. Benötigt Codex und Node.js. Beim ersten Start die DM-Workspace-Hooks in Codex mit /hooks prüfen und ihnen vertrauen.",
-    "codexLimits": "Bei Codex können Freigabewartezustände bis zum Antwortende sichtbar bleiben. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",
+    "codexHint": "Startet Codex in dieser Pane. Benötigt Codex und Node.js. Beim ersten Start die DM-Workspace-Hooks in Codex mit /hooks prüfen und ihnen vertrauen.",
+    "codexLimits": "Codex-Freigabeereignisse bestätigen keinen Eingabebedarf und werden als „Unbekannt“ angezeigt, bis ein weiteres Ereignis vorliegt. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",
     "overview": {
       "title": "Agentenübersicht",
       "attention": "Agenten mit Aufmerksamkeitsbedarf: {{count}}",
@@ -26,10 +26,13 @@
       "empty": "Noch keine Agenten verbunden. Über Agent am Pane-Kopf Claude oder Codex mit Statusmeldungen starten.",
       "reported": "Letzte Meldung: {{time}}"
     },
+    "goToTerminal": "Zum Terminal",
+    "sessionHint": "Die Agentensitzung ist bereits verbunden. Eingaben und Freigaben erfolgen direkt im Terminal. Der Status zeigt das zuletzt gemeldete Ereignis.",
+    "promptRequired": "Starte den Agenten an einem freien Shell-Prompt in dieser Pane. Beende zunächst das laufende Programm. Ohne erkannte Shell-Bereitschaft nutze den manuellen Startbefehl.",
     "start": "Agent starten",
     "checking": "Installation wird geprüft …",
     "showCommand": "Startbefehl anzeigen (manuell)",
-    "startFolder": "Neue Pane im Ordner: {{cwd}}",
+    "startFolder": "Aktuelle Pane im Ordner: {{cwd}}",
     "startErrors": {
       "missing-cli": "Der gewählte Agent wurde in der Shell nicht gefunden. Installiere Claude Code, Codex bzw. OpenCode oder ergänze den PATH, dann versuche es erneut.",
       "missing-node": "Codex benötigt Node.js für die Statusanbindung. Installiere Node.js bzw. ergänze den PATH und versuche es erneut.",
@@ -39,7 +42,7 @@
     "stop": "Agentenmodus beenden",
     "stopHint": "Entfernt diese Pane aus der Agentenübersicht und beendet die Statusanbindung. Das Terminal und ein eventuell laufender Agent bleiben geöffnet.",
     "stopError": "Die Statusanbindung konnte nicht beendet werden. Bitte erneut versuchen.",
-    "opencodeHint": "Startet OpenCode in einer neuen Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Unbekannt“.",
+    "opencodeHint": "Startet OpenCode in dieser Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Unbekannt“.",
     "details": "Hinweise zum Status"
   },
   "common": {

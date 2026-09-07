@@ -77,12 +77,14 @@ Available for **macOS** and **Windows**.
 
 Click **Agent** in a pane header, choose **Claude Code**, **Codex** or **OpenCode**,
 then click **Start agent**. DM Workspace checks the CLI (and Node.js for Codex)
-and opens a new pane in the source terminal's current folder. Existing programs
-and unfinished input stay untouched. Failed checks stay in the dialog with a
-repair hint; failed terminal starts offer retry. Start requests are one-shot
-and are never replayed after restarting the app.
+and starts it at the current pane's shell prompt, keeping its directory and
+layout. An unfinished input line is cleared before launch; a running program
+must be exited first. Failed checks stay in the dialog with a repair hint.
+Start requests are never replayed after restarting the app. Connected sessions
+show their current status and **Go to terminal** instead of another start form.
 
-The start flow supports macOS and Linux with zsh/bash/sh, and Windows with
+The direct start requires a detected shell prompt. It supports macOS and Linux
+with zsh/bash, and Windows with
 PowerShell (PowerShell 7 when installed, otherwise Windows PowerShell).
 **Show start command (manual)** remains available for setting up an existing,
 idle pane. Claude status requires a current Claude Code installation supporting
@@ -119,8 +121,9 @@ The local helper forwards only lifecycle identifiers, never prompts, tool inputs
 or responses. It returns no approval decisions or model context.
 
 Codex does not provide a general failure hook, so it does not report **Error**.
-Its permission events do not identify a tool invocation: **Needs input** may stay
-visible until the response ends, even after approval. User-question tools are
+Its permission hook runs before the approval decision, which may be automatic.
+It therefore shows **Unknown**, not **Needs input**; the next explicit work event
+restores **Working**. User-question tools are
 not consistently covered by hooks. Interruptions return to **Unknown**; late events
 from older turns cannot finish a newer turn. End an active agent session before
 switching providers in the same pane.

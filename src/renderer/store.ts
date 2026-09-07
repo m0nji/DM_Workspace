@@ -354,7 +354,7 @@ export interface StoreState extends AppState {
   paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   pendingAgentStarts: Record<string, { provider: AgentProvider; cwd: string }>;
-  startAgentInNewPane: (sourcePaneId: string, provider: AgentProvider) => string | null;
+  startAgentInPane: (paneId: string, command: string) => boolean;
   finishAgentStart: (paneId: string) => void;
   agentStates: Record<string, AgentState>;
   setAgentState: (paneId: string, state: AgentState | null) => void;
@@ -1282,22 +1282,19 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  startAgentInNewPane: (sourcePaneId, provider) => {
+  startAgentInPane: (paneId, command) => {
     const s = get();
-    const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(sourcePaneId));
-    if (!ws?.layout || ws.kind === 'remote') return null;
-    const id = nextPaneId();
-    const cwd = s.paneCwd[sourcePaneId] ?? ws.cwd;
-    const next = { ...s,
-      workspaces: s.workspaces.map(w => w.id === ws.id ? { ...w,
-        layout: splitPane(ws.layout!, sourcePaneId, 'h', id, nextSplitId()) } : w),
-      pendingAgentStarts: { ...s.pendingAgentStarts, [id]: { provider, cwd } },
-      paneCwd: { ...s.paneCwd, [id]: cwd },
-      activeWorkspaceId: ws.id, focusedPaneId: id, maximizedPaneId: null, taskView: false
-    };
-    set(next);
-    persist(next);
-    return id;
+    const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(paneId));
+    if (!ws || ws.kind === 'remote' || s.paneShell[paneId] !== 'atPrompt' || s.agentStates[paneId]?.sessionId) return false;
+    // Clear an unfinished shell line before sending the prepared command.
+    // Never send these editing keys to a foreground application.
+    const data = `\x05\x15${command}\r`;
+    set({ activeWorkspaceId: ws.id, focusedPaneId: paneId, taskView: false,
+      paneShell: { ...s.paneShell, [paneId]: 'running' } });
+    // Track the CLI name so the internal bootstrap path never becomes the pane label.
+    trackTerminalInput(paneId, `\x05\x15${s.agentStates[paneId]?.provider ?? command}\r`);
+    window.api.input({ paneId, data });
+    return true;
   },
   finishAgentStart: (paneId) => set(s => {
     const pendingAgentStarts = { ...s.pendingAgentStarts };

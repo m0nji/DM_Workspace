@@ -27,7 +27,7 @@ describe('agent status bridge', () => {
     });
     return { result, hook, post };
   }
-  it('runs Codex command hooks, protects turns and preserves ambiguous permission waits', async () => {
+  it('runs Codex command hooks, protects turns without claiming ambiguous approvals need user input', async () => {
     const result = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'codex');
     const post = async (event: string, turn = 't1', extra = {}) => {
       const child = spawn(process.execPath, [result.settingsPath], {
@@ -44,8 +44,9 @@ describe('agent status bridge', () => {
     expect(bridge.snapshot('p1')).toMatchObject({ provider: 'codex', status: 'working' });
     await expect(bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude')).rejects.toThrow();
     await post('PermissionRequest');
+    expect(bridge.snapshot('p1')?.status).toBe('unknown');
     await post('PostToolUse', 't1', { tool_use_id: 'unrelated' });
-    expect(bridge.snapshot('p1')?.status).toBe('needs-input');
+    expect(bridge.snapshot('p1')?.status).toBe('working');
     await post('Stop');
     expect(bridge.snapshot('p1')?.status).toBe('completed');
     await post('UserPromptSubmit', 't2');
