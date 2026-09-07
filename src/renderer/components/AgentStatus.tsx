@@ -70,7 +70,7 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
       if (result !== 'ready') { setDialog({ error: `startErrors.${result}` }); return; }
       const setup = await window.api.prepareAgentStatus(paneId, provider);
       if (ticket !== operation.current) return;
-      if (!useStore.getState().startAgentInPane(paneId, setup.launchCommand)) { setDialog({ error: 'promptRequired' }); return; }
+      if (!useStore.getState().startAgentInPane(paneId, setup.launchCommand, setup.inputPrefix)) { setDialog({ error: 'promptRequired' }); return; }
       close();
       requestAnimationFrame(() => focusTerminal(paneId));
     } catch { if (ticket === operation.current) setDialog({ error: 'startErrors.check-failed' }); }

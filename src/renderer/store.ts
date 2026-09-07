@@ -354,7 +354,7 @@ export interface StoreState extends AppState {
   paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
   pendingAgentStarts: Record<string, { provider: AgentProvider; cwd: string }>;
-  startAgentInPane: (paneId: string, command: string) => boolean;
+  startAgentInPane: (paneId: string, command: string, inputPrefix?: string) => boolean;
   finishAgentStart: (paneId: string) => void;
   agentStates: Record<string, AgentState>;
   setAgentState: (paneId: string, state: AgentState | null) => void;
@@ -1282,13 +1282,13 @@ export const useStore = create<StoreState>((set, get) => ({
     return next;
   }),
 
-  startAgentInPane: (paneId, command) => {
+  startAgentInPane: (paneId, command, inputPrefix = '\x05\x15') => {
     const s = get();
     const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(paneId));
     if (!ws || ws.kind === 'remote' || s.paneShell[paneId] !== 'atPrompt' || s.agentStates[paneId]?.sessionId) return false;
     // Clear an unfinished shell line before sending the prepared command.
     // Never send these editing keys to a foreground application.
-    const data = `\x05\x15${command}\r`;
+    const data = `${inputPrefix}${command}\r`;
     set({ activeWorkspaceId: ws.id, focusedPaneId: paneId, taskView: false,
       paneShell: { ...s.paneShell, [paneId]: 'running' } });
     // Track the CLI name so the internal bootstrap path never becomes the pane label.

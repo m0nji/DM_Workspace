@@ -170,6 +170,10 @@ describe('agent status bridge', () => {
     expect(events).toHaveLength(count);
     expect(events.at(-1)?.state).toBeNull();
   });
+  it.skipIf(process.platform === 'win32')('uses POSIX editing keys for PowerShell hosted on a POSIX PTY', async () => {
+    const result = await bridge.prepare('pwsh', '/usr/local/bin/pwsh', 'a'.repeat(64), 'opencode');
+    expect(result.inputPrefix).toBe('\x05\x15');
+  });
   it('prepares idempotently without replacing an active session and rejects unsupported shells', async () => {
     const { result, post } = await setup();
     await post({ session_id: 's', hook_event_name: 'UserPromptSubmit' });

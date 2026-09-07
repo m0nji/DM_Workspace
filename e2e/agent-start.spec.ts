@@ -86,6 +86,9 @@ const cp = require('node:child_process');
       const original = win.locator('.pane').first();
       await expect(original.locator('.xterm')).toBeVisible();
       await expect.poll(() => win.evaluate(provider => window.api.checkAgentStart('original', provider), provider)).toBe('ready');
+      await expect.poll(() => win.evaluate(() => (window as unknown as {
+        __store: { getState(): { paneShell: Record<string, string> } }
+      }).__store.getState().paneShell.original)).toBe('atPrompt');
       // Replace unfinished shell input without executing it as part of the agent command.
       await win.evaluate(() => window.api.input({ paneId: 'original', data: 'unfinished-input' }));
       await original.getByRole('button', { name: 'Agent status', exact: true }).click();
@@ -97,7 +100,10 @@ const cp = require('node:child_process');
       await expect(dialog.locator('code')).toHaveCount(0);
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}.png`) });
       await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
-      await expect(dialog).toHaveCount(0);
+      await expect.poll(async () => {
+        if (await dialog.count() === 0) return 'started';
+        return await dialog.innerText();
+      }).toBe('started');
       await expect(win.locator('.pane-agent-status')).toHaveCount(1);
       const buffers = () => win.evaluate(() => Object.fromEntries([...((window as unknown as { __bufferText: Map<string, () => string> }).__bufferText)].map(([id, read]) => [id, read()])));
       await expect.poll(async () => (await buffers()).original.replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);

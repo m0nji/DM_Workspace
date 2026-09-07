@@ -2,10 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
-## 0.17.1 – 2026-09-07
+## 0.17.2 – 2026-09-07
 - fix: Start agents in the current pane at a free shell prompt, preserving the layout and working folder. Clear unfinished shell input before launch and keep internal startup paths out of the pane label.
 - fix: Connected agent sessions show their status and a Go to terminal action instead of another start form.
 - fix: Stop treating Codex approval hooks as confirmed requests for user input. Ambiguous approval events show Unknown; subsequent work events restore Working.
+- fix: Clear unfinished PowerShell input with native Windows editing keys before starting an agent.
 - fix: Disarm shell prompt repair when commands start programmatically so resizing cannot send repair keys to a running agent.
 
 ## 0.17.0 – 2026-09-07

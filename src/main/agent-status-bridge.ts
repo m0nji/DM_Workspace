@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { PSREADLINE_CLEAR_INPUT_SEQUENCE } from '../shared/psreadline-heal';
 import { codexSetup } from './codex-status-setup';
 import { join } from 'node:path';
 import { claudeState, codexState, type AgentState, type AgentStateEvent } from '../shared/agent-state';
@@ -12,7 +13,7 @@ interface Registration {
   paneId: string; token: string; settingsPath: string; command: string; launchCommand: string;
   turnId?: string; retiredTurns: Set<string>; state: AgentState; retired: Set<string>; waiting: Set<string>; nonce: string; interrupted: boolean;
 }
-export interface AgentSetup { command: string; settingsPath: string; launchCommand: string }
+export interface AgentSetup { command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }
 
 export class AgentStatusBridge {
   private server: Server | null = null;
@@ -52,10 +53,11 @@ export class AgentStatusBridge {
       throw new Error('Unsupported shell for agent status setup');
     }
     if (!/^[a-f0-9]{64}$/.test(nonce)) throw new Error('Invalid terminal nonce');
+    const inputPrefix = powershell && process.platform === 'win32' ? PSREADLINE_CLEAR_INPUT_SEQUENCE : '\x05\x15';
     const port = provider === 'opencode' ? 0 : await this.listen();
     if (this.closed) throw new Error('Agent bridge is closed');
     const existing = this.registrations.get(paneId);
-    if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand };
+    if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand, inputPrefix };
     if (existing) {
       if (existing.state.sessionId) throw new Error('End the active agent session before switching providers');
       this.release(paneId);
@@ -87,7 +89,7 @@ export class AgentStatusBridge {
     this.registrations.set(paneId, registration);
     this.byToken.set(token, registration);
     this.send({ paneId, state: registration.state });
-    return { command: registration.command, launchCommand: registration.launchCommand, settingsPath };
+    return { command: registration.command, launchCommand: registration.launchCommand, settingsPath, inputPrefix };
   }
 
   snapshot(paneId: string): AgentState | null { return this.registrations.get(paneId)?.state ?? null; }

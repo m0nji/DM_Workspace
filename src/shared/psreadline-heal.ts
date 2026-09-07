@@ -31,3 +31,11 @@ const VK_F24 = 135;
 // typed, and readline would put the digits into the user's command line.
 export const PSREADLINE_HEAL_SEQUENCE =
   `\x1b[${VK_F24};0;0;1;0;1_\x1b[${VK_F24};0;0;0;0;1_`;
+
+// PowerShell's default Windows editing mode clears input with Ctrl+Home and
+// Ctrl+End, not the POSIX Ctrl+E/Ctrl+U pair. Send explicit ConPTY key records
+// so these cannot become literal control characters in the command line.
+// Clear both sides of the cursor, including input recalled from history.
+export const PSREADLINE_CLEAR_INPUT_SEQUENCE =
+  '\x1b[36;0;0;1;8;1_\x1b[36;0;0;0;8;1_' +
+  '\x1b[35;0;0;1;8;1_\x1b[35;0;0;0;8;1_';
