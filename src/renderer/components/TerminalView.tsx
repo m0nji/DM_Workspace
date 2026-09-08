@@ -482,6 +482,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       saveScheduler.schedule();
       activity.onOutput();
     });
+    let agentExitReceived: (() => void) | null = null;
     const offExit = window.api.onExit(paneId, (exitCode) => {
       processEnded = true;
       // Remote session lifecycle remains server-owned; a later server restart
@@ -501,6 +502,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // tRef statt t: die Meldung erscheint in der Sprache, die beim Beenden des
       // Prozesses eingestellt ist — nicht in der, die beim Mount der Pane galt.
       term.write(`\r\n[${tRef.current('terminal.processExited', { code: exitCode })}]\r\n`);
+      agentExitReceived?.();
     });
     const inputDisp = term.onData((data) => {
       // Driver-Gating: Ohne Schreibrecht wird Input einer Remote-Pane lokal
@@ -624,16 +626,27 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     registerAgentEnd(paneId, async (generation) => {
       if (remote || disposed || endingAgent || processEnded) throw new Error('Terminal unavailable');
       endingAgent = true;
+      const exitReceived = new Promise<void>(resolve => { agentExitReceived = resolve; });
+      let exitTimer: ReturnType<typeof setTimeout> | undefined;
       try {
         agentRestartCwd = useStore.getState().paneCwd[paneId] ?? cwd;
         await window.api.endAgentSession(paneId, generation);
+        // The invoke reply can overtake the PTY exit notification (notably
+        // with ConPTY). Process that old exit before resetting for a new shell.
+        await Promise.race([exitReceived, new Promise<never>((_resolve, reject) => {
+          exitTimer = setTimeout(() => reject(new Error('Terminal exit notification missing')), 5000);
+        })]);
         if (disposed) return;
         // Keep the xterm instance and scrollback; replace only the ended PTY.
         // Leaving alternate-screen mode can restore an old saved cursor.
         // Move to the bottom before parking the entire viewport in scrollback.
         term.write(STUCK_MODE_RESET + `\x1b[${term.rows};1H` + parkRestoredHistory(term.rows));
         retryStartRef.current?.();
-      } finally { endingAgent = false; }
+      } finally {
+        clearTimeout(exitTimer);
+        agentExitReceived = null;
+        endingAgent = false;
+      }
     });
 
     // Spawnen erst, wenn die Panebreite stabil ist.

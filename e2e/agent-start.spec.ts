@@ -93,6 +93,16 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     app.process().stderr?.on('data', chunk => { mainErrors = (mainErrors + chunk.toString()).slice(-16000); });
     try {
       const win = await app.firstWindow();
+      // IPC invoke replies and PTY exit notifications can arrive independently.
+      // Force the old terminal's exit to arrive after the end-session reply.
+      await app.evaluate(({ BrowserWindow }) => {
+        const contents = BrowserWindow.getAllWindows()[0].webContents;
+        const send = contents.send.bind(contents);
+        contents.send = (channel, ...args) => {
+          if (channel === 'pty:exit') setTimeout(() => send(channel, ...args), 250);
+          else send(channel, ...args);
+        };
+      });
       await expect(win.locator('.welcome')).toBeVisible();
       await win.evaluate(project => {
         (window as unknown as { __store: { setState(s: unknown): void } }).__store.setState({
@@ -193,7 +203,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
       const win = await app.firstWindow();
       console.error('Agent main-process errors:', mainErrors);
       console.error('Agent dialog at failure:', await win.getByRole('alertdialog').allTextContents());
-      console.error('Agent terminal at failure:', await win.evaluate(() => (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText.get('original')?.()));
+      console.error('Agent terminal at failure:', await win.evaluate(() => (window as unknown as { __bufferText?: Map<string, () => string> }).__bufferText?.get('original')?.()));
       throw error;
     } finally {
       // Stop our stand-in explicitly. On Linux a PTY child can retain inherited

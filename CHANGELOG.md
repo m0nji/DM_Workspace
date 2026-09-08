@@ -2,10 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
-## 0.17.4 – 2026-09-08
+## 0.17.5 – 2026-09-08
 - feat: Pause the agent status display and reconnect the same running session without restarting its CLI. Reports continue in the background, and paused sessions stay out of the active overview.
 - feat: End a local agent session through a separate confirmation. The shell and its agent process tree are terminated, then a fresh shell starts in the current folder while preserving the pane and scrollback.
 - fix: Distinguish waiting for the first report, confirmed status, interruption, shutdown and ended sessions. Ended sessions leave the active overview and offer Restart. OpenCode explicitly shows that live status is unsupported; ambiguous status reports explain their limits.
+- fix: Wait for the old terminal's exit notification before starting a replacement shell, so delayed Windows exit events cannot disable a new agent session.
 
 ## 0.17.2 – 2026-09-07
 - fix: Start agents in the current pane at a free shell prompt, preserving the layout and working folder. Clear unfinished shell input before launch and keep internal startup paths out of the pane label.
