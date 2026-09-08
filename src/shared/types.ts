@@ -527,6 +527,8 @@ export type UpdateEvent =
 // Shape exposed on window.api by the preload script
 export interface RendererApi {
   stopAgentStatus(paneId: string): Promise<void>;
+  reconnectAgentStatus(paneId: string): Promise<void>;
+  endAgentSession(paneId: string, generation: string): Promise<void>;
   checkAgentStart(paneId: string, provider: AgentProvider, cwd?: string): Promise<'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'check-failed'>;
   prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }>;
   getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;

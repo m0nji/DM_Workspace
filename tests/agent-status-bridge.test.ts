@@ -60,16 +60,38 @@ describe('agent status bridge', () => {
     bridge.release('p1');
     expect(existsSync(result.settingsPath)).toBe(false);
   });
-  it('disconnects the overview while keeping live hook scripts usable and revoking old events', async () => {
+  it('pauses display without losing live events and reconnects the same session', async () => {
     const { result, post } = await setup();
+    await post({ session_id: 's', hook_event_name: 'UserPromptSubmit' });
     bridge.disconnect('p1');
-    expect(bridge.snapshot('p1')).toBeNull();
-    expect(events.at(-1)).toEqual({ paneId: 'p1', state: null });
+    expect(bridge.snapshot('p1')).toMatchObject({ paused: true, sessionId: 's' });
     expect(existsSync(result.settingsPath)).toBe(true);
-    expect((await post({ session_id: 'late', hook_event_name: 'UserPromptSubmit' })).status).toBe(401);
-    expect(bridge.snapshot('p1')).toBeNull();
+    expect((await post({ session_id: 's', hook_event_name: 'Stop' })).status).toBe(200);
+    const reportTime = bridge.snapshot('p1')!.updatedAt;
+    bridge.reconnect('p1');
+    expect(bridge.snapshot('p1')).toMatchObject({ paused: false, sessionId: 's', status: 'completed', updatedAt: reportTime });
+    bridge.disconnect('p1');
+    bridge.shellReturned('p1');
+    expect(() => bridge.reconnect('p1')).toThrow();
+    const generation = bridge.snapshot('p1')!.generation;
+    await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64));
+    expect(bridge.snapshot('p1')).toMatchObject({ paused: false, event: 'setup', sessionId: null });
+    expect(bridge.snapshot('p1')!.generation).not.toBe(generation);
+    await post({ session_id: 's', hook_event_name: 'UserPromptSubmit' });
+    expect(bridge.snapshot('p1')!.sessionId).toBeNull();
     await bridge.close();
     expect(existsSync(result.settingsPath)).toBe(false);
+  });
+  it('remembers a terminated session without retaining live hooks', async () => {
+    const { post } = await setup();
+    const previous = bridge.snapshot('p1')!;
+    bridge.release('p1');
+    bridge.rememberEnded('p1', previous);
+    expect(bridge.snapshot('p1')).toMatchObject({ event: 'shell', sessionId: null });
+    expect((await post({ session_id: 'late', hook_event_name: 'UserPromptSubmit' })).status).toBe(401);
+    expect(() => bridge.reconnect('p1')).toThrow();
+    await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64));
+    expect(bridge.snapshot('p1')!.generation).not.toBe(previous.generation);
   });
   it('starts OpenCode without claiming hook status or needing a loopback server', async () => {
     const result = await bridge.prepare('open', '/bin/sh', 'a'.repeat(64), 'opencode');

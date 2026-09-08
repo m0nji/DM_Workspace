@@ -67,9 +67,11 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await emit('StopFailure');
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Error');
     await emit('SessionEnd');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Unknown');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Session ending');
+    await win.evaluate(() => window.api.agentShellReturned('agent1'));
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Session ended');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
-    await expect(dialog.getByRole('button', { name: 'Start agent', exact: true })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Restart', exact: true })).toBeFocused();
     await win.keyboard.press('Tab');
     await expect(dialog.getByRole('combobox', { name: 'Agent', exact: true })).toBeFocused();
     await dialog.getByRole('combobox', { name: 'Agent', exact: true }).selectOption('codex');
@@ -94,15 +96,15 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Response ended');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
-    await dialog.getByRole('button', { name: 'End agent mode', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Pause status reporting', exact: true }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Agent');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Status paused');
     await expect(panes).toHaveCount(2);
     await win.getByRole('button', { name: 'Agent overview', exact: true }).click();
     await expect(win.locator('.agent-overview-row')).toHaveCount(0);
     await win.getByRole('alertdialog').getByRole('button', { name: 'Close', exact: true }).click();
-    // Retired hook commands cannot put the removed pane back in the overview.
+    // Events continue while paused without restoring the overview entry.
     await postCodex('UserPromptSubmit');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Agent');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Status paused');
   } finally { await app.close(); }
 });

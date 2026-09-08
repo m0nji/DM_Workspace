@@ -3,6 +3,8 @@ export const AGENT_NAMES: Record<AgentProvider, string> = { claude: 'Claude Code
 export type AgentStatus = 'unknown' | 'working' | 'needs-input' | 'completed' | 'error';
 export interface AgentState {
   provider: AgentProvider;
+  paused?: boolean;
+  generation?: string;
   status: AgentStatus;
   sessionId: string | null;
   event: string;

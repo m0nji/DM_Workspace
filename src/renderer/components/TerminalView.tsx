@@ -12,7 +12,7 @@ import { getTheme } from '../../shared/themes';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
 import {
-  registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, refreshTerminalLayoutAfterCommit,
+  registerAgentEnd, unregisterAgentEnd, registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, refreshTerminalLayoutAfterCommit,
   registerTerminalFocus, unregisterTerminalFocus,
   registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh,
   registerTerminalInputTracking, unregisterTerminalInputTracking
@@ -555,6 +555,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // auch wenn sich cols/rows gar nicht geändert haben.
     let sentCols = 0;
     let sentRows = 0;
+    let agentRestartCwd: string | null = null;
     const spawnNow = (): void => {
       if (spawned || disposed) return;
       spawned = true;
@@ -585,7 +586,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         const rows = term.rows || 24;
         const agentStart = useStore.getState().pendingAgentStarts[paneId];
         if (agentStart) term.options.disableStdin = true;
-        await window.api.spawn({ paneId, cwd: agentStart?.cwd ?? cwd, cols, rows,
+        await window.api.spawn({ paneId, cwd: agentStart?.cwd ?? agentRestartCwd ?? cwd, cols, rows,
           ...(target ? { target } : {}), ...(agentStart ? { agent: agentStart.provider } : {}) });
         if (agentStart) useStore.getState().finishAgentStart(paneId);
         if (disposed || processEnded) return;
@@ -618,6 +619,22 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       spawned = false;
       spawnNow();
     };
+
+    let endingAgent = false;
+    registerAgentEnd(paneId, async (generation) => {
+      if (remote || disposed || endingAgent || processEnded) throw new Error('Terminal unavailable');
+      endingAgent = true;
+      try {
+        agentRestartCwd = useStore.getState().paneCwd[paneId] ?? cwd;
+        await window.api.endAgentSession(paneId, generation);
+        if (disposed) return;
+        // Keep the xterm instance and scrollback; replace only the ended PTY.
+        // Leaving alternate-screen mode can restore an old saved cursor.
+        // Move to the bottom before parking the entire viewport in scrollback.
+        term.write(STUCK_MODE_RESET + `\x1b[${term.rows};1H` + parkRestoredHistory(term.rows));
+        retryStartRef.current?.();
+      } finally { endingAgent = false; }
+    });
 
     // Spawnen erst, wenn die Panebreite stabil ist.
     //
@@ -748,6 +765,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       resizeScheduler.dispose();
       unregisterTerminalLayoutRefresh(paneId);
       unregisterTerminalInputTracking(paneId);
+      unregisterAgentEnd(paneId);
       autoTitleTracker.dispose();
       cancelAnimationFrame(pinRaf);
       // Rückwärts, damit die Reihenfolge das Spiegelbild des Aufbaus ist.

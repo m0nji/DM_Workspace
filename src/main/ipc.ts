@@ -225,6 +225,22 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
     agents.disconnect(paneId);
   });
+  handle('agent:reconnect', (_e, paneId: unknown) => {
+    if (!isNonEmptyString(paneId) || !localPty.sessionInfo(paneId)) throw new Error('Invalid local pane');
+    agents.reconnect(paneId);
+  });
+  handle('agent:end-session', async (_e, paneId: unknown, generation: unknown) => {
+    if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
+    const registration = agents.snapshot(paneId);
+    const session = localPty.sessionInfo(paneId);
+    if (!registration || !session || typeof generation !== 'string' || registration.generation !== generation || registration.event === 'shell') throw new Error('No active local agent');
+    await localPty.endSession(paneId, () => {
+      const current = agents.snapshot(paneId);
+      return current?.generation === generation && current.event !== 'shell';
+    });
+    // A different terminal must never lose its registration after an old exit.
+    if (!localPty.sessionInfo(paneId)) { agents.release(paneId); agents.rememberEnded(paneId, registration); }
+  });
   handle('agent:check-start', async (_e, paneId: unknown, provider: unknown, cwd: unknown) => {
     if (!isNonEmptyString(paneId) || (provider !== 'claude' && provider !== 'codex' && provider !== 'opencode')) throw new Error('Invalid agent start');
     const session = localPty.sessionInfo(paneId);

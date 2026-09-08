@@ -1,3 +1,4 @@
+import { terminateProcessTree } from './terminate-process-tree';
 import { randomBytes } from 'node:crypto';
 import * as pty from 'node-pty';
 import { killAndWait } from './pty-shutdown';
@@ -213,6 +214,19 @@ export class PtyManager implements TerminalBackend {
     if (last && last.cols === cols && last.rows === rows) return;
     this.dims.set(paneId, { cols, rows });
     this.procs.get(paneId)?.resize(cols, rows);
+  }
+
+  async endSession(paneId: string, stillAgent: () => boolean): Promise<void> {
+    const proc = this.procs.get(paneId);
+    if (!proc) throw new Error('No local terminal');
+    let exited = false;
+    const sub = proc.onExit(() => { exited = true; });
+    try {
+      await terminateProcessTree(proc.pid, () => this.procs.get(paneId) === proc && stillAgent());
+      const deadline = Date.now() + 3000;
+      while (!exited && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+      if (!exited) throw new Error('Terminal has not exited');
+    } finally { sub.dispose(); }
   }
 
   kill(paneId: string): void {

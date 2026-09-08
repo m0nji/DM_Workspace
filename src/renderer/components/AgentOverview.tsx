@@ -1,3 +1,4 @@
+import { agentLabelKey, agentNeedsAttention } from '../../shared/agent-presentation';
 import { AGENT_NAMES } from '../../shared/agent-state';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -15,8 +16,9 @@ export function AgentOverview(): React.JSX.Element {
   const states = useStore(s => s.agentStates);
   const titles = useStore(s => s.paneAutoTitles);
   const cwd = useStore(s => s.paneCwd);
+  const shell = useStore(s => s.paneShell);
   const rows = agentOverview(workspaces, states);
-  const attention = rows.filter(row => row.state.status === 'needs-input' || row.state.status === 'error').length;
+  const attention = rows.filter(row => agentNeedsAttention(row.state)).length;
   const close = (): void => setOpen(false);
   return <>
     <button type="button" className={`icon-btn agent-overview-trigger ${attention ? 'has-attention' : ''}`}
@@ -36,7 +38,7 @@ export function AgentOverview(): React.JSX.Element {
             }}>
             <span className="agent-overview-name">{paneDisplayName(workspace.paneTitles?.[paneId] || titles[paneId] || '', cwd[paneId] ?? workspace.cwd) || t('palette.paneNumber', { number: position })}</span>
             <span>{workspace.name} · {t('palette.paneNumber', { number: position })}</span>
-            <span className="agent-overview-state">{AGENT_NAMES[state.provider]} · {t(`agent.state.${state.status}`)}</span>
+            <span className="agent-overview-state">{AGENT_NAMES[state.provider]} · {t(agentLabelKey(state, shell[paneId]))}</span>
             <span>{t('agent.overview.reported', { time: new Date(state.updatedAt).toLocaleTimeString() })}</span>
           </button>)}
         </span>

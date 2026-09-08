@@ -39,11 +39,41 @@
       "unsupported-shell": "Direct start supports zsh, bash, sh and PowerShell. Open a terminal using one of these shells.",
       "check-failed": "Could not check the installation. Wait for the terminal to start and try again. If this persists, check your shell startup profile."
     },
-    "stop": "End agent mode",
-    "stopHint": "Removes this pane from the agent overview and disconnects status reporting. The terminal and any running agent stay open.",
+    "stop": "Pause status reporting",
+    "stopHint": "Pauses the status display and hides this session from the overview. The CLI and receipt of its status reports continue. You can reconnect this same session afterwards.",
+    "runningWithoutStatus": "A program without reconnectable status reporting is running in this pane. Exit it in the terminal first. Once the normal shell prompt returns, you can start a new agent session here.",
     "stopError": "Could not disconnect status reporting. Please try again.",
     "opencodeHint": "Starts OpenCode in this pane. OpenCode must be installed in your shell. Live status reporting is not available yet; the overview shows Unknown.",
-    "details": "About status reporting"
+    "details": "About status reporting",
+    "phase": {
+      "ready": "Start prepared",
+      "waiting": "Waiting for status",
+      "paused": "Status paused",
+      "ended": "Session ended",
+      "ending": "Session ending",
+      "unsupported": "No live status",
+      "interrupted": "Interrupted"
+    },
+    "hint": {
+      "ready": "Startup is prepared. The CLI has not been started yet.",
+      "waiting": "The CLI has started, but no status report has arrived. Check the agent hooks and submit your first task there. Only a received report confirms status reporting.",
+      "live": "Status reports have been received. Enter responses and approvals in the terminal. The display shows the last reported event.",
+      "paused": "The CLI keeps running. Its status reports are still received in the background, while this session is hidden from the overview. Reconnect restores the display for this same session.",
+      "ended": "The agent session has ended and is no longer in the active overview. You can start a new session in this same pane.",
+      "ending": "The agent reported that its session is ending. Wait for the shell to become ready.",
+      "unsupported": "OpenCode has no live status adapter. DM Workspace can start and end the process, but cannot report work, questions or response completion.",
+      "interrupted": "The session was interrupted. A new status report is needed to tell whether the agent is working again."
+    },
+    "reconnect": "Reconnect",
+    "reconnectError": "Status reporting could not be reconnected. The session may have ended.",
+    "end": "End agent session",
+    "endTitle": "End this agent session?",
+    "endConfirm": "Immediately terminates the agent, its child processes and the shell in this pane. Running work is interrupted and unsaved state may be lost. A fresh shell then starts in the current folder. The pane and terminal history stay; shell variables and background programs in this session do not.",
+    "ending": "Ending session …",
+    "endError": "The session could not be fully ended or restarted. Check the terminal before trying again.",
+    "restart": "Restart",
+    "approvalUnknown": "The last approval event does not confirm that user input is needed. A subsequent status report will clarify the state.",
+    "evidenceUnknown": "The last event does not establish a definite work state."
   },
   "common": {
     "close": "Close",

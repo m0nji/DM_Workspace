@@ -19,6 +19,7 @@ export class AgentStatusBridge {
   private server: Server | null = null;
   private starting: Promise<number> | null = null;
   private closed = false;
+  private endedStates = new Map<string, AgentState>();
   private registrations = new Map<string, Registration>();
   private byToken = new Map<string, Registration>();
   constructor(private readonly dir: string, private readonly send: (event: AgentStateEvent) => void) {}
@@ -57,6 +58,11 @@ export class AgentStatusBridge {
     const port = provider === 'opencode' ? 0 : await this.listen();
     if (this.closed) throw new Error('Agent bridge is closed');
     const existing = this.registrations.get(paneId);
+    if (existing?.state.provider === provider && existing.state.event === 'shell') {
+      existing.state.paused = false;
+      existing.state.generation = randomBytes(16).toString('hex');
+      this.update(existing, 'unknown', 'setup', null);
+    }
     if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand, inputPrefix };
     if (existing) {
       if (existing.state.sessionId) throw new Error('End the active agent session before switching providers');
@@ -84,18 +90,19 @@ export class AgentStatusBridge {
       : `. '${startQuoted}'`;
     const registration: Registration = {
       paneId, token, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
-      state: { provider, status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
+      state: { provider, generation: randomBytes(16).toString('hex'), status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
     };
+    this.endedStates.delete(paneId);
     this.registrations.set(paneId, registration);
     this.byToken.set(token, registration);
     this.send({ paneId, state: registration.state });
     return { command: registration.command, launchCommand: registration.launchCommand, settingsPath, inputPrefix };
   }
 
-  snapshot(paneId: string): AgentState | null { return this.registrations.get(paneId)?.state ?? null; }
+  snapshot(paneId: string): AgentState | null { return this.registrations.get(paneId)?.state ?? this.endedStates.get(paneId) ?? null; }
 
   private update(r: Registration, status: AgentState['status'], event: string, sessionId = r.state.sessionId): void {
-    r.state = { provider: r.state.provider, status, event, sessionId, updatedAt: Date.now() };
+    r.state = { ...r.state, status, event, sessionId, updatedAt: Date.now() };
     this.send({ paneId: r.paneId, state: r.state });
   }
   interrupt(paneId: string): void {
@@ -112,15 +119,26 @@ export class AgentStatusBridge {
   disconnect(paneId: string): void {
     const r = this.registrations.get(paneId);
     if (!r) return;
-    this.registrations.delete(paneId);
-    this.byToken.delete(r.token);
-    // A live Codex process still calls its hook script. Keep detached artifacts
-    // until app shutdown; their revoked token can no longer report any status.
-    this.send({ paneId, state: null });
+    r.state = { ...r.state, paused: true };
+    this.send({ paneId, state: r.state });
+  }
+  reconnect(paneId: string): void {
+    const r = this.registrations.get(paneId);
+    if (!r || !r.state.paused || ['shell', 'SessionEnd'].includes(r.state.event)) throw new Error('No paused live registration');
+    r.state = { ...r.state, paused: false };
+    // Replay the last observed state, preserving its actual report timestamp.
+    this.send({ paneId, state: r.state });
+  }
+  rememberEnded(paneId: string, previous: AgentState): void {
+    if (this.registrations.has(paneId)) return;
+    const state: AgentState = { ...previous, paused: false, status: 'unknown', sessionId: null, event: 'shell', updatedAt: Date.now() };
+    this.endedStates.set(paneId, state);
+    this.send({ paneId, state });
   }
   release(paneId: string): void {
+    const hadEnded = this.endedStates.delete(paneId);
     const r = this.registrations.get(paneId);
-    if (!r) return;
+    if (!r) { if (hadEnded) this.send({ paneId, state: null }); return; }
     this.registrations.delete(paneId);
     this.byToken.delete(r.token);
     rmSync(r.settingsPath, { force: true });
@@ -129,6 +147,7 @@ export class AgentStatusBridge {
   }
   async close(): Promise<void> {
     this.closed = true;
+    this.endedStates.clear();
     for (const id of this.registrations.keys()) this.release(id);
     if (this.starting) await this.starting.catch(() => undefined);
     const server = this.server;

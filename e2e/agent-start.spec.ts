@@ -1,5 +1,5 @@
 import { test, expect, _electron as electron } from '@playwright/test';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync, copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -44,8 +44,10 @@ for (const provider of ['claude', 'codex', 'opencode'] as const) {
     const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-start-'));
     const project = join(dir, "project with 'quotes'");
     mkdirSync(project);
-    const testShell = join(dir, 'sh');
-    if (process.platform !== 'win32') writeFileSync(testShell, `#!/bin/sh\nexport PATH='${dir}:/usr/bin:/bin'\nexec /bin/bash --noprofile --norc "$@"\n`, { mode: 0o700 });
+    const useZsh = process.platform === 'darwin' && provider === 'codex';
+    if (useZsh) writeFileSync(join(dir, '.zshrc'), `export PATH='${dir}:/usr/bin:/bin'\n`);
+    const testShell = useZsh ? '/bin/zsh' : join(dir, 'sh');
+    if (!useZsh && process.platform !== 'win32') writeFileSync(testShell, `#!/bin/sh\nexport PATH='${dir}:/usr/bin:/bin'\nexec /bin/bash --noprofile --norc "$@"\n`, { mode: 0o700 });
     if (process.platform === 'win32') copyFileSync(process.execPath, join(dir, 'node.exe'));
     else symlinkSync(process.execPath, join(dir, 'node'));
     const fixture = join(dir, process.platform === 'win32' ? 'agent-fixture.cjs' : provider);
@@ -53,18 +55,25 @@ for (const provider of ['claude', 'codex', 'opencode'] as const) {
 const fs = require('node:fs');
 const cp = require('node:child_process');
 (async () => {
+  while (!fs.existsSync(${JSON.stringify(join(dir, 'allow-report'))})) await new Promise(resolve => setTimeout(resolve, 20));
   if (${JSON.stringify(provider)} === 'claude') {
     const settings = JSON.parse(fs.readFileSync(process.argv[process.argv.indexOf('--settings') + 1], 'utf8'));
     const hook = settings.hooks.UserPromptSubmit[0].hooks[0];
-    const res = await fetch(hook.url, { method: 'POST', headers: { ...hook.headers, 'Content-Type': 'application/json', 'X-DMWS-Terminal': process.env.DMWS_AGENT_NONCE }, body: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start' }) });
+    const res = await fetch(hook.url, { method: 'POST', headers: { ...hook.headers, 'Content-Type': 'application/json', 'X-DMWS-Terminal': process.env.DMWS_AGENT_NONCE }, body: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start-' + process.pid }) });
     if (!res.ok) process.exit(7);
   } else if (${JSON.stringify(provider)} === 'codex') {
     const config = process.argv[process.argv.indexOf('-c') + 1];
     if (process.argv.length !== 4 || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
     const encoded = config.match(/Buffer.from\\('([^']+)'/)[1];
     const path = Buffer.from(encoded, 'base64').toString();
-    const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start', turn_id: 'turn-1' }) });
+    const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start-' + process.pid, turn_id: 'turn-' + process.pid }) });
     if (child.status !== 0) process.exit(8);
+  }
+  fs.writeFileSync(${JSON.stringify(join(dir, 'agent-pid'))}, String(process.pid));
+  if (fs.existsSync(${JSON.stringify(join(dir, 'spawn-child'))})) {
+    const child = cp.spawn(process.execPath, ['-e', 'process.title = "dmws-e2e-agent-child"; setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    fs.writeFileSync(${JSON.stringify(join(dir, 'child-pid'))}, String(child.pid));
+    process.on('exit', () => { try { child.kill(); } catch {} });
   }
   console.log('AGENT_STARTED_IN=' + process.cwd());
   setInterval(() => { if (fs.existsSync(${JSON.stringify(join(dir, 'stop'))})) process.exit(0); }, 50);
@@ -73,7 +82,7 @@ const cp = require('node:child_process');
     if (process.platform === 'win32') writeFileSync(join(dir, `${provider}.cmd`), `@"${process.execPath}" "${fixture}" %*\r\n`);
     if (process.platform === 'win32' && provider === 'codex') writeFileSync(join(dir, 'codex.ps1'), "throw 'The native Codex shim should be selected'\r\n");
     const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env,
-      ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin` }), DMWS_E2E: '1' } });
+      ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin`, ...(useZsh ? { ZDOTDIR: dir } : {}) }), DMWS_E2E: '1' } });
     try {
       const win = await app.firstWindow();
       await expect(win.locator('.welcome')).toBeVisible();
@@ -105,13 +114,73 @@ const cp = require('node:child_process');
         return await dialog.innerText();
       }).toBe('started');
       await expect(win.locator('.pane-agent-status')).toHaveCount(1);
+      await expect(original.locator('.pane-agent-status')).toContainText(provider === 'opencode' ? 'No live status' : 'Waiting for status');
+      writeFileSync(join(dir, 'allow-report'), '');
       const buffers = () => win.evaluate(() => Object.fromEntries([...((window as unknown as { __bufferText: Map<string, () => string> }).__bufferText)].map(([id, read]) => [id, read()])));
       await expect.poll(async () => (await buffers()).original.replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);
-      await expect(win.locator('.pane-agent-status').filter({ hasText: `${provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode'} · ${provider === 'opencode' ? 'Unknown' : 'Working'}` })).toHaveCount(1);
+      await expect(win.locator('.pane-agent-status').filter({ hasText: `${provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode'} · ${provider === 'opencode' ? 'No live status' : 'Working'}` })).toHaveCount(1);
       expect((await buffers()).original).not.toContain('unfinished-input: command not found');
       await expect(original.locator('.pane-label.automatic')).toHaveText(provider);
       await expect(original.getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}-running.png`) });
+      // A completed CLI must leave this same pane ready for another launch.
+      writeFileSync(join(dir, 'stop'), '');
+      await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.original)).toBe('atPrompt');
+      await expect.poll(() => win.evaluate(() => window.__store.getState().agentStates.original?.sessionId ?? null)).toBe(null);
+      rmSync(join(dir, 'stop'));
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Restart', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect.poll(async () => ((await buffers()).original.match(/AGENT_STARTED_IN=/g) ?? []).length).toBe(2);
+      await original.getByRole('textbox', { name: 'Terminal input' }).press('Control+c');
+      await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.original)).toBe('atPrompt');
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Restart', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect.poll(async () => ((await buffers()).original.match(/AGENT_STARTED_IN=/g) ?? []).length).toBe(3);
+      // Pause/reconnect keeps exactly the same CLI process and generation.
+      const pid = Number(readFileSync(join(dir, 'agent-pid'), 'utf8'));
+      const generation = await win.evaluate(() => window.__store.getState().agentStates.original.generation);
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Pause status reporting', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(original.locator('.pane-agent-status')).toContainText('Status paused');
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await expect(dialog).toContainText('same session');
+      await dialog.getByRole('button', { name: 'Reconnect', exact: true }).click();
+      await expect(original.locator('.pane-agent-status')).toContainText(provider === 'opencode' ? 'No live status' : 'Working');
+      expect(Number(readFileSync(join(dir, 'agent-pid'), 'utf8'))).toBe(pid);
+      expect(await win.evaluate(() => window.__store.getState().agentStates.original.generation)).toBe(generation);
+      // Cancellation cannot terminate the session. Confirming must kill the CLI.
+      await dialog.getByRole('button', { name: 'End agent session', exact: true }).click();
+      await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      expect(() => process.kill(pid, 0)).not.toThrow();
+      await dialog.getByRole('button', { name: 'End agent session', exact: true }).click();
+      await dialog.getByRole('button', { name: 'End agent session', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.original)).toBe('atPrompt');
+      await expect.poll(() => { try { process.kill(pid, 0); return true; } catch { return false; } }).toBe(false);
+      await expect(win.locator('.pane')).toHaveCount(1);
+      expect(realpathSync.native(await win.evaluate(() => window.__store.getState().paneCwd.original))).toBe(realpathSync.native(project));
+      expect(((await buffers()).original.replace(/\n/g, '').match(/AGENT_STARTED_IN=/g) ?? []).length).toBe(3);
+      await expect(original.locator('.pane-agent-status')).toContainText('Session ended');
+      // A stale end request from the previous session cannot kill a later one.
+      writeFileSync(join(dir, 'spawn-child'), '');
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Restart', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect.poll(async () => ((await buffers()).original.replace(/\n/g, '').match(/AGENT_STARTED_IN=/g) ?? []).length).toBe(4);
+      const childPid = Number(readFileSync(join(dir, 'child-pid'), 'utf8'));
+      expect(await win.evaluate(async generation => { try { await window.api.endAgentSession('original', generation!); return 'ended'; } catch { return 'rejected'; } }, generation)).toBe('rejected');
+      expect(() => process.kill(childPid, 0)).not.toThrow();
+      await original.getByRole('button', { name: 'Agent status', exact: true }).click();
+      await dialog.getByRole('button', { name: 'End agent session', exact: true }).click();
+      await dialog.getByRole('button', { name: 'End agent session', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect.poll(() => { try { process.kill(childPid, 0); return true; } catch { return false; } }).toBe(false);
+      await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.original)).toBe('atPrompt');
+
     } finally {
       // Stop our stand-in explicitly. On Linux a PTY child can retain inherited
       // descriptors after Electron exits, which Playwright waits to close.

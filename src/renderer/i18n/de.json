@@ -39,11 +39,41 @@
       "unsupported-shell": "Der direkte Start unterstützt zsh, bash, sh und PowerShell. Öffne ein Terminal mit einer dieser Shells.",
       "check-failed": "Die Installation konnte nicht geprüft werden. Warte, bis das Terminal gestartet ist, und versuche es erneut. Prüfe bei erneutem Fehler auch das Shell-Startprofil."
     },
-    "stop": "Agentenmodus beenden",
-    "stopHint": "Entfernt diese Pane aus der Agentenübersicht und beendet die Statusanbindung. Das Terminal und ein eventuell laufender Agent bleiben geöffnet.",
+    "stop": "Statusanzeige pausieren",
+    "stopHint": "Pausiert die Statusanzeige und blendet die Sitzung aus der Übersicht aus. Die CLI und der Empfang ihrer Statusmeldungen laufen weiter. Du kannst dieselbe Sitzung anschließend wieder verbinden.",
+    "runningWithoutStatus": "In dieser Pane läuft ein Programm ohne wiederverbindbare Statusanbindung. Beende es zuerst im Terminal. Sobald der normale Shell-Prompt erscheint, kannst du hier eine neue Agentensitzung starten.",
     "stopError": "Die Statusanbindung konnte nicht beendet werden. Bitte erneut versuchen.",
     "opencodeHint": "Startet OpenCode in dieser Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Unbekannt“.",
-    "details": "Hinweise zum Status"
+    "details": "Hinweise zum Status",
+    "phase": {
+      "ready": "Start vorbereitet",
+      "waiting": "Warte auf Statusmeldung",
+      "paused": "Status pausiert",
+      "ended": "Sitzung beendet",
+      "ending": "Sitzung wird beendet",
+      "unsupported": "Kein Live-Status",
+      "interrupted": "Unterbrochen"
+    },
+    "hint": {
+      "ready": "Der Start ist vorbereitet. Die CLI wurde noch nicht gestartet.",
+      "waiting": "Die CLI wurde gestartet, aber es ist noch keine Statusmeldung eingegangen. Prüfe die Hooks im Agenten und sende dort deinen ersten Auftrag. Erst eine empfangene Meldung bestätigt die Statusanbindung.",
+      "live": "Statusmeldungen wurden empfangen. Eingaben und Freigaben erfolgen im Terminal. Angezeigt wird das zuletzt gemeldete Ereignis.",
+      "paused": "Die CLI läuft weiter. Ihre Statusmeldungen werden im Hintergrund weiter empfangen; diese Sitzung ist aus der Übersicht ausgeblendet. Mit „Wiederverbinden“ schaltest du die Anzeige für dieselbe Sitzung wieder ein.",
+      "ended": "Die Agentensitzung ist beendet und aus der aktiven Übersicht entfernt. Du kannst in derselben Pane eine neue Sitzung starten.",
+      "ending": "Der Agent hat sein Sitzungsende gemeldet. Warte, bis die Shell wieder bereit ist.",
+      "unsupported": "OpenCode läuft ohne Live-Statusadapter. DM Workspace kann den Prozess starten und beenden, aber weder Arbeit noch Rückfragen oder Antwortende anzeigen.",
+      "interrupted": "Die Sitzung wurde unterbrochen. Ob der Agent weiterarbeitet, ist erst nach einer neuen Statusmeldung bekannt."
+    },
+    "reconnect": "Wiederverbinden",
+    "reconnectError": "Die Statusanzeige konnte nicht wieder verbunden werden. Möglicherweise wurde die Sitzung inzwischen beendet.",
+    "end": "Agentensitzung beenden",
+    "endTitle": "Agentensitzung wirklich beenden?",
+    "endConfirm": "Beendet den Agenten, seine untergeordneten Prozesse und die Shell dieser Pane sofort. Laufende Arbeit wird abgebrochen; nicht gespeicherter Zustand kann verloren gehen. Danach startet eine frische Shell im aktuellen Ordner. Pane und Terminalverlauf bleiben erhalten, Shell-Variablen und Hintergrundprogramme dieser Sitzung nicht.",
+    "ending": "Sitzung wird beendet …",
+    "endError": "Die Sitzung konnte nicht vollständig beendet oder neu gestartet werden. Prüfe das Terminal, bevor du es erneut versuchst.",
+    "restart": "Neu starten",
+    "approvalUnknown": "Das letzte Freigabeereignis belegt nicht, dass eine Eingabe erforderlich ist. Eine weitere Statusmeldung klärt den Zustand.",
+    "evidenceUnknown": "Das letzte Ereignis liefert keinen eindeutigen Arbeitszustand."
   },
   "common": {
     "close": "Schließen",

@@ -92,19 +92,35 @@ HTTP hooks and `PostToolBatch` (verified with 2.1.251).
 
 **OpenCode** starts its normal [CLI interface](https://opencode.ai/docs/cli/).
 Its live status adapter is not implemented yet, so its badge and overview entry
-stay **Unknown**. No working/completed status is inferred from terminal output.
+show **No live status**. No working/completed status is inferred from terminal output.
 
-Choose **End agent mode** in an attached pane's Agent dialog to remove it from
-the overview and disconnect status reporting. This also works after the CLI has
-already exited. The terminal and any still-running agent stay open. Revoked
-hooks cannot add the entry back; their temporary files survive until app exit
-so a running CLI does not encounter missing hook scripts.
+The badge distinguishes **Waiting for status** (CLI started, no report yet),
+confirmed work events, **Interrupted**, **Status paused**, **Session ending** and
+**Session ended**. OpenCode explicitly shows **No live status**. A successful
+launch alone does not establish a working status connection. Ended and paused
+sessions are excluded from the active overview and its attention count.
+
+Choose **Pause status reporting** to hide a session from the overview while the
+CLI and receipt of its status events continue. **Reconnect** restores the same
+session and its latest observed state, without restarting the CLI. This applies
+to sessions set up by DM Workspace; arbitrary pre-existing or resumed CLIs cannot
+be attached retroactively. The registration lasts until the terminal or app ends.
+
+**End agent session** is a separate confirmed action. It immediately terminates
+the local shell and the agent process tree, then starts a fresh shell in the
+current directory. The pane, layout and scrollback are preserved; shell variables,
+background programs and unsaved in-memory work are not. Cancel is focused first.
+A failed termination shows an error. Remote sessions are not controlled by this
+local action. On POSIX, descendant processes are identified from an OS process
+snapshot; already reparented/detached work is outside that tree. Windows uses
+`taskkill /T /F` on the owned shell process.
 
 The badge shows the last explicit event: **Working**, **Needs input**, **Response
 ended**, **Error**, or **Unknown**. Output silence never completes an agent turn.
 “Response ended” means the agent finished responding, not that its changes passed
-verification. Missing or policy-blocked hooks leave the badge unknown or at its
-last reported state; hover to see the report time.
+verification. Missing or policy-blocked hooks leave the badge at **Waiting for status** before
+the first report, or at its last reported state afterwards; hover to see the
+report time.
 
 This first integration supports new local sessions from their first submitted
 prompt. Existing, remote and `/resume` sessions are not supported yet. The

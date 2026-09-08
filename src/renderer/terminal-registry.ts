@@ -62,3 +62,12 @@ export function unregisterTerminalInputTracking(paneId: string): void {
 export function trackTerminalInput(paneId: string, data: string): void {
   inputTrackingRegistry.get(paneId)?.(data);
 }
+
+const agentEndRegistry = new Map<string, (generation: string) => Promise<void>>();
+export function registerAgentEnd(paneId: string, end: (generation: string) => Promise<void>): void { agentEndRegistry.set(paneId, end); }
+export function unregisterAgentEnd(paneId: string): void { agentEndRegistry.delete(paneId); }
+export async function endAgentSession(paneId: string, generation: string): Promise<void> {
+  const end = agentEndRegistry.get(paneId);
+  if (!end) throw new Error('Terminal unavailable');
+  await end(generation);
+}
