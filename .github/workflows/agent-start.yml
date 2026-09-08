@@ -38,7 +38,8 @@ jobs:
         run: npm run build
       - name: Verify Windows agent startup
         if: runner.os == 'Windows'
-        run: npx playwright test e2e/agent-start.spec.ts --workers=1
+        shell: bash
+        run: npx playwright test e2e/agent-start.spec.ts --workers=1 --repeat-each=3
       - name: Verify Linux agent startup
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts --workers=1

@@ -89,6 +89,8 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     if (process.platform === 'win32' && provider === 'codex') writeFileSync(join(dir, 'codex.ps1'), "throw 'The native Codex shim should be selected'\r\n");
     const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env,
       ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin`, ...(useZsh ? { ZDOTDIR: dir } : {}) }), DMWS_E2E: '1' } });
+    let mainErrors = '';
+    app.process().stderr?.on('data', chunk => { mainErrors = (mainErrors + chunk.toString()).slice(-16000); });
     try {
       const win = await app.firstWindow();
       await expect(win.locator('.welcome')).toBeVisible();
@@ -189,6 +191,8 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
 
     } catch (error) {
       const win = await app.firstWindow();
+      console.error('Agent main-process errors:', mainErrors);
+      console.error('Agent dialog at failure:', await win.getByRole('alertdialog').allTextContents());
       console.error('Agent terminal at failure:', await win.evaluate(() => (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText.get('original')?.()));
       throw error;
     } finally {
