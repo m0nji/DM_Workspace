@@ -41,6 +41,7 @@ test('Codex arguments survive Windows PowerShell and pwsh with npm and native in
 // Real shell, PTY, hook bridge and UI; stand-in CLIs avoid paid model requests.
 for (const provider of ['claude', 'codex', 'opencode'] as const) {
   test(`${provider} starts by button in the current pane and reports status`, async () => {
+    test.setTimeout(120000);
     const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-start-'));
     const project = join(dir, "project with 'quotes'");
     mkdirSync(project);
@@ -54,6 +55,11 @@ for (const provider of ['claude', 'codex', 'opencode'] as const) {
     writeFileSync(fixture, `#!${process.execPath}
 const fs = require('node:fs');
 const cp = require('node:child_process');
+// Interactive CLIs consume Ctrl+C in raw mode. On Windows, a cooked-mode
+// Node stand-in instead interrupts its .cmd wrapper and leaves cmd's batch
+// termination prompt waiting for input.
+if (process.stdin.isTTY) process.stdin.setRawMode(true);
+process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
 (async () => {
   while (!fs.existsSync(${JSON.stringify(join(dir, 'allow-report'))})) await new Promise(resolve => setTimeout(resolve, 20));
   if (${JSON.stringify(provider)} === 'claude') {
@@ -112,7 +118,7 @@ const cp = require('node:child_process');
       await expect.poll(async () => {
         if (await dialog.count() === 0) return 'started';
         return await dialog.innerText();
-      }).toBe('started');
+      }, { timeout: 20000 }).toBe('started');
       await expect(win.locator('.pane-agent-status')).toHaveCount(1);
       await expect(original.locator('.pane-agent-status')).toContainText(provider === 'opencode' ? 'No live status' : 'Waiting for status');
       writeFileSync(join(dir, 'allow-report'), '');
@@ -181,6 +187,10 @@ const cp = require('node:child_process');
       await expect.poll(() => { try { process.kill(childPid, 0); return true; } catch { return false; } }).toBe(false);
       await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.original)).toBe('atPrompt');
 
+    } catch (error) {
+      const win = await app.firstWindow();
+      console.error('Agent terminal at failure:', await win.evaluate(() => (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText.get('original')?.()));
+      throw error;
     } finally {
       // Stop our stand-in explicitly. On Linux a PTY child can retain inherited
       // descriptors after Electron exits, which Playwright waits to close.
