@@ -4,7 +4,8 @@ import { createResizeScheduler } from '../src/renderer/resize-scheduler';
 function harness(
   fitResult: () => boolean = () => true,
   getWidth?: () => number,
-  maxFitRetries?: number
+  maxFitRetries?: number,
+  deferAll = false
 ) {
   let fits = 0;
   let resizes = 0;
@@ -17,6 +18,7 @@ function harness(
     fit: () => { fits++; return fitResult(); },
     sendResize: () => { resizes++; },
     getWidth,
+    deferAll,
     raf: (fn) => { rafCalls++; rafCb = fn; return 1; },
     caf: () => { rafCb = null; },
     setTimer: (fn) => { const id = nextTimer++; timers.set(id, fn); return id; },
@@ -129,7 +131,7 @@ describe('resize-scheduler', () => {
 // Codex) repaints via cursor-up over rows whose wrapping just changed, so every
 // intermediate width leaves a generation of garbled rows behind. The scheduler
 // therefore defers the fit until the width settles and sends the pty resize in
-// the same tick, so the app and xterm agree on the new width atomically.
+// the same tick, minimizing the mismatch before the process handles the resize.
 describe('resize-scheduler width settle', () => {
   it('fits live while the width is stable (height-only resize)', () => {
     const width = 400;
@@ -160,7 +162,7 @@ describe('resize-scheduler width settle', () => {
     expect(h.fits()).toBe(1); // still dragging -> still deferred
     h.fireAllTimers(); // settle
     expect(h.fits()).toBe(2); // one fit at the final width
-    expect(h.resizes()).toBeGreaterThanOrEqual(1); // pty resized with it
+    expect(h.resizes()).toBe(1); // no stale height resize before the settled fit
   });
 
   it('does not send the pty resize when the deferred fit fails', () => {
@@ -199,6 +201,46 @@ describe('resize-scheduler width settle', () => {
 // the new size while the pty keeps the old one, and nothing ever reconciles
 // them - the desync this whole module exists to prevent.
 describe('resize-scheduler fit retry', () => {
+  it('cancels a failed-fit retry when a width drag takes over', () => {
+    let width = 400;
+    let ok = false;
+    const h = harness(() => ok, () => width);
+    h.sched.flush();
+    ok = true;
+    width = 300;
+    h.sched.onResize();
+    h.fireRaf();
+    h.fireAllTimers();
+    expect(h.fits()).toBe(2);
+    expect(h.resizes()).toBe(1);
+  });
+
+  it('cancels width settling when a drag returns to the fitted width', () => {
+    let width = 400;
+    const h = harness(() => true, () => width);
+    h.sched.flush();
+    width = 300;
+    h.sched.onResize(); h.fireRaf();
+    width = 400;
+    h.sched.onResize(); h.fireRaf();
+    h.fireAllTimers();
+    expect(h.fits()).toBe(2);
+    expect(h.resizes()).toBe(2);
+  });
+
+  it('settles height and width together for ConPTY without an intermediate fit', () => {
+    const h = harness(() => true, () => 400, undefined, true);
+    h.sched.flush();
+    for (let i = 0; i < 5; i++) {
+      h.sched.onResize(); h.fireRaf();
+    }
+    expect(h.fits()).toBe(1);
+    expect(h.resizes()).toBe(1);
+    h.fireAllTimers();
+    expect(h.fits()).toBe(2);
+    expect(h.resizes()).toBe(2);
+  });
+
   it('re-arms after a failed fit and sends the resize once the fit succeeds', () => {
     let fitOk = false;
     const h = harness(() => fitOk);

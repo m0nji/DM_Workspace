@@ -1,6 +1,7 @@
 import { terminateProcessTree } from './terminate-process-tree';
 import { randomBytes } from 'node:crypto';
 import * as pty from 'node-pty';
+import { createConptyFrameBuffer } from './conpty-frame-buffer';
 import { killAndWait } from './pty-shutdown';
 import { existsSync, accessSync, constants, statSync } from 'fs';
 import { resolveCwd } from './resolve-cwd';
@@ -174,10 +175,16 @@ export class PtyManager implements TerminalBackend {
       cwd,
       env: { ...cwdHookEnv(shell), DMWS_AGENT_NONCE: nonce }
     });
-    proc.onData((data) => {
+    const sendData = (data: string): void => {
       if (this.procs.get(paneId) === proc) this.dataListeners.forEach((l) => l(paneId, data));
-    });
+    };
+    const frames = process.platform === 'win32' ? createConptyFrameBuffer(sendData) : null;
+    proc.onData((data) => frames ? frames.push(data) : sendData(data));
     proc.onExit(({ exitCode }) => {
+      // Deliver the final buffered bytes before the exit notification, and
+      // release timers even when a replacement has already reused this pane ID.
+      frames?.flush();
+      frames?.dispose();
       // A killed terminal can report its exit after a retry reused the pane ID.
       // Only the current process may clear the session or notify the renderer.
       if (this.procs.get(paneId) !== proc) return;

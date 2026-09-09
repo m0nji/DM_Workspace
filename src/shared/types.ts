@@ -580,6 +580,7 @@ export interface RendererApi {
   openExternal(url: string): void;
   // the host platform (for path-escaping decisions in the renderer)
   platform: NodeJS.Platform;
+  windowsBuild?: number;
   // e2e-only: keep xterm on the DOM renderer for tests that assert terminal text
   disableWebgl: boolean;
   // e2e-only: true when launched with DMWS_E2E=1, gates the window.__store hook

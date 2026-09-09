@@ -1,6 +1,7 @@
 import type { AgentState, AgentStateEvent } from '../shared/agent-state';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { promptNonceFromArgv } from '../shared/prompt-nonce';
+import { windowsBuildFromArgv } from '../shared/windows-pty';
 import type {
   RendererApi, PtySpawnRequest, PtyInputRequest, PtyResizeRequest,
   PtyDataEvent, PtyExitEvent, AppState, UpdateEvent, AgentDonePayload,
@@ -100,6 +101,7 @@ const api: RendererApi = {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
   platform: process.platform,
+  windowsBuild: windowsBuildFromArgv(process.argv),
   disableWebgl: process.env.DMWS_DISABLE_WEBGL === '1',
   isE2E: process.env.DMWS_E2E === '1',
   // Authenticates the local shell prompt marker; '' when absent, which makes

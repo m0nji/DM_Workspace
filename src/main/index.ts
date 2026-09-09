@@ -2,7 +2,8 @@ import { app, BrowserWindow, nativeTheme, screen } from 'electron';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
+import { tmpdir, release } from 'os';
+import { WINDOWS_BUILD_FLAG } from '../shared/windows-pty';
 import { registerIpc } from './ipc';
 import { isBoundsVisible } from './window-bounds';
 import { wireWindowShow } from './window-show';
@@ -140,7 +141,10 @@ function createWindow(): void {
       // shell hook's marker from one a program printed (see prompt-nonce.ts).
       // Passed as a launch argument because the preload runs sandboxed and
       // cannot import main-process modules.
-      additionalArguments: [`${PROMPT_NONCE_FLAG}${promptNonce()}`],
+      additionalArguments: [
+        `${PROMPT_NONCE_FLAG}${promptNonce()}`,
+        ...(isWin ? [`${WINDOWS_BUILD_FLAG}${release().split('.')[2]}`] : [])
+      ],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

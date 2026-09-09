@@ -14,8 +14,9 @@
 // keeps repainting via cursor-up over rows whose wrapping just changed — every
 // intermediate width leaves a generation of torn rows in the buffer. So while
 // the width is changing the fit itself is deferred; when it settles, the fit
-// and the pty resize run in the same tick, so xterm reflows exactly once and
-// the app immediately repaints at the width xterm actually has.
+// and the pty resize run in the same tick. xterm reflows once; the process can
+// then repaint at that width. Its output still arrives asynchronously.
+// ConPTY callers defer height changes too to avoid a 100 ms row mismatch.
 
 export interface ResizeSchedulerOptions {
   /** Perform the fit; return false when the fit could not run (skips the IPC, arms a retry). */
@@ -28,6 +29,8 @@ export interface ResizeSchedulerOptions {
    * resize fits live (height-only semantics).
    */
   getWidth?: () => number;
+  /** ConPTY repaints rows as well as columns; settle both dimensions together. */
+  deferAll?: boolean;
   raf?: (fn: () => void) => number;
   caf?: (handle: number) => void;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -95,8 +98,7 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
     }, debounceMs);
   };
 
-  // Fit and forward it to the pty in the same tick, so the two never disagree
-  // about the width.
+  // Send the size in the fit's tick. The process still repaints asynchronously.
   const fitAndSend = (): void => {
     lastWidth = opts.getWidth?.() ?? null;
     if (!opts.fit()) { armRetry(); return; }
@@ -113,11 +115,16 @@ export function createResizeScheduler(opts: ResizeSchedulerOptions): ResizeSched
         frame = null;
         if (disposed) return;
         const width = opts.getWidth?.() ?? null;
-        if (width !== null && lastWidth !== null && width !== lastWidth) {
+        // A new observation supersedes every earlier path, including retries.
+        // Otherwise a height timer can resize the PTY in the middle of a width
+        // drag, or a retry can fit an intermediate width before it has settled.
+        if (timer !== null) { clearTimer(timer); timer = null; }
+        if (settle !== null) { clearTimer(settle); settle = null; }
+        clearRetry();
+        if (opts.deferAll || (width !== null && lastWidth !== null && width !== lastWidth)) {
           // Width is changing (splitter drag / window resize): don't reflow at
           // this intermediate width. Re-arm the settle timer; the last event
           // wins and fits + resizes the pty together.
-          if (settle !== null) clearTimer(settle);
           settle = setTimer(() => {
             settle = null;
             if (!disposed) fitAndSend();

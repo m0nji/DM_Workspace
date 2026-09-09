@@ -48,3 +48,44 @@ test('terminal refits after a height-only pane resize via splitter drag', async 
 
   await app.close();
 });
+
+test('terminal settles rapid window narrowing and remains editable', async () => {
+  const app = await electron.launch({
+    args: ['out/main/index.js', '--lang=en-US'],
+    env: { ...process.env, DMWS_E2E: '1' }
+  });
+  try {
+    const win = await app.firstWindow();
+    await win.getByText('1 Pane', { exact: true }).click();
+    const host = win.locator('.xterm-host').first();
+    await expect(host.locator('.xterm-screen')).toBeVisible();
+    const input = host.locator('.xterm-helper-textarea');
+    const text = () => win.evaluate(() => {
+      const hooks = (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText;
+      return [...hooks.values()].map(read => read()).join('\n');
+    });
+    // A visible xterm precedes the async PTY spawn and shell integration.
+    await expect.poll(text).toMatch(/[>$#❯]/);
+    await input.focus();
+    await win.keyboard.type('RESIZE_INPUT_123', { delay: 30 });
+    await expect.poll(text).toContain('RESIZE_INPUT_123');
+    for (const [width, height] of [[1400, 900], [1100, 750], [900, 650], [800, 620], [1000, 700]]) {
+      await app.evaluate(({ BrowserWindow }, size) => {
+        BrowserWindow.getAllWindows()[0].setSize(size[0], size[1]);
+      }, [width, height]);
+      await win.waitForTimeout(25);
+    }
+    await expect.poll(() => host.evaluate(el => {
+      const screen = el.querySelector('.xterm-screen') as HTMLElement;
+      const wrap = el.parentElement!;
+      return screen.offsetWidth <= wrap.clientWidth && screen.offsetWidth > wrap.clientWidth - 40
+        && screen.offsetHeight <= wrap.clientHeight && screen.offsetHeight > wrap.clientHeight - 40;
+    })).toBe(true);
+    await input.focus();
+    await win.keyboard.press('End');
+    await win.keyboard.type('_EDITED');
+    await expect.poll(text).toContain('RESIZE_INPUT_123_EDITED');
+  } finally {
+    await app.close();
+  }
+});

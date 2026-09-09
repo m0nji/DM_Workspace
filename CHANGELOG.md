@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.17.6 – 2026-09-08
+- fix: Reduce brief cursor jumps during Codex output on Windows by combining closely spaced terminal repaint updates.
+- fix: Improve window narrowing and resizing on Windows by settling terminal dimensions together and canceling outdated resize callbacks. Enable xterm's ConPTY compatibility behavior for the detected Windows version.
+- note: Repeated resizing can still leave duplicated older lines in the scrollback. This update improves cursor and input stability but does not fully resolve that history-rendering issue.
+
 ## 0.17.5 – 2026-09-08
 - feat: Pause the agent status display and reconnect the same running session without restarting its CLI. Reports continue in the background, and paused sessions stay out of the active overview.
 - feat: End a local agent session through a separate confirmation. The shell and its agent process tree are terminated, then a fresh shell starts in the current folder while preserving the pane and scrollback.

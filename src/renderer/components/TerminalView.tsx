@@ -208,7 +208,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // der Effect hängt bewusst nur an paneId, und der Schlüssel bestimmt das
     // Ziel vollständig.
     const remote = parseRemotePaneKey(paneId);
+    const localWindows = !remote && window.api.platform === 'win32';
     const term = new Terminal({
+      // ConPTY keeps rows in scrollback on resize. xterm must use the same
+      // policy; keep modern Windows reflow enabled using the actual OS build.
+      ...(localWindows ? { windowsPty: { backend: 'conpty' as const, buildNumber: window.api.windowsBuild } } : {}),
       fontFamily: 'Menlo, "Cascadia Mono", monospace',
       fontSize: useStore.getState().settings.terminalFontSize ?? TERMINAL_FONT_SIZE_DEFAULT,
       allowTransparency: true,
@@ -707,6 +711,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // dragged), but debounce the pty:resize IPC so the shell gets one SIGWINCH
     // when the drag settles instead of a storm — see resize-scheduler.ts.
     const resizeScheduler = createResizeScheduler({
+      deferAll: localWindows,
       fit: () => {
         if (!safeFit()) return false;
         spawnOnce();
