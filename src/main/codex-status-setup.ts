@@ -32,5 +32,5 @@ process.stdin.on('end', () => {
   // The child scope restores the user's mode once Codex exits.
   // This config contains fixed syntax and a base64 path only (no % expansion).
   const windowsQuoted = config.replace(/(\\*)"/g, '$1$1\\"');
-  return { command: powershell ? `& { $PSNativeCommandArgumentPassing = 'Legacy'\n& (Get-Command codex -CommandType Application).Source --% -c "${windowsQuoted}"\n}` : `codex -c '${quoted}'`, script };
+  return { command: powershell ? `& { $PSNativeCommandArgumentPassing = 'Legacy'\n& (Get-Command codex -CommandType Application | Select-Object -First 1).Source --% -c "${windowsQuoted}"\n}` : `codex -c '${quoted}'`, script };
 }

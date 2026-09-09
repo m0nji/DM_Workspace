@@ -1,4 +1,5 @@
 import { test, expect, _electron as electron } from '@playwright/test';
+import { resolve } from 'node:path';
 
 // Regression: the host-height pin (black-bar fix) froze the ResizeObserver.
 // The observer watched .xterm-host, whose height is pinned to a fixed pixel
@@ -85,6 +86,50 @@ test('terminal settles rapid window narrowing and remains editable', async () =>
     await win.keyboard.press('End');
     await win.keyboard.type('_EDITED');
     await expect.poll(text).toContain('RESIZE_INPUT_123_EDITED');
+  } finally {
+    await app.close();
+  }
+});
+
+test('native terminal history survives repeated width and height changes exactly once', async () => {
+  const app = await electron.launch({
+    args: ['out/main/index.js', '--lang=en-US'],
+    env: { ...process.env, DMWS_E2E: '1' }
+  });
+  try {
+    const win = await app.firstWindow();
+    await win.getByText('1 Pane', { exact: true }).click();
+    const input = win.locator('.xterm-helper-textarea').first();
+    const text = () => win.evaluate(() => {
+      const hooks = (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText;
+      return [...hooks.values()].map(read => read()).join('\n');
+    });
+    await expect.poll(text).toMatch(/[>$#❯]/);
+    await input.focus();
+    await win.keyboard.type(`node "${resolve('e2e/fixtures/resize-history.cjs')}"`, { delay: 5 });
+    await win.keyboard.press('Enter');
+    await expect.poll(text).toContain('HISTORY_ROW_069');
+    for (const [width, height] of [[1400, 900], [800, 620], [1400, 900], [800, 900], [1400, 900], [1400, 620], [1400, 900]]) {
+      await app.evaluate(({ BrowserWindow }, size) => {
+        BrowserWindow.getAllWindows()[0].setSize(size[0], size[1]);
+      }, [width, height]);
+      // Include the deferred fit and the asynchronous native resize repaint.
+      await win.waitForTimeout(500);
+      const buffer = await text();
+      const ids = buffer.match(/HISTORY_ROW_\d{3}/g) ?? [];
+      expect(ids, `history at ${width}x${height}`).toEqual(
+        Array.from({ length: 70 }, (_,i) => `HISTORY_ROW_${String(i).padStart(3, '0')}`)
+      );
+      const unwrapped = buffer.replace(/\s/g, '');
+      for (const id of ids) expect(unwrapped).toContain(id + 'abcdefghij'.repeat(8));
+    }
+    await input.focus();
+    await win.keyboard.type('RESIZE_ECHO_OK');
+    await expect.poll(text).toContain('RESIZE_ECHO_OK');
+    await win.keyboard.press('Control+C');
+    await win.keyboard.type('echo SHELL_AFTER_RESIZE');
+    await win.keyboard.press('Enter');
+    await expect.poll(text).toMatch(/SHELL_AFTER_RESIZE[\r\n]+/);
   } finally {
     await app.close();
   }

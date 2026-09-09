@@ -23,6 +23,7 @@ import { collectPaneIds } from '../../shared/layout-tree';
 // Eigenständige Terminal-Belange: jedes Modul hält Auf- und Abbau beieinander
 // und gibt seinen Disposer zurück (siehe die Disposer-Liste im Mount-Effect).
 import { registerE2EHooks } from '../terminal/e2e-hooks';
+import { resizeConptyTerminal } from '../terminal/conpty-resize';
 import { attachLinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
@@ -424,7 +425,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // WebGL region with no uncovered slack to paint black (see syncBackgrounds).
       host.style.height = '';
       if (host.clientWidth <= 0 || host.clientHeight <= 0) return false;
-      fit.fit();
+      if (localWindows) {
+        const size = fit.proposeDimensions();
+        if (!size || !Number.isFinite(size.cols) || !Number.isFinite(size.rows)) return false;
+        resizeConptyTerminal(term, size.cols, size.rows);
+      } else {
+        fit.fit();
+      }
       const screen = host.querySelector('.xterm-screen') as HTMLElement | null;
       if (screen && screen.offsetHeight > 0) host.style.height = `${screen.offsetHeight}px`;
       return true;

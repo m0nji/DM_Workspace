@@ -2,6 +2,12 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.17.7 – 2026-09-09
+- fix: Resizing Windows terminals no longer pulls old history into the area ConPTY repaints. Repeated narrowing and widening preserve terminal output without duplicated or missing rows and keep the shell cursor aligned.
+- fix: Reduce brief cursor jumps during Codex output on Windows by combining closely spaced repaint updates. Settle terminal dimensions together and cancel outdated resize callbacks.
+- change: New local Windows terminals default Claude Code to its fullscreen renderer inside the pane, preventing its classic renderer from stacking transcript copies during resize. Scroll and search the conversation inside Claude; existing environment opt-outs remain respected. No global Claude settings are changed.
+- fix: Start Codex correctly when multiple native or npm installations are on the Windows PATH.
+
 ## 0.17.6 – 2026-09-08
 - fix: Reduce brief cursor jumps during Codex output on Windows by combining closely spaced terminal repaint updates.
 - fix: Improve window narrowing and resizing on Windows by settling terminal dimensions together and canceling outdated resize callbacks. Enable xterm's ConPTY compatibility behavior for the detected Windows version.

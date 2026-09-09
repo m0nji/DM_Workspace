@@ -117,7 +117,14 @@ function inheritedUserZdotdir(integrationDir: string): string {
 // generated integration dir (with _DMWS_USER_ZDOTDIR preserving the original).
 function cwdHookEnv(shell: string): Record<string, string> {
   const base = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } as Record<string, string>;
-  if (process.platform === 'win32') return base;
+  if (process.platform === 'win32') {
+    // Claude's inline renderer reprints transcript history into scrollback on
+    // resize. Its supported alternate-screen renderer owns that history and
+    // avoids accumulating duplicate redraws. Only this app's child shells
+    // inherit the default; explicit user opt-outs still take precedence.
+    base.CLAUDE_CODE_NO_FLICKER ??= '1';
+    return base;
+  }
   // macOS's bundled GNU screen 4.00.03 chokes on the 21-char window TERM it
   // derives from xterm-256color; redirect it to a screenrc that uses the
   // 15-char screen-256color instead. Only screen reads $SCREENRC, so this is
