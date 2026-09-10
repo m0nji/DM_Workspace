@@ -33,6 +33,11 @@ test('Codex arguments survive Windows PowerShell and pwsh with npm and native in
           env: { ...process.env, PATH: `${bin};${process.env.PATH ?? ''}` }, cwd: dir, encoding: 'utf8', timeout: 10000
         });
         const args = output.trim().split(/\r?\n/).map(line => Buffer.from(line, 'base64').toString());
+        if (remote) {
+          // PowerShell expands Windows 8.3 paths (RUNNER~1) to long names.
+          expect(realpathSync.native(args[3])).toBe(realpathSync.native(dir));
+          args[3] = dir;
+        }
         expect(args, `${shell} via ${bin}, remote=${remote}`).toEqual(remote ? ['--remote', 'unix://', '--cd', dir, '-c', expected] : ['-c', expected]);
         }
       }
