@@ -2,6 +2,11 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.18.1 – 2026-09-10
+- fix: Stop extending terminal activity for unchanged screen repaints and decorative stars in the empty Codex composer. New text and progress updates still register as activity, independently of explicit agent status.
+- fix: Remote terminal observers follow the controlling client's rows and columns instead of reflowing cursor-addressed output to their own window. Smaller views scroll, and taking control restores local fitting.
+- fix: Show a single Close button in the remote Agent status information dialog.
+
 ## 0.18.0 – 2026-09-10
 - feat: Add AI agent settings for automatic phone access when starting Codex or Claude Code through DM Workspace. Codex supports phone pairing and service checks directly in Settings; OpenCode links to its separate web-access setup.
 - fix: Keep the current workspace directory and pane status reporting when Codex runs through its shared local service. Support native and npm Codex installations through Windows PowerShell as well as macOS shells.

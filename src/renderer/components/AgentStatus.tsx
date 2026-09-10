@@ -134,7 +134,7 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
       </>}
       confirmLabel={t(confirmEnd ? (pending ? 'agent.ending' : 'agent.end') : remote ? 'common.close' : (connected || runningWithoutStatus) ? 'agent.goToTerminal' : pending ? 'agent.checking' : phase === 'ended' ? 'agent.restart' : 'agent.start')}
       confirmDisabled={pending}
-      cancelLabel={t(confirmEnd ? 'common.cancel' : 'common.close')}
+      cancelLabel={remote ? null : t(confirmEnd ? 'common.cancel' : 'common.close')}
       onCancel={() => { if (confirmEnd) setConfirmEnd(null); else close(); }}
       onConfirm={() => { if (confirmEnd) void end(); else if (remote) close(); else if (connected || runningWithoutStatus) { close(); useStore.getState().setFocusedPane(paneId); requestAnimationFrame(() => focusTerminal(paneId)); } else void start(); }}
     />, document.querySelector('.root') ?? document.body)}

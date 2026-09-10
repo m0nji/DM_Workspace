@@ -7,8 +7,9 @@ import { SearchAddon } from '@xterm/addon-search';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
-import { useStore } from '../store';
+import { remoteConnKey, useStore } from '../store';
 import { getTheme } from '../../shared/themes';
+import { createActivityContentObserver } from '../terminal/activity-content';
 import { createPaneActivity } from '../pane-activity';
 import { registerSearch, unregisterSearch } from '../search-registry';
 import {
@@ -396,7 +397,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       return true;
     });
 
-    // Per-pane activity machine: drive status from the raw output/input streams.
+    // Activity follows rendered content changes; redraw traffic alone is not work.
     const activity = createPaneActivity({
       onChange: (status) => setPaneStatus(paneId, status),
       setTimer: (fn, ms) => setTimeout(fn, ms),
@@ -424,6 +425,21 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // back is reliable even before the first WebGL render. Pinning leaves the
       // WebGL region with no uncovered slack to paint black (see syncBackgrounds).
       host.style.height = '';
+      host.style.width = '';
+      // Observers must interpret cursor movements in the driver's grid, even
+      // when their own pane is smaller or hidden. Only the driver may fit.
+      const conn = remote ? useStore.getState().remote[remoteConnKey(remote.serverId, remote.scopeKey)] : undefined;
+      const remotePane = conn?.panes.find(p => p.paneId === remote?.remotePaneId);
+      const observing = !!remote && !isPaneWritable(useStore.getState(), paneId);
+      host.parentElement?.classList.toggle('remote-observer', observing);
+      if (observing) {
+        if (!remotePane) return false;
+        term.resize(remotePane.cols, remotePane.rows);
+        const screen = host.querySelector<HTMLElement>('.xterm-screen');
+        if (screen?.offsetHeight) host.style.height = `${screen.offsetHeight}px`;
+        if (screen?.offsetWidth) host.style.width = `${screen.offsetWidth}px`;
+        return true;
+      }
       if (host.clientWidth <= 0 || host.clientHeight <= 0) return false;
       if (localWindows) {
         const size = fit.proposeDimensions();
@@ -487,11 +503,15 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     registerTerminal(paneId, clearBuffer);
     registerTerminalFocus(paneId, () => term.focus());
 
+    const contentActivity = createActivityContentObserver(term, () => {
+      if (!disposed && !processEnded) activity.onOutput();
+    });
+    disposers.push(() => contentActivity.dispose());
+
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
-      term.write(data, updateAtBottom);
+      term.write(data, () => { updateAtBottom(); contentActivity.output(); });
       saveScheduler.schedule();
-      activity.onOutput();
     });
     let agentExitReceived: (() => void) | null = null;
     const offExit = window.api.onExit(paneId, (exitCode) => {
@@ -608,6 +628,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         sentCols = cols;
         sentRows = rows;
         spawnSent = true;
+        // Remote spawn only subscribes; it does not apply the requested size.
+        if (remote && isPaneWritable(useStore.getState(), paneId)) {
+          window.api.resize({ paneId, cols, rows });
+        }
         // One-shot startup command for a pane created from a template. Consuming
         // clears it (and persists) so it never runs again after a restart. The
         // PTY buffers the input until the shell is ready to read it.
@@ -731,6 +755,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // PSReadLine dazu, seine Eingabespalte neu zu rechnen. Der Spawn zählt
       // als erste Meldung (siehe sentCols/sentRows).
       sendResize: () => {
+        if (remote && !isPaneWritable(useStore.getState(), paneId)) return;
         if (term.cols === sentCols && term.rows === sentRows) return;
         const widened = term.cols > sentCols;
         sentCols = term.cols;
@@ -745,6 +770,26 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // tracks the pane layout. Width changes defer the fit (see scheduler).
       getWidth: () => (host.parentElement ?? host).clientWidth
     });
+    if (remote) {
+      const key = remoteConnKey(remote.serverId, remote.scopeKey);
+      disposers.push(useStore.subscribe((next, previous) => {
+        const current = next.remote[key];
+        const old = previous.remote[key];
+        const pane = current?.panes.find(p => p.paneId === remote.remotePaneId);
+        const oldPane = old?.panes.find(p => p.paneId === remote.remotePaneId);
+        if (pane?.cols === oldPane?.cols && pane?.rows === oldPane?.rows
+          && pane?.driver === oldPane?.driver && current?.clientId === old?.clientId
+          && current?.status === old?.status) return;
+        // A previously rejected observer resize is not a sent driver size.
+        // Force a fresh resize when control or the connection changes.
+        if (isPaneWritable(next, paneId) && (!isPaneWritable(previous, paneId)
+          || (current?.status === 'connected' && old?.status !== 'connected'))) {
+          sentCols = 0;
+          sentRows = 0;
+        }
+        resizeScheduler.flush();
+      }));
+    }
     // Observe the wrapper, not the host: safeFit pins the host to a fixed pixel
     // height, so a height-only pane resize (splitter drag, maximize) never
     // changes the host's size and would never fire the observer. The wrapper

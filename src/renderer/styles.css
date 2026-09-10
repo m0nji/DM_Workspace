@@ -1094,6 +1094,7 @@ input[type="checkbox"]:checked::after {
 
 /* Terminal host wrapper holds the floating scroll-to-bottom button */
 .xterm-host-wrap { position: relative; height: 100%; }
+.xterm-host-wrap.remote-observer { overflow: auto; }
 .scroll-bottom-btn {
   position: absolute; right: 12px; bottom: 12px; z-index: 5;
   width: 30px; height: 30px; border-radius: 50%; cursor: pointer;

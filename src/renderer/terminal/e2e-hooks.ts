@@ -17,7 +17,7 @@ import type { Terminal } from '@xterm/xterm';
 // prompt wurden zwei der drei beim Unmount vergessen: die Closures hielten das
 // disposete Terminal fest, und ein späterer Test hätte ein totes xterm
 // angesteuert, statt am fehlenden Eintrag zu scheitern.
-const HOOK_NAMES = ['__bufferTypes', '__termWrite', '__bufferText'] as const;
+const HOOK_NAMES = ['__bufferTypes', '__termWrite', '__bufferText', '__termSize'] as const;
 
 type HookWindow = Record<string, Map<string, unknown> | undefined>;
 
@@ -29,6 +29,7 @@ export function registerE2EHooks(paneId: string, term: Terminal): () => void {
     (g[name] ??= new Map()).set(paneId, value);
   };
 
+  set('__termSize', () => ({ cols: term.cols, rows: term.rows }));
   set('__bufferTypes', () => term.buffer.active.type);
   set('__termWrite', (data: string) => term.write(data));
   set('__bufferText', () => {
