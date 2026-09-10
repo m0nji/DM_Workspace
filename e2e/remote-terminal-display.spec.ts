@@ -3,7 +3,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('remote observer uses the server grid and has a single close action', async () => {
+for (const initialScreen of ['Worked for 4m 44s', 'OpenAI Codex (v0.154.0)'] as const) {
+test(`remote observer and idle animation: ${initialScreen}`, async () => {
   const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: {
     ...process.env, DMWS_USERDATA: mkdtempSync(join(tmpdir(), 'dmws-remote-display-')),
     DMWS_E2E: '1', DMWS_DISABLE_WEBGL: '1'
@@ -54,7 +55,7 @@ test('remote observer uses the server grid and has a single close action', async
     const emit = async (data: string) => app.evaluate(({ BrowserWindow }, data) => {
       BrowserWindow.getAllWindows()[0].webContents.send('pty:data', { paneId: 'r:srv:project:p1', data });
     }, data);
-    await emit('\x1b[2J\x1b[1;1HWorked for 4m 44s\r\n\r\n› Ask Codex to do anything\r\ngpt-6-astra medium · Context 100% left');
+    await emit(`\x1b[2J\x1b[1;1H${initialScreen}\r\n\r\n› Ask Codex to do anything\r\ngpt-6-astra medium · Context 100% left`);
     const status = () => win.evaluate(() => (window as any).__store.getState().paneStatus['r:srv:project:p1']);
     await expect.poll(status).toBe('busy');
     // Keep repainting more often than the 2-second silence threshold.
@@ -62,6 +63,10 @@ test('remote observer uses the server grid and has a single close action', async
     for (let frame = 0; frame < 16; frame++) {
       await emit(`\x1b[2;1H\x1b[2K${' '.repeat(frame % 8)}·   .\x1b[3;1H\x1b[2K› Ask Codex to do anything${' '.repeat(frame % 5)}·`);
       await new Promise(resolve => setTimeout(resolve, 200));
+      if (frame === 12) {
+        expect(await status()).toBe('done');
+        await expect(win.locator('.status-dot.done')).toBeVisible();
+      }
     }
     expect(await status()).toBe('done');
     await emit('\x1b[1;1HNew answer is arriving');
@@ -73,3 +78,4 @@ test('remote observer uses the server grid and has a single close action', async
     await expect.poll(size).toEqual({ cols: 110, rows: 40 });
   } finally { await app.close(); }
 });
+}
