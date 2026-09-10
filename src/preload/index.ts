@@ -46,6 +46,7 @@ function subscribe<T>(map: Map<string, Set<T>>, paneId: string, cb: T): () => vo
 }
 
 const api: RendererApi = {
+  codexRemote: action => ipcRenderer.invoke('agent:codex-remote', action),
   reconnectAgentStatus: paneId => ipcRenderer.invoke('agent:reconnect', paneId),
   endAgentSession: (paneId, generation) => ipcRenderer.invoke('agent:end-session', paneId, generation),
   stopAgentStatus: paneId => ipcRenderer.invoke('agent:stop-status', paneId),
@@ -71,13 +72,6 @@ const api: RendererApi = {
   writeTextFile: (path: string, content: string) => ipcRenderer.invoke('fs:writeText', { path, content }) as Promise<void>,
   createFile: (dir: string, name: string) => ipcRenderer.invoke('fs:createFile', { dir, name }) as Promise<import('../shared/types').CreateFileResult>,
   deletePath: (path: string) => ipcRenderer.invoke('fs:delete', path) as Promise<void>,
-  loadTasks: (dir: string) => ipcRenderer.invoke('tasks:load', dir) as Promise<import('../shared/tasks-markdown').TaskBoard>,
-  saveTasks: (dir, board) => ipcRenderer.send('tasks:save', { dir, board }),
-  onTasksChanged: (cb) => {
-    const handler = (_e: unknown, p: { dir: string; board: import('../shared/tasks-markdown').TaskBoard }) => cb(p.dir, p.board);
-    ipcRenderer.on('tasks:changed', handler);
-    return () => ipcRenderer.removeListener('tasks:changed', handler);
-  },
   getScrollback: (paneId: string) => ipcRenderer.invoke('scrollback:get', paneId) as Promise<string | null>,
   saveScrollback: (paneId: string, data: string) => ipcRenderer.send('scrollback:save', { paneId, data }),
   checkForUpdates: () => ipcRenderer.send('updates:check'),

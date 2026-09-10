@@ -62,9 +62,9 @@ four panes.
   terminal output pauses. A pause does not mean a task has finished or succeeded.
 - **Workspaces at scale** — organise workspaces into groups and use the command palette
   to find actions, workspaces and saved launch templates.
-- **Files, preview and tasks** — browse and edit text files, preview content and keep a
-  task board beside your terminals. Connected workspace servers also support shared
-  terminals and scheduled agent tasks when the server provides these features.
+- **Files, preview and scheduled tasks** — browse and edit text files and preview
+  content. Connected workspace servers also support shared terminals and agent tasks
+  that run manually or on a schedule when the server provides these features.
 - **Safer keyboard confirmation** — destructive confirmations start on Cancel; Tab stays
   within the dialog and Enter activates the focused button.
 - **Stays up to date** — checks for new versions on startup and updates itself in one click.

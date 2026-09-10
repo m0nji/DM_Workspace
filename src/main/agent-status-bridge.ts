@@ -2,6 +2,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { PSREADLINE_CLEAR_INPUT_SEQUENCE } from '../shared/psreadline-heal';
+import type { Settings } from '../shared/types';
 import { codexSetup } from './codex-status-setup';
 import { join } from 'node:path';
 import { claudeState, codexState, type AgentState, type AgentStateEvent } from '../shared/agent-state';
@@ -10,7 +11,7 @@ import { claudeState, codexState, type AgentState, type AgentStateEvent } from '
 const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
   'PostToolUseFailure', 'PostToolBatch', 'Notification', 'Elicitation', 'ElicitationResult', 'Stop', 'StopFailure', 'SessionEnd'];
 interface Registration {
-  paneId: string; token: string; settingsPath: string; command: string; launchCommand: string;
+  paneId: string; token: string; remoteEnabled: boolean; settingsPath: string; command: string; launchCommand: string;
   turnId?: string; retiredTurns: Set<string>; state: AgentState; retired: Set<string>; waiting: Set<string>; nonce: string; interrupted: boolean;
 }
 export interface AgentSetup { command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }
@@ -22,7 +23,8 @@ export class AgentStatusBridge {
   private endedStates = new Map<string, AgentState>();
   private registrations = new Map<string, Registration>();
   private byToken = new Map<string, Registration>();
-  constructor(private readonly dir: string, private readonly send: (event: AgentStateEvent) => void) {}
+  constructor(private readonly dir: string, private readonly send: (event: AgentStateEvent) => void,
+    private readonly remoteSettings: () => NonNullable<Settings['agentRemoteControl']> = () => ({})) {}
 
   private listen(): Promise<number> {
     if (this.closed) return Promise.reject(new Error('Agent bridge is closed'));
@@ -57,7 +59,13 @@ export class AgentStatusBridge {
     const inputPrefix = powershell && process.platform === 'win32' ? PSREADLINE_CLEAR_INPUT_SEQUENCE : '\x05\x15';
     const port = provider === 'opencode' ? 0 : await this.listen();
     if (this.closed) throw new Error('Agent bridge is closed');
-    const existing = this.registrations.get(paneId);
+    const remote = this.remoteSettings();
+    const remoteEnabled = provider === 'codex' ? remote.codex === true : provider === 'claude' && remote.claude === true;
+    let existing = this.registrations.get(paneId);
+    if (existing?.state.event === 'shell' && existing.remoteEnabled !== remoteEnabled) {
+      this.release(paneId);
+      existing = undefined;
+    }
     if (existing?.state.provider === provider && existing.state.event === 'shell') {
       existing.state.paused = false;
       existing.state.generation = randomBytes(16).toString('hex');
@@ -75,10 +83,10 @@ export class AgentStatusBridge {
       headers: { Authorization: `Bearer ${token}`, 'X-DMWS-Terminal': '$DMWS_AGENT_NONCE' },
       allowedEnvVars: ['DMWS_AGENT_NONCE'] };
     const hooks = Object.fromEntries(EVENTS.map(event => [event, [{ hooks: [hook] }]]));
-    const codex = provider === 'codex' ? codexSetup(settingsPath, port, token, powershell) : null;
+    const codex = provider === 'codex' ? codexSetup(settingsPath, port, token, powershell, remote.codex === true, nonce) : null;
     writeFileSync(settingsPath, codex?.script ?? JSON.stringify(provider === 'opencode' ? {} : { hooks }), { mode: 0o600, flag: 'wx' });
     const quoted = powershell ? settingsPath.replace(/'/g, "''") : settingsPath.replace(/'/g, "'\\''");
-    const command = provider === 'opencode' ? 'opencode' : codex?.command ?? `claude --settings '${quoted}'`;
+    const command = provider === 'opencode' ? 'opencode' : codex?.command ?? `claude --settings '${quoted}'${remote.claude ? ' --remote-control' : ''}`;
     // Keep PTY input below canonical line limits, even before readline is ready.
     // The full Codex hook configuration stays in a private file, not an input line.
     const startPath = `${settingsPath}.start`;
@@ -89,7 +97,7 @@ export class AgentStatusBridge {
       ? `& ([scriptblock]::Create([IO.File]::ReadAllText('${startQuoted}')))`
       : `. '${startQuoted}'`;
     const registration: Registration = {
-      paneId, token, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
+      paneId, token, remoteEnabled, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
       state: { provider, generation: randomBytes(16).toString('hex'), status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
     };
     this.endedStates.delete(paneId);

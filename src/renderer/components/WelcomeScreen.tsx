@@ -22,8 +22,6 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
   const templates = useStore((s) => s.workspaceTemplates ?? []);
   const launchTemplate = useStore((s) => s.launchTemplateIntoWorkspace);
-  const setTasksEnabled = useStore((s) => s.setTasksEnabled);
-  const tasksEnabled = useStore((s) => s.workspaces.find((w) => w.id === workspaceId)?.tasksEnabled ?? false);
 
   const chooseFolder = async () => {
     const dir = await window.api.pickDirectory();
@@ -39,11 +37,6 @@ export function WelcomeScreen({ workspaceId, cwd }: Props): React.JSX.Element {
         <code className="cwd-value" title={cwd}>{cwd}</code>
         <button className="cwd-btn" onClick={() => void chooseFolder()}>{t('welcome.chooseFolder')}</button>
       </div>
-      <label className="welcome-tasks-toggle">
-        <input type="checkbox" checked={tasksEnabled}
-               onChange={(e) => setTasksEnabled(workspaceId, e.target.checked)} />
-        {t('welcome.enableTasks')}
-      </label>
       <div className="preset-row">
         {PRESETS.map((p) => (
           <button type="button" key={p.kind} className="preset" onClick={() => applyPreset(p.kind)}>

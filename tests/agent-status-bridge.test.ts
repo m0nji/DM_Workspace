@@ -60,6 +60,33 @@ describe('agent status bridge', () => {
     bridge.release('p1');
     expect(existsSync(result.settingsPath)).toBe(false);
   });
+  it('routes shared-daemon hook events without inheriting the terminal environment', async () => {
+    await bridge.close();
+    bridge = new AgentStatusBridge(dir, e => events.push(e), () => ({ codex: true, claude: true }));
+    const result = await bridge.prepare('remote', '/bin/zsh', 'b'.repeat(64), 'codex');
+    expect(result.command).toContain('--remote unix://');
+    const child = spawn(process.execPath, [result.settingsPath], {
+      env: { ...process.env, DMWS_AGENT_NONCE: 'wrong-daemon-environment' }, stdio: ['pipe', 'pipe', 'pipe']
+    });
+    child.stdin.end(JSON.stringify({ session_id: 'remote-session', turn_id: 'remote-turn', hook_event_name: 'UserPromptSubmit' }));
+    await once(child, 'close');
+    expect(bridge.snapshot('remote')).toMatchObject({ provider: 'codex', status: 'working', sessionId: 'remote-session' });
+    const claude = await bridge.prepare('claude', '/bin/zsh', 'c'.repeat(64), 'claude');
+    expect(claude.command).toContain('--remote-control');
+    expect(claude.command).toContain('--settings');
+  });
+  it('uses changed remote preferences on a new session after returning to the shell', async () => {
+    await bridge.close();
+    let enabled = false;
+    bridge = new AgentStatusBridge(dir, e => events.push(e), () => ({ claude: enabled }));
+    const first = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude');
+    expect(first.command).not.toContain('--remote-control');
+    bridge.shellReturned('p1');
+    enabled = true;
+    const second = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude');
+    expect(second.command).toContain('--remote-control');
+    expect(second.settingsPath).not.toBe(first.settingsPath);
+  });
   it('pauses display without losing live events and reconnects the same session', async () => {
     const { result, post } = await setup();
     await post({ session_id: 's', hook_event_name: 'UserPromptSubmit' });

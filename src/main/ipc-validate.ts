@@ -2,7 +2,6 @@ import type {
   AgentDonePayload, PtyInputRequest, PtyResizeRequest, PtySpawnRequest, ServerConfig,
   SpawnTarget, SpawnTargetScope
 } from '../shared/types';
-import type { Task, TaskBoard, TaskColumn } from '../shared/tasks-markdown';
 
 // Laufzeitprüfung für IPC-Payloads.
 //
@@ -274,42 +273,4 @@ export function parseLoginLocal(raw: unknown): { serverId: string; username: str
   if (!isRecord(raw)) return null;
   if (!isNonEmptyString(raw.serverId) || !isNonEmptyString(raw.username) || typeof raw.password !== 'string') return null;
   return { serverId: raw.serverId, username: raw.username, password: raw.password };
-}
-
-// Ein Task wird strukturell normalisiert statt nur geprüft: das Board geht direkt
-// in serializeTasks und von dort in die TASKS.md des Nutzers. Ein Fremdfeld dürfte
-// dort nicht landen, und ein fehlendes Pflichtfeld würde beim Serialisieren zu
-// "undefined" im Markdown.
-function parseTask(raw: unknown): Task | null {
-  if (!isRecord(raw)) return null;
-  if (!isNonEmptyString(raw.id) || typeof raw.title !== 'string' || typeof raw.done !== 'boolean') return null;
-  const out: Task = { id: raw.id, title: raw.title, done: raw.done };
-  if (typeof raw.description === 'string') out.description = raw.description;
-  if (typeof raw.command === 'string') out.command = raw.command;
-  return out;
-}
-
-function parseTaskColumn(raw: unknown): TaskColumn | null {
-  if (!isRecord(raw)) return null;
-  if (typeof raw.name !== 'string' || !Array.isArray(raw.tasks)) return null;
-  const tasks: Task[] = [];
-  for (const t of raw.tasks) {
-    const task = parseTask(t);
-    if (!task) return null; // ein kaputter Task verwirft das Board, statt ihn stumm zu schlucken
-    tasks.push(task);
-  }
-  return { name: raw.name, tasks };
-}
-
-export function parseTasksSave(raw: unknown): { dir: string; board: TaskBoard } | null {
-  if (!isRecord(raw)) return null;
-  if (!isNonEmptyString(raw.dir) || !isRecord(raw.board)) return null;
-  if (!Array.isArray(raw.board.columns)) return null;
-  const columns: TaskColumn[] = [];
-  for (const c of raw.board.columns) {
-    const col = parseTaskColumn(c);
-    if (!col) return null;
-    columns.push(col);
-  }
-  return { dir: raw.dir, board: { columns } };
 }

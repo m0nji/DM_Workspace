@@ -2,6 +2,12 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.18.0 – 2026-09-10
+- feat: Add AI agent settings for automatic phone access when starting Codex or Claude Code through DM Workspace. Codex supports phone pairing and service checks directly in Settings; OpenCode links to its separate web-access setup.
+- fix: Keep the current workspace directory and pane status reporting when Codex runs through its shared local service. Support native and npm Codex installations through Windows PowerShell as well as macOS shells.
+- fix: Load workspace configurations with a UTF-8 BOM correctly. Invalid configurations are preserved with a byte-for-byte backup; startup explains the problem and stops before an empty session can overwrite workspaces or terminal history.
+- change: Remove the optional local workspace task board and its terminal command launcher. Existing `.dmworkspace/TASKS.md` files and `.gitignore` entries are preserved. Scheduled agent tasks on workspace servers remain available.
+
 ## 0.17.7 – 2026-09-09
 - fix: Resizing Windows terminals no longer pulls old history into the area ConPTY repaints. Repeated narrowing and widening preserve terminal output without duplicated or missing rows and keep the shell cursor aligned.
 - fix: Reduce brief cursor jumps during Codex output on Windows by combining closely spaced repaint updates. Settle terminal dimensions together and cancel outdated resize callbacks.

@@ -11,11 +11,6 @@ export function TitlebarActions(): React.JSX.Element {
   const previewOpen = useStore((s) => s.previewPanel.open);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setCommandPaletteOpen = useStore((s) => s.setCommandPaletteOpen);
-  const taskView = useStore((s) => s.taskView);
-  const openTaskView = useStore((s) => s.openTaskView);
-  const closeTaskView = useStore((s) => s.closeTaskView);
-  // The board toggle only exists when the active workspace has tasks enabled.
-  const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
   // Geplante Agenten-Tasks: dieselbe Prüfung wie Panel und Palette
   // (tasksAvailable), damit die drei nie auseinanderlaufen (siehe store.ts).
   const scheduledTasksAvailable = useStore(tasksAvailable);
@@ -26,16 +21,6 @@ export function TitlebarActions(): React.JSX.Element {
     <div className="titlebar-actions">
       <UpdateBadge />
       <AgentOverview />
-      {tasksEnabled && (
-        <div className="view-toggle" role="tablist" aria-label={t('titlebar.view')}>
-          <button type="button" role="tab" aria-selected={!taskView}
-                  className={`view-toggle-btn ${!taskView ? 'active' : ''}`}
-                  onClick={closeTaskView}>{t('titlebar.terminals')}</button>
-          <button type="button" role="tab" aria-selected={taskView}
-                  className={`view-toggle-btn ${taskView ? 'active' : ''}`}
-                  onClick={() => void openTaskView()}>{t('titlebar.tasks')}</button>
-        </div>
-      )}
       {/* Umschalter, nicht nur „öffnen": aria-pressed und die active-Klasse
           versprechen genau das, und der Nachbar (Vorschau) macht es ebenso —
           ein Klick auf den gedrückten Knopf schließt das Panel wieder. */}

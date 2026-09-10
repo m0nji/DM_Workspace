@@ -1,17 +1,15 @@
+import { codexRemoteAction } from './agent-remote';
 import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync, type FSWatcher } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'path';
 import { AgentStatusBridge } from './agent-status-bridge';
-import { PtyManager } from './pty-manager';
+import { PtyManager, resolveWindowsShell } from './pty-manager';
 import { BackendRouter, type TerminalBackend } from './terminal-backend';
 import { createPtyDataBatcher } from './pty-data-batcher';
 import { loadStateFromFile, saveStateToFile } from './persistence';
 import { ScrollbackStore } from './scrollback';
-import { loadTasks, saveTasks, tasksFilePath } from './task-store';
-import { armTaskWatcher } from './task-watcher';
-import type { TaskBoard } from '../shared/types';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
 import { pathEndsWith } from '../shared/link-detect';
@@ -24,7 +22,7 @@ import {
   parseRemoteDriverDecision, parseRemoteFsFile, parseRemoteFsList, parseRemoteFsRename,
   parseRemoteFsWrite, parseRemotePaneRef, parseRemoteRef, parseRemoteRunRef, parseRemoteScopeRef,
   parseRemoteTaskCreate, parseRemoteTaskLogRef, parseRemoteTaskRef, parseRemoteTaskUpdate,
-  parseScrollbackSave, parseServerConfig, parseServerRef, parseTasksSave
+  parseScrollbackSave, parseServerConfig, parseServerRef
 } from './ipc-validate';
 import { AuthManager } from './remote/auth-manager';
 import { RemoteManager } from './remote/remote-manager';
@@ -220,7 +218,18 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   const localPty = new PtyManager();
   const router = new BackendRouter(localPty);
   const agents = new AgentStatusBridge(join(app.getPath('userData'), 'agent-status', randomUUID()),
-    event => getWindow()?.webContents.send('agent:state', event));
+    event => getWindow()?.webContents.send('agent:state', event),
+    () => loadStateFromFile(STATE_FILE()).settings.agentRemoteControl ?? {});
+  let remoteActionPending = false;
+  handle('agent:codex-remote', async (_e, action: unknown) => {
+    if (action !== 'status' && action !== 'pair') throw new Error('Invalid remote action');
+    if (remoteActionPending) throw new Error('Remote action already in progress');
+    remoteActionPending = true;
+    try {
+      const shell = process.platform === 'win32' ? resolveWindowsShell(process.env.PATH) : process.env.SHELL || '/bin/zsh';
+      return await codexRemoteAction(shell, action);
+    } finally { remoteActionPending = false; }
+  });
   handle('agent:stop-status', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
     agents.disconnect(paneId);
@@ -288,14 +297,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     enabled: loadStateFromFile(STATE_FILE()).settings.restoreTerminalHistory !== false
   });
 
-  // Wipe the temp image dir on quit; pasted images only need to survive the
-  // session. Also release the task watcher and its pending debounce (declared
-  // below; the handler runs at quit time, long after they exist).
+  // Wipe the temp image dir on quit; pasted images only need to survive the session.
   app.on('will-quit', () => {
     void agents.close();
     scrollback.flush();
-    taskWatcher?.close();
-    if (watchDebounce) clearTimeout(watchDebounce);
     try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   });
 
@@ -566,7 +571,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   handle('state:save', (_e, state: AppState) => {
     const win = getWindow();
     if (win) state.windowBounds = currentWindowBounds(win);
-    saveStateToFile(STATE_FILE(), state);
+    if (!saveStateToFile(STATE_FILE(), state)) throw new Error('Workspace configuration could not be saved');
     // Drop scrollback for panes that no longer exist in any layout (closed panes).
     const liveIds = state.workspaces.flatMap((w) => collectPaneIds(w.layout));
     scrollback.prune(liveIds);
@@ -582,59 +587,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     const req = parseScrollbackSave(raw);
     if (!req) { rejectPayload('scrollback:save', raw); return; }
     scrollback.set(req.paneId, req.data);
-  });
-
-  // --- Task board ---------------------------------------------------------
-  // Echo-guard: remember the exact content we last wrote per dir so the file
-  // watcher ignores our own writes (no save->watch->reload ping-pong). Mirrors the
-  // scrollback debounce philosophy. One watcher at a time (the board only ever
-  // shows the active workspace's dir).
-  const lastWritten = new Map<string, string>();
-  let taskWatcher: FSWatcher | null = null;
-  let watchedDir: string | null = null;
-  let watchDebounce: ReturnType<typeof setTimeout> | null = null;
-
-  const startTaskWatch = (dir: string): void => {
-    if (watchedDir === dir && taskWatcher) return;
-    taskWatcher?.close();
-    taskWatcher = null;
-    watchedDir = dir;
-    // Only one dir is ever watched; drop echo-guard entries for other dirs so
-    // the map cannot grow without bound over a long session.
-    for (const key of [...lastWritten.keys()]) if (key !== dir) lastWritten.delete(key);
-    const file = tasksFilePath(dir);
-    // Watch the .dmworkspace dir (the file may not exist yet); filter on filename.
-    // armTaskWatcher owns the error path: a watcher that dies at runtime (EMFILE,
-    // folder removed) must not take the main process down — we just lose live
-    // reloads until the next tasks:load/save re-arms it.
-    taskWatcher = armTaskWatcher(
-      dirname(file),
-      (name) => {
-        if (name && name !== 'TASKS.md') return;
-        if (watchDebounce) clearTimeout(watchDebounce);
-        watchDebounce = setTimeout(() => {
-          let content: string;
-          try { content = readFileSync(file, 'utf8'); } catch { content = ''; }
-          if (content === lastWritten.get(dir)) return; // our own write
-          getWindow()?.webContents.send('tasks:changed', { dir, board: loadTasks(dir) });
-        }, 150);
-      },
-      () => { taskWatcher = null; watchedDir = null; }
-    );
-    if (!taskWatcher) watchedDir = null; // re-try arming on the next load/save
-  };
-
-  handle('tasks:load', (_e, dir: unknown): TaskBoard => {
-    if (!isNonEmptyString(dir)) { rejectPayload('tasks:load', dir); return { columns: [] }; }
-    startTaskWatch(dir);
-    return loadTasks(dir);
-  });
-  on('tasks:save', (_e, raw: unknown) => {
-    const req = parseTasksSave(raw);
-    if (!req) { rejectPayload('tasks:save', raw); return; }
-    const content = saveTasks(req.dir, req.board);
-    lastWritten.set(req.dir, content);
-    startTaskWatch(req.dir); // (re)arm now that .dmworkspace exists
   });
 
   handle('clipboard:read', () => clipboard.readText());

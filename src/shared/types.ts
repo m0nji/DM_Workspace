@@ -1,10 +1,15 @@
 import type { AgentProvider } from './agent-state';
 import type { ShortcutAction } from './shortcuts';
-export type { Task, TaskColumn, TaskBoard } from './tasks-markdown';
+
+export type CodexRemoteAction = 'status' | 'pair';
+export type CodexRemoteResult =
+  | { status: 'running' | 'stopped' }
+  | { status: 'paired-code'; code: string; expiresAt: string }
+  | { status: 'error'; reason: 'unavailable' | 'connection' | 'invalid-response' };
 
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
-export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'session' | 'notifications' | 'account' | 'updates';
+export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'session' | 'notifications' | 'agents' | 'account' | 'updates';
 
 export type WorkspaceNavigationPlacement = 'left' | 'top';
 
@@ -33,7 +38,6 @@ export interface Workspace {
   color?: string;       // optional hex accent shown in the sidebar
   paneTitles?: Record<string, string>;            // custom pane label keyed by pane id (overrides live cwd when set)
   pendingStartupCommands?: Record<string, string>; // one-shot commands to send after a pane spawns (created-from-template)
-  tasksEnabled?: boolean; // opt-in: show the task board for this workspace (default off)
   // Remote-Workspaces (Plan 4.4): fehlt kind, ist der Workspace lokal (heutiger
   // Zustand). Ein Remote-Workspace spiegelt die Panes eines Server-Projekts
   // oder der persönlichen User-Runtime (Phase D); seine Pane-Schlüssel sind
@@ -113,6 +117,8 @@ export const TERMINAL_FONT_SIZE_MIN = 10;
 export const TERMINAL_FONT_SIZE_MAX = 32;
 
 export interface Settings {
+  agentRemoteControl?: { codex?: boolean; claude?: boolean }; // app-launched sessions on this computer only
+
   terminalFontSize?: number;   // px; absent => 13, changed live without restarting shells
   themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
   terminalOpacity: number;     // 0..1 (1 = fully opaque)
@@ -529,6 +535,7 @@ export interface RendererApi {
   stopAgentStatus(paneId: string): Promise<void>;
   reconnectAgentStatus(paneId: string): Promise<void>;
   endAgentSession(paneId: string, generation: string): Promise<void>;
+  codexRemote(action: 'status' | 'pair'): Promise<CodexRemoteResult>;
   checkAgentStart(paneId: string, provider: AgentProvider, cwd?: string): Promise<'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'check-failed'>;
   prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }>;
   getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;
@@ -554,10 +561,6 @@ export interface RendererApi {
   writeTextFile(path: string, content: string): Promise<void>;
   createFile(dir: string, name: string): Promise<CreateFileResult>;
   deletePath(path: string): Promise<void>;
-  // task board (TASKS.md per working dir)
-  loadTasks(dir: string): Promise<import('./tasks-markdown').TaskBoard>;
-  saveTasks(dir: string, board: import('./tasks-markdown').TaskBoard): void;
-  onTasksChanged(cb: (dir: string, board: import('./tasks-markdown').TaskBoard) => void): () => void;
   // terminal scrollback persistence (replayed on restart; the process itself is fresh)
   getScrollback(paneId: string): Promise<string | null>;
   saveScrollback(paneId: string, data: string): void;

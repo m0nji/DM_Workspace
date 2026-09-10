@@ -1,5 +1,5 @@
 // Native Codex command hooks: no user config changes and no approval decisions.
-export function codexSetup(path: string, port: number, token: string, powershell: boolean): { command: string; script: string } {
+export function codexSetup(path: string, port: number, token: string, powershell: boolean, remote = false, nonce?: string): { command: string; script: string } {
   // Base64 keeps paths out of shell syntax on both POSIX and Windows shells.
   const hookCommand = `node -e "require(Buffer.from('${Buffer.from(path).toString('base64')}','base64').toString())"`;
   const events = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'PreCompact', 'PostCompact', 'Stop', 'Interrupt', 'SessionEnd'];
@@ -19,7 +19,7 @@ process.stdin.on('end', () => {
     const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     const body = JSON.stringify(Object.fromEntries(['session_id', 'turn_id', 'hook_event_name', 'agent_id', 'tool_use_id', 'stop_hook_active'].filter(key => input[key] !== undefined).map(key => [key, input[key]])));
     const req = http.request({ hostname: '127.0.0.1', port: ${port}, path: '/codex', method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: ${JSON.stringify(`Bearer ${token}`)}, 'X-DMWS-Terminal': process.env.DMWS_AGENT_NONCE || '' } }, res => { res.resume(); res.on('end', finish); });
+      headers: { 'Content-Type': 'application/json', Authorization: ${JSON.stringify(`Bearer ${token}`)}, 'X-DMWS-Terminal': ${remote && nonce ? JSON.stringify(nonce) : "process.env.DMWS_AGENT_NONCE || ''"} } }, res => { res.resume(); res.on('end', finish); });
     req.on('error', finish);
     req.end(body);
   } catch { finish(); }
@@ -32,5 +32,28 @@ process.stdin.on('end', () => {
   // The child scope restores the user's mode once Codex exits.
   // This config contains fixed syntax and a base64 path only (no % expansion).
   const windowsQuoted = config.replace(/(\\*)"/g, '$1$1\\"');
-  return { command: powershell ? `& { $PSNativeCommandArgumentPassing = 'Legacy'\n& (Get-Command codex -CommandType Application | Select-Object -First 1).Source --% -c "${windowsQuoted}"\n}` : `codex -c '${quoted}'`, script };
+  // --% expands this one environment value even in Windows PowerShell 5.1.
+  // Set it inside the child scope and restore it when the TUI disconnects.
+  const remoteArgs = remote ? `--remote unix:// ${powershell ? '--cd "%DMWS_CODEX_CWD%" ' : ''}` : '';
+  const nativeCodex = '& (Get-Command codex -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source';
+  if (powershell) {
+    const lines = [
+      '& {',
+      "$PSNativeCommandArgumentPassing = 'Legacy'",
+      ...(remote ? [
+        `${nativeCodex} remote-control start --json | Out-Null`,
+        "if ($LASTEXITCODE -ne 0) { throw 'Codex Remote Control could not start. Check login and other desktop connections.' }",
+        '$dmwsPreviousCwd = $env:DMWS_CODEX_CWD',
+        '$env:DMWS_CODEX_CWD = (Get-Location).Path',
+        'try {'
+      ] : []),
+      `${nativeCodex} --% ${remoteArgs}-c "${windowsQuoted}"`,
+      ...(remote ? ['} finally { $env:DMWS_CODEX_CWD = $dmwsPreviousCwd }'] : []),
+      '}'
+    ];
+    return { command: lines.join('\n'), script };
+  }
+  // Bypass personal shell wrappers, which may otherwise insert --remote twice.
+  const start = remote ? 'command codex remote-control start --json >/dev/null && ' : '';
+  return { command: `${start}command codex ${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'`, script };
 }

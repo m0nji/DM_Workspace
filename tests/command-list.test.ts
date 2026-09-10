@@ -379,7 +379,7 @@ describe('global pane search', () => {
       ],
       workspaceGroups: [{ id: 'g', name: 'Backend', collapsed: true }],
       workspaceTemplates: [], remote: {}, activeWorkspaceId: 'a', focusedPaneId: 'a1',
-      maximizedPaneId: 'a1', taskView: true,
+      maximizedPaneId: 'a1',
       paneAutoTitles: { b1: 'Claude', b2: 'npm run dev', stale: 'Ghost' },
       paneCwd: { b2: '/src/api/logs' }
     });
@@ -395,12 +395,12 @@ describe('global pane search', () => {
     expect(panes[2].keywords).toContain('npm run dev');
   });
 
-  it('reveals a pane across workspaces, expands its group and leaves the board', () => {
+  it('reveals a pane across workspaces, expands its group', () => {
     const command = build().find(c => c.id === 'pane-b-b2');
     expect(command).toBeDefined();
     command!.run();
     expect(useStore.getState()).toMatchObject({
-      activeWorkspaceId: 'b', focusedPaneId: 'b2', maximizedPaneId: null, taskView: false,
+      activeWorkspaceId: 'b', focusedPaneId: 'b2', maximizedPaneId: null,
       workspaceGroups: [{ id: 'g', collapsed: false }]
     });
   });

@@ -1,5 +1,6 @@
 import { homedir } from 'os';
 import { readFileSync } from 'fs';
+import { randomUUID } from 'node:crypto';
 import { writeFileAtomic } from './atomic-write';
 import type {
   AppState, BusyIndicator, LayoutNode, ServerConfig, Settings, WindowBounds, Workspace,
@@ -108,6 +109,13 @@ export function migrateSettings(raw: unknown): Settings {
       Math.max(BUSY_INDICATOR_SPEED_MIN_MS, Math.round(r.busyIndicatorSpeedMs))
     );
   }
+  if (r.agentRemoteControl && typeof r.agentRemoteControl === 'object') {
+    const remote = r.agentRemoteControl as Record<string, unknown>;
+    out.agentRemoteControl = {};
+    for (const provider of ['codex', 'claude'] as const) {
+      if (typeof remote[provider] === 'boolean') out.agentRemoteControl[provider] = remote[provider];
+    }
+  }
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
   if (typeof r.restoreTerminalHistory === 'boolean') out.restoreTerminalHistory = r.restoreTerminalHistory;
   // brandDesign/locale MUST survive the round-trip: dropping them here is what
@@ -200,7 +208,6 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
   if (layout === undefined) return undefined;
   const out: Workspace = { id: r.id, name: r.name, cwd: r.cwd, layout };
   if (typeof r.color === 'string') out.color = r.color;
-  if (typeof r.tasksEnabled === 'boolean') out.tasksEnabled = r.tasksEnabled;
   // Group membership has to be carried over explicitly: this function builds a
   // NEW object and keeps only what is named here, so anything not listed is
   // dropped on every load. An empty id would not name a group, so only a
@@ -289,70 +296,109 @@ function migrateWorkspaceGroups(raw: unknown): WorkspaceGroup[] {
   return out;
 }
 
+function parseState(json: string): AppState {
+  // Explizit unknown statt des impliziten any von JSON.parse: die Guards unten
+  // (isValidRoot, migrate*) sind die einzige Stelle, an der aus diesen Daten ein
+  // Typ wird — any würde sie stillschweigend umgehbar machen.
+  const parsed: unknown = JSON.parse(json.replace(/^\uFEFF/, ''));
+  if (!isValidRoot(parsed)) throw new Error('Invalid state structure or unsupported version');
+  const rawWorkspaces = parsed.workspaces as unknown[];
+  const migrated = rawWorkspaces
+    .map(migrateWorkspace)
+    .filter((w): w is Workspace => w !== undefined);
+  // Groups are repaired, not believed — same stance as the activeWorkspaceId
+  // check below. A file on disk can come from an older build, a crash between
+  // two writes, or an editor: normalizeGroups drops ids naming no group,
+  // drops groups with no members, and pulls a broken run back together. It
+  // runs first so everything below already sees the repaired list.
+  const normalized = normalizeGroups({
+    workspaces: migrated,
+    groups: migrateWorkspaceGroups((parsed as unknown as Record<string, unknown>).workspaceGroups)
+  });
+  const workspaces = normalized.workspaces;
+  const rawActiveWorkspaceId = parsed.activeWorkspaceId as string | null;
+  const activeWorkspaceId = workspaces.some((w) => w.id === rawActiveWorkspaceId)
+    ? rawActiveWorkspaceId
+    : (workspaces[0]?.id ?? null);
+  // Migrate persisted settings to the current shape.
+  const out: AppState = {
+    version: 1,
+    workspaces,
+    activeWorkspaceId,
+    settings: migrateSettings(parsed.settings)
+  };
+  // Absent rather than empty: a state with no groups has to look exactly like
+  // one written before groups existed, so nothing downstream has to tell the
+  // two apart.
+  if (normalized.groups.length > 0) out.workspaceGroups = normalized.groups;
+  const rawTemplates = (parsed as unknown as Record<string, unknown>).workspaceTemplates;
+  if (Array.isArray(rawTemplates)) {
+    out.workspaceTemplates = rawTemplates
+      .map(migrateWorkspaceTemplate)
+      .filter((t): t is WorkspaceTemplate => t !== undefined);
+  }
+  const wb = migrateWindowBounds((parsed as unknown as Record<string, unknown>).windowBounds);
+  if (wb) out.windowBounds = wb; else delete out.windowBounds;
+  return out;
+}
+
 export function deserialize(json: string): AppState {
   try {
-    // Explizit unknown statt des impliziten any von JSON.parse: die Guards unten
-    // (isValidRoot, migrate*) sind die einzige Stelle, an der aus diesen Daten ein
-    // Typ wird — any würde sie stillschweigend umgehbar machen.
-    const parsed: unknown = JSON.parse(json);
-    if (!isValidRoot(parsed)) return defaultState();
-    const rawWorkspaces = parsed.workspaces as unknown[];
-    const migrated = rawWorkspaces
-      .map(migrateWorkspace)
-      .filter((w): w is Workspace => w !== undefined);
-    // Groups are repaired, not believed — same stance as the activeWorkspaceId
-    // check below. A file on disk can come from an older build, a crash between
-    // two writes, or an editor: normalizeGroups drops ids naming no group,
-    // drops groups with no members, and pulls a broken run back together. It
-    // runs first so everything below already sees the repaired list.
-    const normalized = normalizeGroups({
-      workspaces: migrated,
-      groups: migrateWorkspaceGroups((parsed as unknown as Record<string, unknown>).workspaceGroups)
-    });
-    const workspaces = normalized.workspaces;
-    const rawActiveWorkspaceId = parsed.activeWorkspaceId as string | null;
-    const activeWorkspaceId = workspaces.some((w) => w.id === rawActiveWorkspaceId)
-      ? rawActiveWorkspaceId
-      : (workspaces[0]?.id ?? null);
-    // Migrate persisted settings to the current shape.
-    const out: AppState = {
-      version: 1,
-      workspaces,
-      activeWorkspaceId,
-      settings: migrateSettings(parsed.settings)
-    };
-    // Absent rather than empty: a state with no groups has to look exactly like
-    // one written before groups existed, so nothing downstream has to tell the
-    // two apart.
-    if (normalized.groups.length > 0) out.workspaceGroups = normalized.groups;
-    const rawTemplates = (parsed as unknown as Record<string, unknown>).workspaceTemplates;
-    if (Array.isArray(rawTemplates)) {
-      out.workspaceTemplates = rawTemplates
-        .map(migrateWorkspaceTemplate)
-        .filter((t): t is WorkspaceTemplate => t !== undefined);
-    }
-    const wb = migrateWindowBounds((parsed as unknown as Record<string, unknown>).windowBounds);
-    if (wb) out.windowBounds = wb; else delete out.windowBounds;
-    return out;
+    return parseState(json);
   } catch {
     return defaultState();
   }
 }
+
+export class StateLoadError extends Error {
+  constructor(public readonly file: string, public readonly backupFile?: string) {
+    // Never include parse errors: they can contain snippets of private state.
+    super(backupFile ? 'Workspace configuration is invalid; original saved.' : 'Workspace configuration cannot be read or safely backed up.');
+    this.name = 'StateLoadError';
+  }
+}
+
+// A failed load must never authorize a later bounds/autosave to replace it.
+const blockedFiles = new Set<string>();
 
 export function loadStateFromFile(file: string): AppState {
+  let bytes: Buffer;
   try {
-    return deserialize(readFileSync(file, 'utf8'));
+    bytes = readFileSync(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT' && !blockedFiles.has(file)) return defaultState();
+    blockedFiles.add(file);
+    throw new StateLoadError(file);
+  }
+  try {
+    const state = parseState(bytes.toString('utf8'));
+    // A successful explicit reload permits saving after an external repair.
+    blockedFiles.delete(file);
+    return state;
   } catch {
-    return defaultState();
+    blockedFiles.add(file);
+    const backupFile = `${file}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
+    try {
+      // Keep the original in place, too. Preserve even invalid UTF-8 byte for
+      // byte, in an owner-only file, before reporting a recoverable location.
+      writeFileAtomic(backupFile, bytes, { mode: 0o600 });
+    } catch {
+      throw new StateLoadError(file);
+    }
+    throw new StateLoadError(file, backupFile);
   }
 }
 
-export function saveStateToFile(file: string, state: AppState): void {
+export function saveStateToFile(file: string, state: AppState): boolean {
+  if (blockedFiles.has(file)) return false;
   try {
-    // Owner-only like the scrollback beside it: this records the user's project
-    // paths and per-workspace startup commands, which can carry credentials.
+    // Recheck before overwriting: a file can become unreadable/corrupt while
+    // the app is running, including before a window-bounds-only save.
+    loadStateFromFile(file);
     writeFileAtomic(file, serialize(state), { mode: 0o600 });
+    return true;
   } catch (err) {
     console.error(`Failed to save state to ${file}:`, err);
+    return false;
   }
 }

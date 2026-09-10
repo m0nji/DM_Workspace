@@ -97,8 +97,7 @@
       "name": "Name",
       "color": "Farbe",
       "setColor": "Farbe festlegen",
-      "baseFolder": "Basis-Ordner",
-      "enableTasks": "Tasks aktivieren"
+      "baseFolder": "Basis-Ordner"
     },
     "folderRestartTitle": "Workspace neu starten?",
     "folderRestartConfirm": "Diesen Workspace im neuen Ordner neu starten? Die laufenden Terminals werden beendet.",
@@ -136,7 +135,8 @@
       "session": "Sitzung",
       "notifications": "Benachrichtigungen",
       "account": "Konto & Server",
-      "updates": "Updates"
+      "updates": "Updates",
+      "agents": "KI-Agenten"
     },
     "account": {
       "title": "Workspace-Server",
@@ -271,6 +271,30 @@
       "error": "Update-Fehler: {{error}}",
       "errorUnknown": "unbekannt",
       "disabled": "Updates sind nur in der installierten App verfügbar."
+    },
+    "agents": {
+      "scope": "Diese Einstellungen gelten auf diesem Rechner für neue Agentensitzungen, die du über DM Workspace startest. Laufende Sitzungen und manuell eingegebene Terminalbefehle werden nicht umgestellt.",
+      "autoRemote": "Neue Sitzungen für Handy-Zugriff starten",
+      "codexHint": "Terminal und ChatGPT auf dem Handy nutzen einen gemeinsamen lokalen Dienst. Codex muss installiert und angemeldet sein. Der Rechner muss eingeschaltet und erreichbar bleiben.",
+      "pair": "Handy koppeln",
+      "check": "Dienst prüfen",
+      "working": "Verbindung wird geprüft …",
+      "running": "Der lokale Codex-Dienst läuft. Das bestätigt noch keine Verbindung vom Handy.",
+      "stopped": "Der lokale Codex-Dienst läuft nicht. Er startet beim nächsten Codex-Start mit aktivierter Option oder beim Koppeln.",
+      "pairInstructions": "Öffne in ChatGPT auf dem Handy die Remote-Verbindungen und gib diesen Kopplungscode ein:",
+      "expires": "Gültig bis {{time}}. Der Code wird nicht gespeichert.",
+      "expired": "Der Kopplungscode ist abgelaufen. Klicke erneut auf „Handy koppeln“.",
+      "codexTroubleshooting": "„Handy koppeln“ aktiviert den Codex-Remote-Dienst. Falls ChatGPT Desktop dieselbe Verbindung belegt, beende die Desktop-App. Das Ausschalten der Startoption trennt keine bestehenden Verbindungen. Bei älteren CLI-Versionen bitte Codex aktualisieren.",
+      "claudeHint": "Claude startet mit Remote Control. Melde dich in Claude Code und der Handy-App mit deinem berechtigten Claude-Konto an. Eine erstmalige Freigabe und der Verbindungslink erscheinen im Terminal. Bereits laufende Sitzungen kannst du dort mit /rc verbinden.",
+      "openClaude": "Claude im Browser öffnen",
+      "opencodeHint": "OpenCode bietet gemeinsamen Terminal- und Browserzugriff über einen eigenen Webserver. Eine integrierte Handy-Kopplung ist hier noch nicht verfügbar. Netzwerkzugriff erfordert einen geschützten Server; unter Windows empfiehlt OpenCode WSL.",
+      "openGuide": "Webzugriff einrichten – Anleitung",
+      "error": {
+        "unavailable": "Codex konnte nicht erreicht werden. Prüfe Installation und Anmeldung und aktualisiere Codex. Unter Windows eine normale, nicht als Administrator gestartete App verwenden.",
+        "connection": "Der Dienst konnte die Remote-Verbindung noch nicht herstellen. Prüfe das Netzwerk und beende gegebenenfalls ChatGPT Desktop; versuche es danach erneut.",
+        "invalid-response": "Die installierte Codex-Version hat eine unerwartete Antwort geliefert. Bitte Codex aktualisieren und erneut versuchen."
+      },
+      "help": "Verbindung und bestehende Sitzungen"
     }
   },
   "palette": {
@@ -321,7 +345,6 @@
     "heading": "Wie viele Terminals möchtest du öffnen?",
     "workingDirectory": "Arbeitsverzeichnis",
     "chooseFolder": "Ordner auswählen…",
-    "enableTasks": "Tasks für diesen Workspace aktivieren",
     "orTemplate": "…oder aus einer Vorlage starten",
     "noTemplates": "Noch keine Vorlagen – speichere ein Workspace-Layout über die Einstellungen oder die Befehlspalette, um es hier wiederzuverwenden.",
     "templateStartupCommands_one": "{{count}} Startbefehl",
@@ -338,9 +361,6 @@
     "globalSearch": "Alle Terminals durchsuchen",
     "commandPalette": "Befehlspalette",
     "togglePreview": "Vorschau / Browser umschalten",
-    "view": "Ansicht",
-    "terminals": "Terminals",
-    "tasks": "Tasks",
     "scheduledTasks": "Geplante Tasks"
   },
   "update": {
@@ -484,22 +504,6 @@
     }
   },
   "tasks": {
-    "loading": "Lade Tasks…",
-    "newTask": "Neue Task",
-    "add": "Task hinzufügen",
-    "titlePlaceholder": "Titel",
-    "descPlaceholder": "Beschreibung (optional)",
-    "commandPlaceholder": "Befehl (optional)",
-    "chooseTarget": "Ziel-Terminal wählen",
-    "run": "▶ Ausführen",
-    "runTo": "▶ Ausführen → {{name}}",
-    "runIn": "Ausführen in: {{name}}",
-    "noTerminal": "Kein Terminal vorhanden",
-    "whichTerminal": "In welches Terminal?",
-    "newPane": "＋ neues Pane",
-    "noCommand": "— kein Befehl —",
-    "paneNamed": "Terminal {{pos}}",
-    "paneDefault": "Terminal",
     "scheduled": {
       "panel": {
         "title": "Geplante Tasks",

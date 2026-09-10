@@ -7,7 +7,7 @@ export interface AtomicWriteOptions {
   // can carry credentials (scrollback, persisted state) — without it they land
   // at the process umask default, typically 0o644, i.e. readable by every other
   // account on the machine. Leave unset for files that belong to the user's
-  // project (TASKS.md, edited files), whose permissions are not ours to dictate.
+  // project (edited text files), whose permissions are not ours to dictate.
   mode?: number;
   // Seams for the tests only — a rename that fails the way Windows fails, and a
   // retry pause that does not cost the suite real time.
@@ -54,7 +54,7 @@ function renameWithRetry(
 // auto-update, power loss) can never leave a truncated file behind — the loaders
 // fall back to defaults on a corrupt file, which would silently drop user data.
 // Creates the parent directory on demand.
-export function writeFileAtomic(file: string, content: string, options: AtomicWriteOptions = {}): void {
+export function writeFileAtomic(file: string, content: string | Buffer, options: AtomicWriteOptions = {}): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.dmws-tmp-${randomUUID()}`;
   try {
@@ -69,7 +69,7 @@ export function writeFileAtomic(file: string, content: string, options: AtomicWr
     // The temp name is unique per call, so a failed rename (a lock on Windows
     // that outlasts the retries, cross-device, ENOSPC) would strand it next to
     // the real file forever — and these live in the user's workspace
-    // (.dmworkspace/TASKS.md) where the litter is visible. Clean up, then
+    // (edited project files) where the litter is visible. Clean up, then
     // report the original failure.
     rmSync(tmp, { force: true });
     throw err;

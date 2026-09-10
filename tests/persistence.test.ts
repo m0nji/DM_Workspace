@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile, migrateWindowBounds } from '../src/main/persistence';
+import { serialize, deserialize, defaultState, loadStateFromFile, saveStateToFile, migrateWindowBounds, StateLoadError } from '../src/main/persistence';
 import type { AppState, Settings, Workspace } from '../src/shared/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -371,9 +371,9 @@ describe('persistence file IO', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('returns defaultState when read fails (path is a directory)', () => {
+  it('refuses startup when read fails (path is a directory)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'dmws-'));
-    expect(loadStateFromFile(dir)).toEqual(defaultState());
+    expect(() => loadStateFromFile(dir)).toThrow(StateLoadError);
     rmSync(dir, { recursive: true, force: true });
   });
 });

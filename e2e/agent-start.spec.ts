@@ -24,23 +24,25 @@ test('Codex arguments survive Windows PowerShell and pwsh with npm and native in
     execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Add-Type -TypeDefinition '${source}' -OutputAssembly '${exe}' -OutputType ConsoleApplication`]);
     const hookPath = join(dir, "hooks with 'quotes' & %PATH%.cjs");
     const posix = codexSetup(hookPath, 1234, 'test-token', false).command;
-    const expected = posix.slice("codex -c '".length, -1).replaceAll("'\\''", "'");
+    const expected = posix.slice("command codex -c '".length, -1).replaceAll("'\\''", "'");
     for (const shell of ['powershell.exe', 'pwsh.exe']) {
       for (const bin of [npmDir, nativeDir]) {
-        const command = codexSetup(hookPath, 1234, 'test-token', true).command;
+        for (const remote of [false, true]) {
+        const command = codexSetup(hookPath, 1234, 'test-token', true, remote).command;
         const output = execFileSync(shell, ['-NoProfile', '-NonInteractive', '-Command', command], {
-          env: { ...process.env, PATH: `${bin};${process.env.PATH ?? ''}` }, encoding: 'utf8', timeout: 10000
+          env: { ...process.env, PATH: `${bin};${process.env.PATH ?? ''}` }, cwd: dir, encoding: 'utf8', timeout: 10000
         });
         const args = output.trim().split(/\r?\n/).map(line => Buffer.from(line, 'base64').toString());
-        expect(args, `${shell} via ${bin}`).toEqual(['-c', expected]);
+        expect(args, `${shell} via ${bin}, remote=${remote}`).toEqual(remote ? ['--remote', 'unix://', '--cd', dir, '-c', expected] : ['-c', expected]);
+        }
       }
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 // Real shell, PTY, hook bridge and UI; stand-in CLIs avoid paid model requests.
-for (const provider of ['claude', 'codex', 'opencode'] as const) {
-  test(`${provider} starts by button in the current pane and reports status`, async () => {
+for (const [provider, remote] of [['claude', false], ['codex', false], ['opencode', false], ['claude', true], ['codex', true]] as const) {
+  test(`${provider}${remote ? ' remote' : ''} starts by button in the current pane and reports status`, async () => {
     test.setTimeout(120000);
     const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-start-'));
     const project = join(dir, "project with 'quotes'");
@@ -55,6 +57,8 @@ for (const provider of ['claude', 'codex', 'opencode'] as const) {
     writeFileSync(fixture, `#!${process.execPath}
 const fs = require('node:fs');
 const cp = require('node:child_process');
+if (process.argv[2] === 'remote-control') { console.log(JSON.stringify({ status: 'connected' })); process.exit(0); }
+if (${JSON.stringify(provider)} === 'claude' && process.argv.includes('--remote-control') !== ${remote}) throw new Error('Wrong remote preference');
 // Interactive CLIs consume Ctrl+C in raw mode. On Windows, a cooked-mode
 // Node stand-in instead interrupts its .cmd wrapper and leaves cmd's batch
 // termination prompt waiting for input.
@@ -69,7 +73,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     if (!res.ok) process.exit(7);
   } else if (${JSON.stringify(provider)} === 'codex') {
     const config = process.argv[process.argv.indexOf('-c') + 1];
-    if (process.argv.length !== 4 || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
+    if (process.argv.length !== (${remote} ? 8 : 4) || process.argv.includes('--remote') !== ${remote} || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
     const encoded = config.match(/Buffer.from\\('([^']+)'/)[1];
     const path = Buffer.from(encoded, 'base64').toString();
     const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start-' + process.pid, turn_id: 'turn-' + process.pid }) });
@@ -110,6 +114,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
           activeWorkspaceId: 'launch', paneCwd: { original: project }
         });
       }, project);
+      await win.evaluate(remote => window.__store.getState().updateSettings({ agentRemoteControl: { codex: remote, claude: remote } }), remote);
       const original = win.locator('.pane').first();
       await expect(original.locator('.xterm')).toBeVisible();
       await expect.poll(() => win.evaluate(provider => window.api.checkAgentStart('original', provider), provider)).toBe('ready');
@@ -280,8 +285,8 @@ test('programmatic commands disarm the shell prompt before another agent can sta
     const shell = () => win.evaluate(() => (window as unknown as { __store: { getState(): { paneShell: Record<string, string> } } }).__store.getState().paneShell.source);
     await expect.poll(shell).toBe('atPrompt');
     const afterSubmit = await win.evaluate(() => {
-      const store = (window as unknown as { __store: { getState(): { runTaskInPane(id: string, command: string): void; paneShell: Record<string, string> } } }).__store;
-      store.getState().runTaskInPane('source', 'sleep 2');
+      const store = (window as unknown as { __store: { getState(): { startAgentInPane(id: string, command: string): boolean; paneShell: Record<string, string> } } }).__store;
+      store.getState().startAgentInPane('source', 'sleep 2');
       return store.getState().paneShell.source;
     });
     expect(afterSubmit).toBe('running');

@@ -15,7 +15,7 @@ interface WorkspaceEditModalProps {
 }
 
 /**
- * Centered editor for a single workspace (name, colour, base folder, tasks).
+ * Centered editor for a single workspace (name, colour, base folder).
  * Replaces the cramped inline panel that used to expand inside the sidebar row.
  * Built on the shared .modal-backdrop / .modal pattern: backdrop click and
  * Escape close, Enter commits the name.
@@ -26,15 +26,13 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
   const renameWorkspace = useStore((s) => s.renameWorkspace);
   const setWorkspaceColor = useStore((s) => s.setWorkspaceColor);
   const setWorkspaceCwd = useStore((s) => s.setWorkspaceCwd);
-  const setTasksEnabled = useStore((s) => s.setTasksEnabled);
 
   // Every field is buffered locally and applied only on "Done" — Cancel,
-  // Escape and the backdrop discard ALL edits. (Colour/folder/tasks used to
+  // Escape and the backdrop discard ALL edits. (Colour/folder used to
   // write through immediately, which made the Cancel button a lie.)
   const [name, setName] = useState(ws?.name ?? '');
   const [color, setColor] = useState(ws?.color);
   const [cwd, setCwd] = useState(ws?.cwd ?? '');
-  const [tasksEnabled, setTasks] = useState(ws?.tasksEnabled ?? false);
   // Folder picked while terminals are running — held until the user confirms
   // the restart in the in-app dialog below.
   const [pendingDir, setPendingDir] = useState<string | null>(null);
@@ -52,7 +50,6 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     if (ws) {
       if (name.trim() && name.trim() !== ws.name) renameWorkspace(ws.id, name.trim());
       if (color && color !== ws.color) setWorkspaceColor(ws.id, color);
-      if (tasksEnabled !== (ws.tasksEnabled ?? false)) setTasksEnabled(ws.id, tasksEnabled);
       if (cwd && cwd !== ws.cwd) setWorkspaceCwd(ws.id, cwd);
     }
     onClose();
@@ -69,7 +66,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, color, cwd, tasksEnabled, ws, pendingDir]);
+  }, [name, color, cwd, ws, pendingDir]);
 
   const chooseFolder = async (): Promise<void> => {
     if (!ws) return;
@@ -134,15 +131,6 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
             </button>
           </div>
         </div>
-
-        <label className="ws-edit-tasks">
-          <input
-            type="checkbox"
-            checked={tasksEnabled}
-            onChange={(e) => setTasks(e.target.checked)}
-          />
-          {t('workspace.edit.enableTasks')}
-        </label>
 
         <div className="ws-edit-actions">
           <button type="button" className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>

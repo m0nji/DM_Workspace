@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
+import { AgentSettingsSection } from './AgentSettingsSection';
 import { Icon } from './Icon';
 import type { BusyIndicator, RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
 import {
@@ -419,6 +420,7 @@ const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
   { id: 'appearance', labelKey: 'settings.nav.appearance' },
   { id: 'shortcuts', labelKey: 'settings.nav.shortcuts' },
   { id: 'templates', labelKey: 'settings.nav.templates' },
+  { id: 'agents', labelKey: 'settings.nav.agents' },
   { id: 'session', labelKey: 'settings.nav.session' },
   { id: 'notifications', labelKey: 'settings.nav.notifications' },
   { id: 'account', labelKey: 'settings.nav.account' },
@@ -789,6 +791,7 @@ export function SettingsPanel(): React.JSX.Element | null {
                 </div>
               </>
             )}
+            {section === 'agents' && <AgentSettingsSection />}
             {section === 'account' && <AccountSection />}
             {section === 'updates' && <UpdateSection />}
           </div>

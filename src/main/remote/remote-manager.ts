@@ -2,7 +2,7 @@
 // Main-Prozess (gespiegelt aus den Renderer-Settings über server:add/remove,
 // beim Start aus state.json geseedet), holt die Projektliste per REST und
 // pusht Verbindungs-/Presence-/Driver-Status als Events an den Renderer —
-// dasselbe Muster wie der tasks:changed-Push in ipc.ts.
+// Ereignisse werden per IPC an den Renderer weitergegeben.
 
 import { AuthManager } from './auth-manager';
 import { RemotePtyBackend, type RemoteBackendDeps, type TaskServerMessage } from './remote-backend';

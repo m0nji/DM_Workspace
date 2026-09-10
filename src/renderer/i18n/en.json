@@ -97,8 +97,7 @@
       "name": "Name",
       "color": "Color",
       "setColor": "Set color",
-      "baseFolder": "Base folder",
-      "enableTasks": "Enable tasks"
+      "baseFolder": "Base folder"
     },
     "folderRestartTitle": "Restart workspace?",
     "folderRestartConfirm": "Restart this workspace in the new folder? The running terminals will be terminated.",
@@ -136,7 +135,8 @@
       "session": "Session",
       "notifications": "Notifications",
       "account": "Account & servers",
-      "updates": "Updates"
+      "updates": "Updates",
+      "agents": "AI agents"
     },
     "account": {
       "title": "Workspace servers",
@@ -271,6 +271,30 @@
       "error": "Update error: {{error}}",
       "errorUnknown": "unknown",
       "disabled": "Updates are available only in the installed app."
+    },
+    "agents": {
+      "scope": "These settings apply on this computer to new agent sessions launched through DM Workspace. Running sessions and commands typed manually in terminals are not changed.",
+      "autoRemote": "Start new sessions with phone access",
+      "codexHint": "The terminal and ChatGPT on your phone share a local service. Codex must be installed and signed in. Keep this computer awake and connected.",
+      "pair": "Pair phone",
+      "check": "Check service",
+      "working": "Checking connection …",
+      "running": "The local Codex service is running. This does not confirm a connection from your phone.",
+      "stopped": "The local Codex service is stopped. It starts when you launch Codex with this option enabled or pair your phone.",
+      "pairInstructions": "Open Remote connections in ChatGPT on your phone and enter this pairing code:",
+      "expires": "Valid until {{time}}. The code is not saved.",
+      "expired": "The pairing code has expired. Click “Pair phone” again.",
+      "codexTroubleshooting": "“Pair phone” enables the Codex remote service. If ChatGPT Desktop occupies the same connection, quit the desktop app. Turning off the launch option does not disconnect existing clients. Update Codex if your CLI version is too old.",
+      "claudeHint": "Claude starts with Remote Control. Sign in to Claude Code and the mobile app with your eligible Claude account. First-time consent and the connection link appear in the terminal. For existing sessions, use /rc there.",
+      "openClaude": "Open Claude in browser",
+      "opencodeHint": "OpenCode supports shared terminal and browser access through a separate web server. Integrated phone pairing is not available here yet. Network access requires a protected server; OpenCode recommends WSL on Windows.",
+      "openGuide": "Set up web access – guide",
+      "error": {
+        "unavailable": "Could not reach Codex. Check installation and sign-in, and update Codex. On Windows, run the app normally, not as administrator.",
+        "connection": "The service could not establish the remote connection yet. Check your network and, if necessary, quit ChatGPT Desktop, then try again.",
+        "invalid-response": "The installed Codex version returned an unexpected response. Update Codex and try again."
+      },
+      "help": "Connection and existing sessions"
     }
   },
   "palette": {
@@ -321,7 +345,6 @@
     "heading": "How many terminals do you want to open?",
     "workingDirectory": "Working directory",
     "chooseFolder": "Choose folder…",
-    "enableTasks": "Enable tasks for this workspace",
     "orTemplate": "…or start from a template",
     "noTemplates": "No templates yet — save a workspace layout from Settings or the command palette to reuse it here.",
     "templateStartupCommands_one": "{{count}} startup command",
@@ -338,9 +361,6 @@
     "globalSearch": "Search all terminals",
     "commandPalette": "Command palette",
     "togglePreview": "Toggle preview / browser",
-    "view": "View",
-    "terminals": "Terminals",
-    "tasks": "Tasks",
     "scheduledTasks": "Scheduled Tasks"
   },
   "update": {
@@ -484,22 +504,6 @@
     }
   },
   "tasks": {
-    "loading": "Loading tasks…",
-    "newTask": "New task",
-    "add": "Add task",
-    "titlePlaceholder": "Title",
-    "descPlaceholder": "Description (optional)",
-    "commandPlaceholder": "Command (optional)",
-    "chooseTarget": "Choose target terminal",
-    "run": "▶ Run",
-    "runTo": "▶ Run → {{name}}",
-    "runIn": "Run in: {{name}}",
-    "noTerminal": "No terminal available",
-    "whichTerminal": "Which terminal?",
-    "newPane": "＋ new pane",
-    "noCommand": "— no command —",
-    "paneNamed": "Terminal {{pos}}",
-    "paneDefault": "Terminal",
     "scheduled": {
       "panel": {
         "title": "Scheduled Tasks",

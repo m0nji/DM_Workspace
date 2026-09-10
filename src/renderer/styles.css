@@ -185,7 +185,7 @@ body {
 }
 
 /* App-wide scrollbars. Any overflow:auto/scroll element (settings, preview,
-   command palette, task board, …) otherwise gets the NATIVE macOS scrollbar,
+   command palette, …) otherwise gets the NATIVE macOS scrollbar,
    whose visibility follows System Settings → Appearance → "Show scroll bars"
    (Always / when-scrolling / automatic) plus whether a mouse is attached. So the
    same build shows a bright, always-on bar on one Mac and nothing on another.
@@ -1090,10 +1090,6 @@ input[type="checkbox"]:checked::after {
   border-radius: 7px; padding: 8px 12px; cursor: pointer; font-size: 12px;
 }
 .ws-edit-folder-btn:hover { border-color: var(--border-hover); background: var(--panel-elevated); }
-.ws-edit-tasks {
-  display: flex; align-items: center; gap: 10px; cursor: pointer;
-  color: var(--text); font-size: 13px;
-}
 .ws-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
 /* Terminal host wrapper holds the floating scroll-to-bottom button */
@@ -1388,43 +1384,8 @@ body.drag-active webview { pointer-events: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* --- Task board --------------------------------------------------------- */
-.task-board { display: flex; gap: 12px; padding: 14px; height: 100%; overflow: auto; box-sizing: border-box; }
-.task-board-empty { color: var(--muted); padding: 24px; }
-.task-column { flex: 1; min-width: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; }
-.task-column-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--text); border-bottom: 1px solid var(--border); }
-.task-add, .task-del, .task-run-caret { background: none; border: none; color: inherit; cursor: pointer; opacity: .7; }
-.task-add:hover, .task-del:hover, .task-run-caret:hover { opacity: 1; }
-.task-column-body { padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
-.task-card { background: var(--panel-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
-.task-card-main { cursor: grab; }
-.task-title { display: block; color: var(--text); font-size: 13px; }
-.task-cmd { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,0.25); padding: 1px 5px; border-radius: 3px; max-width: 100%; overflow-wrap: anywhere; }
-.task-desc { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.task-no-cmd { font-size: 11px; color: var(--muted); opacity: .7; }
-.task-card-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-.task-run { position: relative; display: flex; align-items: center; gap: 2px; }
-.task-run-btn { background: rgba(48, 209, 88, 0.14); color: var(--success); border: 1px solid rgba(48, 209, 88, 0.35); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
-.task-run-btn:disabled { opacity: .4; cursor: default; }
-.task-pane-backdrop { position: fixed; inset: 0; z-index: 19; }
-/* Fixed (not absolute) so the picker floats above the column's overflow:auto and
-   is never clipped; top/left/bottom are set inline from the caret button's rect. */
-.task-pane-picker { position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-popover); padding: 4px; min-width: 170px; max-height: 60vh; overflow-y: auto; }
-.task-pane-picker-label { font-size: 10px; color: var(--muted); text-transform: uppercase; padding: 3px 7px; }
-.task-pane-item { display: flex; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 5px 7px; border-radius: 4px; cursor: pointer; }
-.task-pane-item:hover { background: var(--chrome-action-hover-bg); }
-.task-pane-new { color: var(--success); }
-.task-card-editing { display: flex; flex-direction: column; gap: 6px; }
-.task-edit-title, .task-edit-cmd, .task-edit-desc { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; }
-.task-edit-desc { font-family: inherit; resize: vertical; min-height: 48px; }
-.task-edit-actions { display: flex; gap: 6px; }
-.task-edit-actions button { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
-.welcome-tasks-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; color: var(--text); font-size: 13px; cursor: pointer; }
 .view-stack { flex: 1; min-width: 0; display: flex; }
 .view-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.view-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; overflow: hidden; margin-right: 8px; -webkit-app-region: no-drag; }
-.view-toggle-btn { background: transparent; border: none; color: var(--muted); padding: 3px 10px; font-size: 12px; cursor: pointer; }
-.view-toggle-btn.active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 
 /* File browser ------------------------------------------------------------ */
 .preview-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
@@ -1657,3 +1618,7 @@ body.drag-active webview { pointer-events: none; }
 
 .agent-folder { overflow-wrap: anywhere; }
 .agent-secondary-action { margin: 0 8px 8px 0; }
+
+.agent-remote-help { margin-top: 12px; color: var(--text-muted); font-size: 13px; }
+.agent-remote-help summary { cursor: pointer; }
+.agent-pairing-code { display: inline-block; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 6px; letter-spacing: 0.12em; user-select: all; }

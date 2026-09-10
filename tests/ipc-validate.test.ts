@@ -4,7 +4,7 @@ import {
   parseAgentDone, parseLoginLocal, parsePtyInput, parsePtyResize, parsePtySpawn,
   parseRemoteDriverDecision, parseRemoteFsFile, parseRemoteFsList, parseRemoteFsRename,
   parseRemoteFsWrite, parseRemotePaneRef, parseRemoteRef, parseRemoteScopeRef, parseScrollbackSave,
-  parseServerConfig, parseServerRef, parseTasksSave, isSafeRemoteFsPath
+  parseServerConfig, parseServerRef, isSafeRemoteFsPath
 } from '../src/main/ipc-validate';
 
 // Anders als der Rest von src/main importiert ipc-validate kein Electron —
@@ -284,47 +284,6 @@ describe('parseAgentDone', () => {
 
   it('rejects a payload missing a field', () => {
     expect(parseAgentDone({ workspaceId: 'w1', workspaceName: 'One' })).toBeNull();
-  });
-});
-
-describe('parseTasksSave', () => {
-  const board = {
-    columns: [
-      { name: 'Todo', tasks: [{ id: 't1', title: 'A', done: false }] },
-      { name: 'Done', tasks: [] }
-    ]
-  };
-
-  it('accepts a well-formed board', () => {
-    expect(parseTasksSave({ dir: '/tmp', board })).toEqual({ dir: '/tmp', board });
-  });
-
-  it('keeps the optional description and command fields', () => {
-    const withOptional = {
-      columns: [{ name: 'Todo', tasks: [{ id: 't1', title: 'A', done: true, description: 'd', command: 'ls' }] }]
-    };
-    expect(parseTasksSave({ dir: '/tmp', board: withOptional })?.board).toEqual(withOptional);
-  });
-
-  // Das Board geht direkt in serializeTasks und von dort in die TASKS.md des
-  // Nutzers — ein Fremdfeld darf dort nicht landen.
-  it('strips unknown task fields', () => {
-    const dirty = { columns: [{ name: 'Todo', tasks: [{ id: 't1', title: 'A', done: false, injected: 'x' }] }] };
-    const out = parseTasksSave({ dir: '/tmp', board: dirty });
-    expect(out?.board.columns[0].tasks[0]).toEqual({ id: 't1', title: 'A', done: false });
-  });
-
-  it('rejects a board whose task is missing a required field', () => {
-    const broken = { columns: [{ name: 'Todo', tasks: [{ id: 't1', title: 'A' }] }] };
-    expect(parseTasksSave({ dir: '/tmp', board: broken })).toBeNull();
-  });
-
-  it('rejects a non-array columns field', () => {
-    expect(parseTasksSave({ dir: '/tmp', board: { columns: 'nope' } })).toBeNull();
-  });
-
-  it('rejects a missing dir', () => {
-    expect(parseTasksSave({ board })).toBeNull();
   });
 });
 

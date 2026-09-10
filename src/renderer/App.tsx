@@ -9,7 +9,6 @@ import { TitlebarActions } from './components/TitlebarActions';
 import { CommandPalette } from './components/CommandPalette';
 import { TemplateWizard } from './components/TemplateWizard';
 import { StartupCommandConfirmDialog } from './components/StartupCommandConfirmDialog';
-import { TaskBoard } from './components/TaskBoard';
 import { ClosePaneConfirmDialog } from './components/ClosePaneConfirmDialog';
 import { RemoteWorkspaceDialog } from './components/RemoteWorkspaceDialog';
 import { TasksPanel } from './components/TasksPanel';
@@ -23,17 +22,9 @@ export function App(): React.JSX.Element {
   const setWindowFocused = useStore((s) => s.setWindowFocused);
   const selectWorkspace = useStore((s) => s.selectWorkspace);
   const workspaceNavigationPlacement = useStore((s) => s.settings.workspaceNavigationPlacement ?? 'left');
-  const taskView = useStore((s) => s.taskView);
-  const applyTasksChanged = useStore((s) => s.applyTasksChanged);
-  const tasksEnabled = useStore((s) => s.activeWorkspace()?.tasksEnabled ?? false);
-  const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
   const pendingClosePane = useStore((s) => s.pendingClosePane);
   const confirmClosePane = useStore((s) => s.confirmClosePane);
   const cancelClosePane = useStore((s) => s.cancelClosePane);
-  // Board shows only when toggled on AND the active workspace opted in. Guards the
-  // case where you switch to a non-task workspace while the board is open.
-  const showBoard = taskView && tasksEnabled;
-
   const locale = useStore((s) => s.settings.locale);
   const brandDesign = useStore((s) => s.settings.brandDesign ?? 'graphite');
 
@@ -73,11 +64,8 @@ export function App(): React.JSX.Element {
     return () => { offFocus(); offActivate(); };
   }, [setWindowFocused, selectWorkspace]);
 
-  // Live-update the board when TASKS.md changes outside the app.
-  useEffect(() => window.api.onTasksChanged(applyTasksChanged), [applyTasksChanged]);
-
   // Remote-Workspaces: Verbindungs-, Driver- und Presence-Pushes aus dem
-  // Main-Prozess in den Store spiegeln (Muster: tasks:changed oben). Die
+  // Main-Prozess in den Store spiegeln. Die
   // Task-Ereignisse (geplante Agenten-Tasks, Arbeitspaket B) laufen über
   // denselben Kanal-Ansatz — global abonniert, nicht erst wenn das
   // Tasks-Panel geöffnet ist, damit Liste und Protokoll auch im Hintergrund
@@ -92,14 +80,6 @@ export function App(): React.JSX.Element {
     ];
     return () => { offs.forEach((off) => off()); };
   }, []);
-
-  // When the active workspace changes while the board is open, rebind it to the
-  // newly active workspace (reloads its TASKS.md, re-arms the file watcher, and
-  // re-points tasksDir) so edits never target the previous workspace's file.
-  useEffect(() => {
-    const s = useStore.getState();
-    if (s.taskView && s.activeWorkspace()?.tasksEnabled) void s.openTaskView();
-  }, [activeWorkspaceId]);
 
   if (!hydrated) {
     return (
@@ -127,10 +107,9 @@ export function App(): React.JSX.Element {
         <div className="workspace-shell">
           <WorkspaceNavigation placement={workspaceNavigationPlacement} />
           <div className="view-stack">
-            <div className="view-pane" style={{ display: showBoard ? 'none' : 'flex' }}>
+            <div className="view-pane">
               <WorkspaceView />
             </div>
-            {showBoard && <div className="view-pane"><TaskBoard /></div>}
           </div>
         </div>
         <PreviewPanel />

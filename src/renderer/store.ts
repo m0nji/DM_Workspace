@@ -371,15 +371,6 @@ export interface StoreState extends AppState {
   pendingClosePane: { paneId: string; remote: boolean } | null;
   windowFocused: boolean;
   searchOpenPaneId: string | null;
-  taskView: boolean;                 // true => board visible instead of terminals
-  tasks: import('../shared/types').TaskBoard | null;
-  tasksDir: string | null;           // working dir the loaded board belongs to
-  openTaskView: () => Promise<void>;
-  closeTaskView: () => void;
-  applyTasksChanged: (dir: string, board: import('../shared/types').TaskBoard) => void;
-  mutateTasks: (fn: (board: import('../shared/types').TaskBoard) => import('../shared/types').TaskBoard) => void;
-  runTaskInPane: (paneId: string, text: string) => void;
-  runTaskInNewPane: (text: string) => void;
   commandPaletteOpen: boolean;
   commandPaletteScope: 'all' | 'panes';
   templateWizard: TemplateWizardState;
@@ -452,7 +443,6 @@ export interface StoreState extends AppState {
   setWindowFocused: (focused: boolean) => void;
   setSearchOpen: (paneId: string | null) => void;
   setWorkspaceColor: (id: string, color: string) => void;
-  setTasksEnabled: (id: string, enabled: boolean) => void;
   // command palette
   setCommandPaletteOpen: (open: boolean, scope?: 'all' | 'panes') => void;
   // templates
@@ -693,9 +683,6 @@ export const useStore = create<StoreState>((set, get) => ({
   pendingClosePane: null,
   windowFocused: true,
   searchOpenPaneId: null,
-  taskView: false,
-  tasks: null,
-  tasksDir: null,
   commandPaletteOpen: false,
   commandPaletteScope: 'all',
   templateWizard: { open: false, templateId: null },
@@ -1149,7 +1136,6 @@ export const useStore = create<StoreState>((set, get) => ({
       activeWorkspaceId: workspaceId,
       focusedPaneId: paneId,
       maximizedPaneId: null,
-      taskView: false,
       workspaceGroups: s.workspaceGroups.map((g) =>
         g.id === ws.groupId && g.collapsed ? { ...g, collapsed: false } : g),
       previewPanel: { ...s.previewPanel, browseRoot: null }
@@ -1160,7 +1146,7 @@ export const useStore = create<StoreState>((set, get) => ({
     requestAnimationFrame(() => {
       const current = get();
       if (current.activeWorkspaceId === workspaceId && current.focusedPaneId === paneId &&
-          !current.commandPaletteOpen && !current.taskView &&
+          !current.commandPaletteOpen &&
           collectPaneIds(current.activeWorkspace()?.layout ?? null).includes(paneId)) {
         focusTerminal(paneId);
       }
@@ -1222,66 +1208,6 @@ export const useStore = create<StoreState>((set, get) => ({
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),
 
-  openTaskView: async () => {
-    const ws = get().activeWorkspace();
-    if (!ws) return;
-    const dir = ws.cwd;
-    // Bind tasksDir synchronously so edits always target the ACTIVE workspace's
-    // file, even before the async load resolves (prevents writing to the previous
-    // workspace's TASKS.md when switching while the board is open). Clear stale
-    // tasks when the dir changes so the board shows "loading" rather than the old
-    // workspace's cards.
-    set((s) => ({ taskView: true, tasksDir: dir, tasks: s.tasksDir === dir ? s.tasks : null }));
-    const board = await window.api.loadTasks(dir);
-    // Guard against an out-of-order load if the dir changed again meanwhile.
-    if (get().tasksDir === dir) set({ tasks: board });
-  },
-  closeTaskView: () => set({ taskView: false }),
-
-  // Apply an external file change only when it matches the board we're showing.
-  applyTasksChanged: (dir, board) => set((s) => (s.tasksDir === dir ? { tasks: board } : s)),
-
-  // Local edit helper: transform the board, persist to TASKS.md, keep state in sync.
-  mutateTasks: (fn) => set((s) => {
-    if (!s.tasks || !s.tasksDir) return s;
-    const tasks = fn(s.tasks);
-    window.api.saveTasks(s.tasksDir, tasks);
-    return { ...s, tasks };
-  }),
-
-  // Send a task's command/title into a running pane, then reveal terminals and
-  // focus that pane. Uses the same input path as startup commands.
-  runTaskInPane: (paneId, text) => {
-    const data = `${text}\r`;
-    trackTerminalInput(paneId, data);
-    window.api.input({ paneId, data });
-    set({ taskView: false, focusedPaneId: paneId });
-    // rAF so the pane is un-hidden (display:none -> block) before we focus it.
-    requestAnimationFrame(() => focusTerminal(paneId));
-  },
-
-  // Create a pane and stage the task text as a one-shot startup command, reusing
-  // the proven consumeStartupCommand mechanism. Splits the focused pane (or makes
-  // a single pane on the welcome screen).
-  runTaskInNewPane: (text) => set((s) => {
-    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
-    if (!ws || ws.kind === 'remote') return s; // Remote-Panes kommen vom Server
-    const newPaneId = nextPaneId();
-    let layout;
-    if (!ws.layout) {
-      layout = { type: 'pane', id: newPaneId } as const;
-    } else {
-      const ids = collectPaneIds(ws.layout);
-      const target = s.focusedPaneId && ids.includes(s.focusedPaneId) ? s.focusedPaneId : ids[0];
-      layout = splitPane(ws.layout, target, 'h', newPaneId, nextSplitId());
-    }
-    const pendingStartupCommands = { ...(ws.pendingStartupCommands ?? {}), [newPaneId]: text };
-    const workspaces = s.workspaces.map((w) => w.id === ws.id ? { ...w, layout, pendingStartupCommands } : w);
-    const next = { ...s, workspaces, taskView: false, focusedPaneId: newPaneId };
-    persist(next);
-    return next;
-  }),
-
   startAgentInPane: (paneId, command, inputPrefix = '\x05\x15') => {
     const s = get();
     const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(paneId));
@@ -1289,7 +1215,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Clear an unfinished shell line before sending the prepared command.
     // Never send these editing keys to a foreground application.
     const data = `${inputPrefix}${command}\r`;
-    set({ activeWorkspaceId: ws.id, focusedPaneId: paneId, taskView: false,
+    set({ activeWorkspaceId: ws.id, focusedPaneId: paneId,
       paneShell: { ...s.paneShell, [paneId]: 'running' } });
     // Track the CLI name so the internal bootstrap path never becomes the pane label.
     trackTerminalInput(paneId, `\x05\x15${s.agentStates[paneId]?.provider ?? command}\r`);
@@ -1328,15 +1254,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };
-    persist(next);
-    return next;
-  }),
-
-  setTasksEnabled: (id, enabled) => set((s) => {
-    const workspaces = s.workspaces.map((w) => w.id === id ? { ...w, tasksEnabled: enabled } : w);
-    // If the active workspace just lost tasks, leave the board view.
-    const taskView = s.taskView && !(s.activeWorkspaceId === id && !enabled);
-    const next = { ...s, workspaces, taskView };
     persist(next);
     return next;
   }),

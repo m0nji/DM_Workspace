@@ -1,10 +1,12 @@
-import { app, BrowserWindow, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, screen } from 'electron';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir, release } from 'os';
 import { WINDOWS_BUILD_FLAG } from '../shared/windows-pty';
 import { registerIpc } from './ipc';
+import { loadStateFromFile, StateLoadError } from './persistence';
+import { stateLoadErrorMessage } from './state-load-error';
 import { isBoundsVisible } from './window-bounds';
 import { wireWindowShow } from './window-show';
 import { registerUpdater } from './updater';
@@ -28,7 +30,7 @@ app.setAppUserModelId('de.dmworkspace.app');
 // into a rejected promise. Nothing above the individual handler is load-bearing,
 // so logging and staying alive is strictly better than taking the sessions down.
 // Individual subsystems still handle their own expected failures (see
-// task-watcher.ts); this only catches what they miss.
+// the remote backend); this only catches what they miss.
 process.on('uncaughtException', (err) => {
   console.error('[main] uncaught exception (kept alive to preserve terminal sessions):', err);
 });
@@ -115,7 +117,7 @@ function createWindow(): void {
   // Restore last-used window size/position. width/height always apply; x/y only
   // if the saved frame still overlaps a connected display (a disconnected monitor
   // would otherwise open the window off-screen) — otherwise the window is centered.
-  const saved = ipc.loadWindowBounds();
+  const saved = ipc?.loadWindowBounds();
   const displays = screen.getAllDisplays().map((d) => d.bounds);
   const usePos = saved ? isBoundsVisible(saved, displays) : false;
   mainWindow = new BrowserWindow({
@@ -206,21 +208,32 @@ function createWindow(): void {
     if (boundsTimer) clearTimeout(boundsTimer);
     boundsTimer = setTimeout(() => {
       boundsTimer = null;
-      if (mainWindow) ipc.persistWindowBounds(mainWindow);
+      if (mainWindow) ipc?.persistWindowBounds(mainWindow);
     }, 500);
   };
   mainWindow.on('resize', scheduleBoundsSave);
   mainWindow.on('move', scheduleBoundsSave);
-  mainWindow.on('maximize', () => mainWindow && ipc.persistWindowBounds(mainWindow));
-  mainWindow.on('unmaximize', () => mainWindow && ipc.persistWindowBounds(mainWindow));
+  mainWindow.on('maximize', () => mainWindow && ipc?.persistWindowBounds(mainWindow));
+  mainWindow.on('unmaximize', () => mainWindow && ipc?.persistWindowBounds(mainWindow));
 }
 
-const ipc = registerIpc(() => mainWindow);
-registerUpdater(() => mainWindow);
+let ipc: ReturnType<typeof registerIpc> | undefined;
 
-void app.whenReady().then(() => {
-  installAppMenu();
-  createWindow();
+void app.whenReady().then(async () => {
+  try {
+    // Before IPC, scrollback stores, window events or renderer autosaves exist.
+    // Never launch an empty replacement session after a failed load.
+    loadStateFromFile(join(app.getPath('userData'), 'state.json'));
+    ipc = registerIpc(() => mainWindow);
+    registerUpdater(() => mainWindow);
+    installAppMenu();
+    createWindow();
+  } catch (err) {
+    if (!(err instanceof StateLoadError)) throw err;
+    const message = stateLoadErrorMessage(err, app.getLocale());
+    await dialog.showMessageBox({ type: 'error', ...message, buttons: ['OK'], noLink: true });
+    app.quit();
+  }
 });
 
 // Single coordinated pty teardown shared by both quit paths. Memoized while it's
@@ -235,6 +248,7 @@ void app.whenReady().then(() => {
 // as the "quit unexpectedly" dialog. See pty-shutdown.ts for the addon detail.
 let ptyTeardown: Promise<void> | null = null;
 function teardownPtys(): Promise<void> {
+  if (!ipc) return Promise.resolve();
   if (!ptyTeardown) {
     ptyTeardown = ipc.pty.killAllAndWait().finally(() => {
       ptyTeardown = null;
@@ -252,7 +266,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (ipc && BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
 // Quit only after every pty has actually exited. preventDefault holds the quit,
