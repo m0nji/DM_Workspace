@@ -9,7 +9,10 @@ export function activityContent(lines: string[]): string {
   const footer = lines.findIndex((line, index) => index > composer && /Context.*left/.test(line));
   return lines.map((line, index) => {
     if (composer >= 0 && footer > composer && index >= Math.max(0, composer - 1) && index < footer) {
-      const normalized = line.replace(/[.·•⋅∙⋆*✦✧⠁-⣿]/g, '').trimEnd();
+      // Blank the decoration, never delete it: a star also lands in the column
+      // between the prompt marker and the placeholder, and dropping the cell
+      // would pull the text left and read as a change on every frame.
+      const normalized = line.replace(/[.·•⋅∙⋆*✦✧⠁-⣿]/g, ' ').trimEnd();
       // Only decoration-only rows or the known placeholder row are excluded.
       if (index === composer || !normalized.trim()) return normalized;
     }

@@ -61,7 +61,10 @@ test(`remote observer and idle animation: ${initialScreen}`, async () => {
     // Keep repainting more often than the 2-second silence threshold.
     // Raw-output activity would never reach done during this sequence.
     for (let frame = 0; frame < 16; frame++) {
-      await emit(`\x1b[2;1H\x1b[2K${' '.repeat(frame % 8)}·   .\x1b[3;1H\x1b[2K› Ask Codex to do anything${' '.repeat(frame % 5)}·`);
+      // Das Sternenfeld trifft auch die Spalte zwischen Prompt-Zeichen und
+      // Platzhalter — dort darf die Normalisierung den Text nicht verschieben.
+      const gap = frame % 2 ? '\u2801' : ' ';
+      await emit(`\x1b[2;1H\x1b[2K${' '.repeat(frame % 8)}·  \u2804.\x1b[3;1H\x1b[2K›${gap}Ask Codex to do anything${' '.repeat(frame % 5)}\u2808`);
       await new Promise(resolve => setTimeout(resolve, 200));
       if (frame === 12) {
         expect(await status()).toBe('done');

@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.18.2 – 2026-09-11
+- fix: Keep the workspace busy indicator from spinning on after Codex has finished. The decorative star field in the empty Codex composer also draws into the column between the prompt marker and its placeholder text; that column is now blanked instead of dropped, so the idle animation no longer reads as new output. Real output, typing and progress updates still register immediately.
+
 ## 0.18.1 – 2026-09-10
 - fix: Stop extending terminal activity for unchanged screen repaints and decorative stars in the empty Codex composer. New text and progress updates still register as activity, independently of explicit agent status.
 - fix: Remote terminal observers follow the controlling client's rows and columns instead of reflowing cursor-addressed output to their own window. Smaller views scroll, and taking control restores local fitting.
