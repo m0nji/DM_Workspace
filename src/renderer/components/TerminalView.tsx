@@ -31,6 +31,7 @@ import { attachLinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
+import { attachMouseSelectionGuard } from '../terminal/mouse-selection-guard';
 import { PSREADLINE_CLEAR_SCREEN_SEQUENCE, PSREADLINE_HEAL_SEQUENCE } from '../../shared/psreadline-heal';
 import { conptyClearSequence, cursorLineRows } from '../../shared/conpty-clear';
 import { promptMarkerDecision, type AgentBootLaunch } from '../../shared/agent-boot-prompt';
@@ -456,6 +457,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       plainClickEnabled: () => useStore.getState().settings.clickMovesCursor ?? false,
       onInput: () => activity.onInput()
     }));
+
+    disposers.push(attachMouseSelectionGuard(host, term));
 
     const safeFit = (): boolean => {
       // Clear any previous pin so we measure (and fit to) the full wrapper height,

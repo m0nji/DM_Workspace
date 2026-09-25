@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.2 – 2026-09-25
+- fix: A selection in a program that tracks the mouse (Codex does) now survives the right-click, so the menu's Copy works. The terminal reported every mouse move and the right-button press to the program as input, and input clears the selection. The right button now belongs to the context menu only, and mouse moves are held back while text is selected.
+- fix: On Windows, Codex no longer flashes several terminal windows for each prompt. Since Codex 0.157 its interface hands the work to a shared background server that has no console, so every `git` and command it started opened a window of its own. Agent panes now start Codex with `--no-daemon` when the installed version supports it; with phone access, which needs that server, Codex keeps using it.
+
 ## 0.19.1 – 2026-09-25
 - fix: On Windows, typing after "Clear Window" no longer appears far below the prompt. Clearing only wiped the terminal view, while Windows' console layer (ConPTY) kept its own copy of the screen with the prompt still on its old row, and it places every keystroke by absolute position, so text landed on that old row while the prompt sat at the top. A resize also brought the cleared history back, because ConPTY repaints from that copy. At a PowerShell prompt the shell now clears its own screen and redraws the prompt at the top, and whatever you had already typed on the line stays there. Where that isn't possible (another shell, or a program running in the pane), the prompt stays on its row and everything else is cleared, so typing still lands in the right place
 - fix: The terminal's right-click menu no longer closes the instant it opens when something is typed at the prompt. On a right-click the terminal moves its hidden input field under the pointer, and that fired a scroll event the menu treated as a reason to close

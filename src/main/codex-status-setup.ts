@@ -41,6 +41,8 @@ process.stdin.on('end', () => {
   const remoteArgs = remote ? `--remote unix:// ${powershell ? '--cd "%DMWS_CODEX_CWD%" ' : ''}` : '';
   const nativeCodex = `& ${powerShellApplication(program)}`;
   if (powershell) {
+    const invocation = (daemonArgs: string): string =>
+      `${nativeCodex} --% ${daemonArgs}${remoteArgs}-c "${windowsQuoted}"${extraArgs.map(arg => ` ${quoteWindowsNative(arg)}`).join('')}`;
     const lines = [
       '& {',
       "$PSNativeCommandArgumentPassing = 'Legacy'",
@@ -49,10 +51,22 @@ process.stdin.on('end', () => {
         "if ($LASTEXITCODE -ne 0) { throw 'Codex Remote Control could not start. Check login and other desktop connections.' }",
         '$dmwsPreviousCwd = $env:DMWS_CODEX_CWD',
         '$env:DMWS_CODEX_CWD = (Get-Location).Path',
-        'try {'
-      ] : []),
-      `${nativeCodex} --% ${remoteArgs}-c "${windowsQuoted}"${extraArgs.map(arg => ` ${quoteWindowsNative(arg)}`).join('')}`,
-      ...(remote ? ['} finally { $env:DMWS_CODEX_CWD = $dmwsPreviousCwd }'] : []),
+        'try {',
+        invocation(''),
+        '} finally { $env:DMWS_CODEX_CWD = $dmwsPreviousCwd }'
+      ] : [
+        // Since 0.157 the TUI hands its work to a shared background server by
+        // default. On Windows that server has no console, so every git.exe and
+        // command it starts opens its own (Windows Terminal) window that
+        // flashes up per prompt. --no-daemon keeps the work in this process,
+        // inside the pane's console. Older Codex rejects the flag: ask first.
+        // The phone option needs the server (--remote) and keeps it.
+        `if ((& ${powerShellApplication(program)} --help 2>&1 | Out-String) -match '--no-daemon') {`,
+        invocation('--no-daemon '),
+        '} else {',
+        invocation(''),
+        '}'
+      ]),
       '}'
     ];
     return { command: lines.join('\n'), script };

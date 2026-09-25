@@ -95,9 +95,11 @@ describe('buildAgentCommand', () => {
       // shares a line with a closing brace of either block.
       expect(codex.command.split('\n')[0]).toBe('& {');
       expect(codex.command.split('\n').at(-1)).toBe('}');
+      // Without the phone option there is one invocation with and one without
+      // --no-daemon (for Codex versions that don't know the flag).
       const stopParsing = lines.filter(line => line.includes(' --% '));
-      expect(stopParsing).toHaveLength(1);
-      expect(stopParsing[0]).toMatch(/^& \(Get-Command codex .* --% .* "--profile" "o s"$/);
+      expect(stopParsing).toHaveLength(remote ? 1 : 2);
+      for (const line of stopParsing) expect(line).toMatch(/^& \(Get-Command codex .* --% .* "--profile" "o s"$/);
       // Outside the --% line (whose TOML config carries braces of its own) the
       // script's braces balance.
       const braces = lines.filter(line => !line.includes(' --% ')).join('\n');
@@ -119,7 +121,29 @@ describe('codexSetup with profile program and args', () => {
       .toMatch(/^command '\/opt\/my codex' -c '.*' '--profile' 'o s'$/s);
     const ps = codexSetup('C:\\t\\h.cjs', 1, 'tok', true, false, undefined, { program: 'codex', args: ['--profile', 'o s'] }).command;
     expect(ps).toContain(' --% -c "');
-    expect(ps).toMatch(/ "--profile" "o s"\n\}$/);
+    expect(ps).toMatch(/ "--profile" "o s"\n\}\n\}$/);
+  });
+});
+
+describe('codexSetup on PowerShell and the shared Codex server', () => {
+  const lines = (remote: boolean) =>
+    codexSetup('C:\\t\\h.cjs', 1, 'tok', true, remote, remote ? 'n'.repeat(64) : undefined).command.split('\n');
+  it('starts Codex without the console-less background server when the version supports it', () => {
+    const l = lines(false);
+    const probe = l.findIndex(line => line.startsWith('if ((& (Get-Command codex '));
+    expect(l[probe]).toBe(`if ((& ${powerShellApplication('codex')} --help 2>&1 | Out-String) -match '--no-daemon') {`);
+    expect(l[probe + 1]).toMatch(/ --% --no-daemon -c "/);
+    expect(l[probe + 2]).toBe('} else {');
+    expect(l[probe + 3]).toMatch(/ --% -c "/);
+    expect(l[probe + 4]).toBe('}');
+  });
+  it('keeps the server for the phone option, which connects through it', () => {
+    const command = lines(true).join('\n');
+    expect(command).not.toContain('--no-daemon');
+    expect(command).toContain(' --% --remote unix:// ');
+  });
+  it('leaves POSIX shells unchanged', () => {
+    expect(codexSetup('/t/h.cjs', 1, 'tok', false).command).not.toContain('--no-daemon');
   });
 });
 
