@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.1 – 2026-09-25
+- fix: On Windows, typing after "Clear Window" no longer appears far below the prompt. Clearing only wiped the terminal view, while Windows' console layer (ConPTY) kept its own copy of the screen with the prompt still on its old row, and it places every keystroke by absolute position, so text landed on that old row while the prompt sat at the top. A resize also brought the cleared history back, because ConPTY repaints from that copy. At a PowerShell prompt the shell now clears its own screen and redraws the prompt at the top, and whatever you had already typed on the line stays there. Where that isn't possible (another shell, or a program running in the pane), the prompt stays on its row and everything else is cleared, so typing still lands in the right place
+- fix: The terminal's right-click menu no longer closes the instant it opens when something is typed at the prompt. On a right-click the terminal moves its hidden input field under the pointer, and that fired a scroll event the menu treated as a reason to close
+
 ## 0.19.0 – 2026-09-25
 - feat: Open a new pane to the right or below from the `+` menu in every pane header: a plain terminal or any configured AI agent. The command palette offers the same entries. Keyboard: arrow keys to choose, Enter opens to the right, Shift+Enter below.
 - feat: Configure AI agents in Settings. Claude Code, Codex and OpenCode are built-in profiles; add your own (for example OpenCode with a local Ollama model) with a base, program, arguments, environment variables and an icon. Duplicate, reorder, hide from the menu, check whether the program is installed, reset or delete profiles. Phone access is set per profile.

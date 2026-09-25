@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, psCwdBootstrap } from '../src/main/shell-integration';
 import { DMWS_PROMPT_OSC, promptPayload } from '../src/shared/pane-auto-title';
-import { PSREADLINE_HEAL_CHORD, PSREADLINE_HEAL_SEQUENCE } from '../src/shared/psreadline-heal';
+import {
+  PSREADLINE_CLEAR_SCREEN_CHORD, PSREADLINE_HEAL_CHORD, PSREADLINE_HEAL_SEQUENCE
+} from '../src/shared/psreadline-heal';
 
 // Every hook embeds this launch's nonce, so the marker it prints cannot be
 // reproduced by a program that only sees the terminal's output stream.
@@ -57,9 +59,18 @@ describe('psCwdBootstrap', () => {
     expect(boot).toContain('[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()');
   });
 
+  it('binds Console.Clear + InvokePrompt to the clear chord (ConPTY-safe Clear Window)', () => {
+    expect(boot).toContain(
+      `-Chord '${PSREADLINE_CLEAR_SCREEN_CHORD}' -ScriptBlock ` +
+      '{try{[Console]::Clear();[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null,0)}catch{}}'
+    );
+  });
+
   it('skips the binding without PSReadLine and never steals an existing one', () => {
     expect(boot).toContain('Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue');
-    expect(boot).toContain(`(Get-PSReadLineKeyHandler -Bound).Key -notcontains '${PSREADLINE_HEAL_CHORD}'`);
+    expect(boot).toContain('$__dmwsBound=(Get-PSReadLineKeyHandler -Bound).Key');
+    expect(boot).toContain(`if($__dmwsBound -notcontains '${PSREADLINE_HEAL_CHORD}')`);
+    expect(boot).toContain(`if($__dmwsBound -notcontains '${PSREADLINE_CLEAR_SCREEN_CHORD}')`);
     // a failing binding — or a failing handler — must not paint the pane red
     expect(boot).toContain('catch{}');
   });

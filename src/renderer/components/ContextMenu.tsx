@@ -63,15 +63,22 @@ export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element 
       e.preventDefault();
       enabled[(next + enabled.length) % enabled.length]?.focus();
     };
+    // On right-click xterm moves its hidden input textarea under the pointer;
+    // with pending input in it that fires a scroll event that is no scrolling
+    // the user did — closing on it made the terminal menu vanish at once.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Element && e.target.classList.contains('xterm-helper-textarea')) return;
+      onClose();
+    };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('blur', onClose);
     window.addEventListener('resize', onClose);
-    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('scroll', onScroll, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('blur', onClose);
       window.removeEventListener('resize', onClose);
-      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('scroll', onScroll, true);
     };
   }, [onClose]);
 

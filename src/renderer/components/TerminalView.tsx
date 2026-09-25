@@ -31,7 +31,8 @@ import { attachLinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
-import { PSREADLINE_HEAL_SEQUENCE } from '../../shared/psreadline-heal';
+import { PSREADLINE_CLEAR_SCREEN_SEQUENCE, PSREADLINE_HEAL_SEQUENCE } from '../../shared/psreadline-heal';
+import { conptyClearSequence, cursorLineRows } from '../../shared/conpty-clear';
 import { promptMarkerDecision, type AgentBootLaunch } from '../../shared/agent-boot-prompt';
 import {
   STUCK_MODE_RESET,
@@ -332,6 +333,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const HEAL_DELAY_MS = 30;
     let promptArmed = false;
     let healTimer: ReturnType<typeof setTimeout> | null = null;
+    // Pending shell-side "Clear Window" (see clearBuffer): armed when F23 is
+    // sent, settled by the next prompt marker, else the fallback runs.
+    const SHELL_CLEAR_TIMEOUT_MS = 1000;
+    let shellClearTimer: ReturnType<typeof setTimeout> | null = null;
     // Set right before a queued agent profile is spawned into this (brand new)
     // pane and updated by the spawn result; see the OSC prompt handler below
     // and shared/agent-boot-prompt.ts for why it exists.
@@ -404,6 +409,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         // die Heilung gefahrlos gesendet werden darf. Nicht aber, wenn der
         // Agent schon gestartet ist: dann läse er die Heilungsbytes.
         promptArmed = decision.shell === 'atPrompt';
+        // A shell-side clear just redrew its prompt: the console buffer is
+        // empty, drop our scrollback to match and persist the cleared state.
+        if (shellClearTimer !== null) {
+          clearTimeout(shellClearTimer);
+          shellClearTimer = null;
+          term.write('\x1b[3J', flushSave);
+        }
         // Zusätzlich melden, damit die Navigation es sehen kann. promptArmed
         // bleibt lokal, weil die Heilung es synchron braucht; hier wird nur
         // gemeldet, nicht abgeleitet — was der Zustand bedeutet, entscheidet
@@ -523,9 +535,38 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // Wipe the buffer (scrollback + viewport), keeping the current prompt line as
     // the new first line, then persist immediately so a restart doesn't replay
     // the history we just cleared. Driven from the context menu via the registry.
+    // A local Windows pane keeps the prompt on its row instead: ConPTY still
+    // thinks it is there and would paint the next keystroke on that row — see
+    // shared/conpty-clear.ts.
+    //
+    // Better still, at a PowerShell prompt the shell clears ConPTY's copy
+    // itself (F23, see PSREADLINE_CLEAR_SCREEN_CHORD) — otherwise the next resize
+    // would repaint the old content. The prompt marker the redrawn prompt emits
+    // confirms it (see the OSC handler); only the scrollback is left for us.
+    // Same gating as the heal: without a marker nobody bound F23.
     const clearBuffer = (): void => {
-      term.clear();
-      flushSave();
+      if (remote || window.api.platform !== 'win32') {
+        term.clear();
+        flushSave();
+        return;
+      }
+      if (promptArmed) {
+        if (shellClearTimer !== null) clearTimeout(shellClearTimer);
+        shellClearTimer = setTimeout(() => {
+          shellClearTimer = null;
+          clearKeepingPromptRow();
+        }, SHELL_CLEAR_TIMEOUT_MS);
+        window.api.input({ paneId, data: PSREADLINE_CLEAR_SCREEN_SEQUENCE });
+        return;
+      }
+      clearKeepingPromptRow();
+    };
+    const clearKeepingPromptRow = (): void => {
+      const buf = term.buffer.active;
+      const [top, bottom] = cursorLineRows(
+        buf.cursorY, term.rows, (row) => buf.getLine(buf.baseY + row)?.isWrapped ?? false
+      );
+      term.write(conptyClearSequence(top, bottom, term.rows, term.cols), flushSave);
     };
     registerTerminal(paneId, clearBuffer);
     registerTerminalFocus(paneId, () => term.focus());
@@ -873,6 +914,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       cancelAnimationFrame(raf2);
       if (settleTimer !== null) { clearTimeout(settleTimer); settleTimer = null; }
       if (healTimer !== null) { clearTimeout(healTimer); healTimer = null; }
+      if (shellClearTimer !== null) { clearTimeout(shellClearTimer); shellClearTimer = null; }
       ro.disconnect();
       resizeScheduler.dispose();
       unregisterTerminalLayoutRefresh(paneId);

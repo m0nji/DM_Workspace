@@ -29,8 +29,9 @@ const VK_F24 = 135;
 // as VT and drops a CSI it does not implement, but a POSIX pty has no such
 // parser at all — the bytes reach the line discipline as if they had been
 // typed, and readline would put the digits into the user's command line.
-export const PSREADLINE_HEAL_SEQUENCE =
-  `\x1b[${VK_F24};0;0;1;0;1_\x1b[${VK_F24};0;0;0;0;1_`;
+const keyPress = (vk: number): string => `\x1b[${vk};0;0;1;0;1_\x1b[${vk};0;0;0;0;1_`;
+
+export const PSREADLINE_HEAL_SEQUENCE = keyPress(VK_F24);
 
 // PowerShell's default Windows editing mode clears input with Ctrl+Home and
 // Ctrl+End, not the POSIX Ctrl+E/Ctrl+U pair. Send explicit ConPTY key records
@@ -39,3 +40,15 @@ export const PSREADLINE_HEAL_SEQUENCE =
 export const PSREADLINE_CLEAR_INPUT_SEQUENCE =
   '\x1b[36;0;0;1;8;1_\x1b[36;0;0;0;8;1_' +
   '\x1b[35;0;0;1;8;1_\x1b[35;0;0;0;8;1_';
+
+// "Clear Window" rides on the same trick as the heal. ConPTY keeps its own
+// copy of the console buffer and paints with absolute cursor positions, so
+// clearing only xterm leaves the two out of step (see shared/conpty-clear.ts),
+// and a later resize repaints the old content. Only the console app can empty
+// that copy: the bootstrap binds F23 to Console.Clear() + InvokePrompt($null, 0),
+// which clears the buffer and redraws the prompt — with whatever the user had
+// typed — on row 0. The row argument matters: without it InvokePrompt redraws
+// on the row the prompt started on before the clear.
+export const PSREADLINE_CLEAR_SCREEN_CHORD = 'F23';
+const VK_F23 = 134;
+export const PSREADLINE_CLEAR_SCREEN_SEQUENCE = keyPress(VK_F23);

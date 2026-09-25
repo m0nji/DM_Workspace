@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { DMWS_PROMPT_OSC, promptPayload, promptSequence } from '../shared/pane-auto-title';
-import { PSREADLINE_HEAL_CHORD } from '../shared/psreadline-heal';
+import { PSREADLINE_CLEAR_SCREEN_CHORD, PSREADLINE_HEAL_CHORD } from '../shared/psreadline-heal';
 
 // Raw control bytes for the OSC 7 cwd report. ESC ] 7 ; file://HOST PATH BEL.
 const ESC = '\x1b';
@@ -19,11 +19,19 @@ const BEL = '\x07';
 // handler body has its own try/catch — a failing key handler would otherwise
 // paint a red error over the pane on every heal. The `-notcontains` guard keeps
 // a user who already bound F24 in charge of their own key.
+//
+// F23 does the same for "Clear Window": Console.Clear() empties the console
+// buffer ConPTY paints from, InvokePrompt() redraws prompt + pending input at
+// the top (see PSREADLINE_CLEAR_SCREEN_CHORD).
+const bindKey = (chord: string, body: string): string =>
+  `if($__dmwsBound -notcontains '${chord}'){` +
+  `Set-PSReadLineKeyHandler -Chord '${chord}' -ScriptBlock {try{${body}}catch{}}}`;
 const psReadLineHeal =
   'try{if(Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue){' +
-  `if((Get-PSReadLineKeyHandler -Bound).Key -notcontains '${PSREADLINE_HEAL_CHORD}'){` +
-  `Set-PSReadLineKeyHandler -Chord '${PSREADLINE_HEAL_CHORD}' -ScriptBlock ` +
-  '{try{[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()}catch{}}}}}catch{}';
+  '$__dmwsBound=(Get-PSReadLineKeyHandler -Bound).Key;' +
+  bindKey(PSREADLINE_HEAL_CHORD, '[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()') +
+  bindKey(PSREADLINE_CLEAR_SCREEN_CHORD, '[Console]::Clear();[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt($null,0)') +
+  '}}catch{}';
 
 // PowerShell bootstrap that makes every prompt emit OSC 9;9 with the current
 // filesystem path, so the renderer can show the live cwd in the pane title. It
