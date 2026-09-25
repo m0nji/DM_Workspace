@@ -2,6 +2,7 @@ import { test, expect, _electron as electron, type ElectronApplication, type Pag
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const win32 = process.platform === 'win32';
 
@@ -46,6 +47,32 @@ async function workspace(win: Page, project: string): Promise<void> {
   await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.source)).toBe('atPrompt');
 }
 
+// Processes started by the app (pid) that are still alive, for a close() that hangs.
+function descendants(pid: number): string {
+  const rows = win32
+    ? (JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress'], { encoding: 'utf8', timeout: 10000 })) as Array<{ ProcessId: number; ParentProcessId: number; Name: string; CommandLine: string | null }>)
+      .map(p => ({ pid: p.ProcessId, ppid: p.ParentProcessId, command: `${p.Name} ${p.CommandLine ?? ''}` }))
+    : execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' }).trim().split('\n')
+      .map(line => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/)!).map(m => ({ pid: Number(m[1]), ppid: Number(m[2]), command: m[3] }));
+  const tree = new Set([pid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const row of rows) if (tree.has(row.ppid) && !tree.has(row.pid)) { tree.add(row.pid); grew = true; }
+  }
+  return rows.filter(row => tree.has(row.pid)).map(row => `${row.pid} <- ${row.ppid}: ${row.command.slice(0, 300)}`).join('\n') || '(none)';
+}
+
+// Windows CI once hung in close() right after a test opened a new pane. Report
+// what is still running instead of failing on a bare timeout.
+async function closeApp(app: ElectronApplication): Promise<void> {
+  const pid = app.process().pid;
+  const timer = pid === undefined ? undefined : setTimeout(() => {
+    try { console.error(`app.close() still waiting after 15 s; processes under ${pid}:\n${descendants(pid)}`); } catch (error) { console.error('process list failed:', error); }
+  }, 15000);
+  try { await app.close(); } finally { clearTimeout(timer); }
+}
+
 const buffer = (win: Page, id: string) => win.evaluate(id => (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText.get(id)?.() ?? '', id);
 
 test.describe('agent profiles', () => {
@@ -63,7 +90,7 @@ test.describe('agent profiles', () => {
   });
   test.afterEach(async () => {
     writeFileSync(join(dir, 'stop'), '');
-    await app.close();
+    await closeApp(app);
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -84,6 +111,8 @@ test.describe('agent profiles', () => {
     await source.getByRole('button', { name: 'New pane', exact: true }).click();
     await menu.getByRole('button', { name: 'Open Terminal below' }).click();
     await expect(win.locator('.pane')).toHaveCount(3);
+    const terminal = await win.evaluate(() => window.__store.getState().focusedPaneId!);
+    await expect.poll(() => win.evaluate(id => window.__store.getState().paneShell[id], terminal)).toBe('atPrompt');
   });
 
   test('custom profile passes arguments and environment exactly and leaves the shell clean', async () => {
@@ -267,6 +296,8 @@ test.describe('agent profiles', () => {
     await win.keyboard.press('Shift+Enter');
     await expect(win.locator('.pane')).toHaveCount(2);
     expect(await win.evaluate(() => window.__store.getState().workspaces[0].layout)).toMatchObject({ type: 'split', direction: 'v' });
+    const terminal = await win.evaluate(() => window.__store.getState().focusedPaneId!);
+    await expect.poll(() => win.evaluate(id => window.__store.getState().paneShell[id], terminal)).toBe('atPrompt');
   });
 
   test('settings add, duplicate, reorder, hide and delete profiles and keep them after restart', async () => {

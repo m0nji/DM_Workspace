@@ -70,7 +70,12 @@ if (${JSON.stringify(provider)} === 'claude' && process.argv.includes('--remote-
 if (process.stdin.isTTY) process.stdin.setRawMode(true);
 process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
 (async () => {
-  while (!fs.existsSync(${JSON.stringify(join(dir, 'allow-report'))})) await new Promise(resolve => setTimeout(resolve, 20));
+  while (!fs.existsSync(${JSON.stringify(join(dir, 'allow-report'))})) {
+    // A test that fails before allowing the report must still stop us, or the
+    // PTY stays open and app.close() hangs until the test timeout hides the error.
+    if (fs.existsSync(${JSON.stringify(join(dir, 'stop'))})) process.exit(0);
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
   if (${JSON.stringify(provider)} === 'claude') {
     const settings = JSON.parse(fs.readFileSync(process.argv[process.argv.indexOf('--settings') + 1], 'utf8'));
     const hook = settings.hooks.UserPromptSubmit[0].hooks[0];
@@ -142,10 +147,10 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
       await expect(dialog.locator('code')).toHaveCount(0);
       await win.screenshot({ path: join(tmpdir(), `dmws-direct-start-${provider}.png`) });
       await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
-      await expect.poll(async () => {
-        if (await dialog.count() === 0) return 'started';
-        return await dialog.innerText();
-      }, { timeout: 20000 }).toBe('started');
+      // One atomic read: a count() followed by innerText() waits forever once
+      // the dialog closes between the two calls.
+      await expect.poll(() => win.evaluate(() => (document.querySelector('[role="alertdialog"]') as HTMLElement | null)?.innerText ?? 'started'),
+        { timeout: 20000 }).toBe('started');
       await expect(win.locator('.pane-agent-status')).toHaveCount(1);
       await expect(original.locator('.pane-agent-status')).toContainText(provider === 'opencode' ? 'No live status' : 'Waiting for status');
       writeFileSync(join(dir, 'allow-report'), '');
@@ -230,6 +235,43 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     }
   });
 }
+
+test('the agent dialog hands focus to the terminal even when a frame runs before it closes', async () => {
+  test.skip(process.platform === 'win32', 'POSIX shell fixture');
+  const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-focus-'));
+  const testShell = join(dir, 'sh');
+  const stop = join(dir, 'stop');
+  writeFileSync(testShell, `#!/bin/sh\nexport PATH='${dir}:/usr/bin:/bin'\nexec /bin/bash --noprofile --norc "$@"\n`, { mode: 0o700 });
+  writeFileSync(join(dir, 'opencode'), `#!/bin/sh\necho OPENCODE_RUNNING\nwhile [ ! -e '${stop}' ]; do sleep 0.05; done\n`, { mode: 0o700 });
+  const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env, SHELL: testShell, PATH: `${dir}:/usr/bin:/bin`, DMWS_E2E: '1' } });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator('.welcome')).toBeVisible();
+    await win.evaluate(cwd => (window as unknown as { __store: { setState(s: unknown): void } }).__store.setState({
+      workspaces: [{ id: 'w', name: 'Focus', cwd, layout: { type: 'pane', id: 'source' } }], activeWorkspaceId: 'w'
+    }), dir);
+    await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.source)).toBe('atPrompt');
+    await win.getByRole('button', { name: 'Agent status', exact: true }).click();
+    const dialog = win.getByRole('alertdialog');
+    await dialog.getByRole('combobox').selectOption('opencode');
+    // A busy renderer can paint a frame before React commits the dialog's
+    // removal. Run animation frames as microtasks to force that order.
+    await win.evaluate(() => {
+      const w = window as unknown as { __raf?: typeof requestAnimationFrame };
+      w.__raf = window.requestAnimationFrame;
+      window.requestAnimationFrame = callback => { queueMicrotask(() => callback(performance.now())); return 0; };
+    });
+    await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await win.evaluate(() => { window.requestAnimationFrame = (window as unknown as { __raf: typeof requestAnimationFrame }).__raf; });
+    await expect.poll(() => win.evaluate(() => (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText.get('source')?.() ?? '')).toContain('OPENCODE_RUNNING');
+    await expect(win.getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
+  } finally {
+    writeFileSync(stop, '');
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('missing CLI stays in the dialog without opening a pane', async () => {
   test.skip(process.platform === 'win32', 'POSIX shell fixture');

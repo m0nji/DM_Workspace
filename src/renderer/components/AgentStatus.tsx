@@ -30,6 +30,17 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
   const busy = useRef(false);
   const cwd = useStore(s => s.paneCwd[paneId] ?? s.workspaces.find(w => collectPaneIds(w.layout).includes(paneId))?.cwd ?? '');
   const close = (): void => { operation.current++; busy.current = false; setPending(false); setConfirmEnd(null); setDialog(null); };
+  // Until React commits the dialog's removal, ConfirmDialog keeps the terminal
+  // inert, and its unmount hands focus back to the status button. A focus
+  // request from requestAnimationFrame can run before that commit and is then
+  // lost. Focus here instead: passive effects run after unmount cleanups.
+  const focusTerminalOnClose = useRef(false);
+  const closeToTerminal = (): void => { focusTerminalOnClose.current = true; close(); };
+  useEffect(() => {
+    if (dialog || !focusTerminalOnClose.current) return;
+    focusTerminalOnClose.current = false;
+    focusTerminal(paneId);
+  }, [dialog, paneId]);
   useEffect(() => () => { operation.current++; }, []);
   useEffect(() => {
     if (remote) return;
@@ -95,7 +106,7 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
     try {
       const result = await startProfileInPane(paneId, profile, cwd, () => ticket === operation.current);
       if (result === 'cancelled') return;
-      if (result === 'started') { close(); requestAnimationFrame(() => focusTerminal(paneId)); return; }
+      if (result === 'started') { closeToTerminal(); return; }
       // 'ready' is unreachable here: startProfileInPane only returns it as part of
       // AgentCheck's type, never as an actual result (a 'ready' check moves on to
       // prepare/start instead). Narrow it away so the dialog's error type — which
@@ -143,7 +154,7 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
       confirmDisabled={pending || (!confirmEnd && !remote && !connected && !runningWithoutStatus && !profile)}
       cancelLabel={remote ? null : t(confirmEnd ? 'common.cancel' : 'common.close')}
       onCancel={() => { if (confirmEnd) setConfirmEnd(null); else close(); }}
-      onConfirm={() => { if (confirmEnd) void end(); else if (remote) close(); else if (connected || runningWithoutStatus) { close(); useStore.getState().setFocusedPane(paneId); requestAnimationFrame(() => focusTerminal(paneId)); } else void start(); }}
+      onConfirm={() => { if (confirmEnd) void end(); else if (remote) close(); else if (connected || runningWithoutStatus) { useStore.getState().setFocusedPane(paneId); closeToTerminal(); } else void start(); }}
     />, document.querySelector('.root') ?? document.body)}
   </>;
 }
