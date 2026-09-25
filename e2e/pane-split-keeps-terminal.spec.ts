@@ -29,7 +29,9 @@ test('split and close move the surviving terminal instead of remounting it', asy
     document.querySelector('.pane .xterm-host')!.setAttribute('data-probe', 'alive');
   });
 
-  await win.locator('.pane-btn[title="Split into left & right"]').first().click();
+  // Task 8 replaced the dedicated split button with the "+" new-pane menu.
+  await win.locator('.pane').first().getByRole('button', { name: 'New pane', exact: true }).click();
+  await win.getByRole('menu', { name: 'New pane' }).getByRole('button', { name: 'Open Terminal to the right' }).click();
   await expect(win.locator('.pane')).toHaveCount(2);
   await win.waitForTimeout(1200); // restore replay (if any) + refit would land here
 

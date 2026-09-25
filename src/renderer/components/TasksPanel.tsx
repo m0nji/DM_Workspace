@@ -9,12 +9,14 @@ import {
   DEFAULT_SCHEDULE_PARTS, SCHEDULE_FREQUENCIES, buildTaskBody, formatTaskSchedule, parseSchedule,
   type ScheduleFrequency, type ScheduleParts
 } from '../task-schedule';
+import { builtinAgentProfile } from '../../shared/agent-profiles';
 import { describeTaskError } from '../task-error';
 import { formatDateTime } from '../task-datetime';
 import { toAbsPath } from '../workdir-path';
 import { Icon } from './Icon';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DirectoryPickerDialog } from './DirectoryPickerDialog';
+import { AgentLogo } from './AgentLogo';
 
 // Panel für geplante Agenten-Tasks eines Remote-Projekts (Arbeitspaket B,
 // Aufgabe 4). Drei Bereiche wie im Web-Client (DM_Workspace_Web/web/src/views/
@@ -571,11 +573,14 @@ function TaskForm({ scope, task, access, members, membersError, onDone, onCancel
       <div className="tasks-form-row-2">
         <label>
           <span className="wizard-label">{t('tasks.scheduled.form.agent')}</span>
-          <select className="wizard-input" value={agent} onChange={(e) => setAgent(e.target.value as RemoteTask['agent'])}>
-            <option value="claude">{t('tasks.scheduled.agent.claude')}</option>
-            <option value="codex">{t('tasks.scheduled.agent.codex')}</option>
-            <option value="opencode">{t('tasks.scheduled.agent.opencode')}</option>
-          </select>
+          <span className="tasks-agent-select">
+            <AgentLogo icon={builtinAgentProfile(agent).icon} name={builtinAgentProfile(agent).name} decorative />
+            <select className="wizard-input" value={agent} onChange={(e) => setAgent(e.target.value as RemoteTask['agent'])}>
+              <option value="claude">{t('tasks.scheduled.agent.claude')}</option>
+              <option value="codex">{t('tasks.scheduled.agent.codex')}</option>
+              <option value="opencode">{t('tasks.scheduled.agent.opencode')}</option>
+            </select>
+          </span>
         </label>
         <label>
           <span className="wizard-label">{t('tasks.scheduled.form.workdir')}</span>

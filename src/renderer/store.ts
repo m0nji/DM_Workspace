@@ -1,12 +1,13 @@
-import type { AgentState, AgentProvider } from '../shared/agent-state';
+import type { AgentProvider, AgentState } from '../shared/agent-state';
 import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceGroup, WorkspaceTemplate, Settings, UpdateEvent,
   PaneShellState, PaneStatus, SettingsSection,
   LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
   RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope,
-  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent, RemoteProjectMember
+  RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent, RemoteProjectMember, AgentCheck
 } from '../shared/types';
+import { deriveAgentRemoteControl, normalizeAgentProfiles, type AgentProfile } from '../shared/agent-profiles';
 import { applyTabDrop, normalizeGroups, type DropTarget, type GroupedList } from '../shared/workspace-groups';
 import type { TabDropIntent } from '../shared/tab-drop-intent';
 import type { RemoteFilesContext } from './files-api';
@@ -329,6 +330,8 @@ export interface TemplateWizardState {
   templateId?: string | null; // set => editing an existing template; null/undefined => save current workspace
 }
 
+export interface AgentLaunchIssue { profile: AgentProfile; check: AgentCheck | 'prompt-required' | 'setup-error' }
+
 export interface StoreState extends AppState {
   // In AppState optional (ein Bestand vor den Gruppen hat das Feld nicht), im
   // Store immer gesetzt — siehe NO_GROUPS.
@@ -353,9 +356,13 @@ export interface StoreState extends AppState {
   // Fluechtig wie paneStatus: persistSnapshot ist eine Whitelist, die es nicht fuehrt.
   paneShell: Record<string, PaneShellState>;
   paneCwd: Record<string, string>; // live working dir per pane (from shell OSC reports)
-  pendingAgentStarts: Record<string, { provider: AgentProvider; cwd: string }>;
-  startAgentInPane: (paneId: string, command: string, inputPrefix?: string) => boolean;
+  pendingAgentStarts: Record<string, { profile: AgentProfile; cwd: string }>;
+  paneDetectedAgents: Record<string, AgentProvider>; // ephemeral: agent CLI typed by hand in this pane
+  setPaneDetectedAgent: (paneId: string, agent: AgentProvider | null) => void;
+  startAgentInPane: (paneId: string, command: string, inputPrefix?: string, displayCommand?: string) => boolean;
   finishAgentStart: (paneId: string) => void;
+  agentLaunchIssues: Record<string, AgentLaunchIssue>;
+  setAgentLaunchIssue: (paneId: string, issue: AgentLaunchIssue | null) => void;
   agentStates: Record<string, AgentState>;
   setAgentState: (paneId: string, state: AgentState | null) => void;
   paneAutoTitles: Record<string, string>; // ephemeral active command / agent prompt title per pane
@@ -419,7 +426,7 @@ export interface StoreState extends AppState {
   ungroupWorkspace: (workspaceId: string) => void;
   // layout
   applyPreset: (kind: PresetKind) => void;
-  splitActivePane: (paneId: string, direction: Direction) => void;
+  splitActivePane: (paneId: string, direction: Direction, options?: { profile?: AgentProfile }) => void;
   requestClosePane: (paneId: string) => void;
   cancelClosePane: () => void;
   confirmClosePane: () => void;
@@ -431,6 +438,10 @@ export interface StoreState extends AppState {
   // settings
   settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
+  setAgentProfiles: (profiles: AgentProfile[]) => void;
+  agentSettingsFocus: string | null;
+  setAgentSettingsFocus: (profileId: string | null) => void;
+  openAgentSettings: (profileId?: string) => void;
   setSettingsOpen: (open: boolean, focusSection?: SettingsSection | null) => void;
   clearSettingsFocusSection: () => void;
   setPaneStatus: (paneId: string, status: PaneStatus) => void;
@@ -672,11 +683,14 @@ export const useStore = create<StoreState>((set, get) => ({
   hydrated: false,
   settingsOpen: false,
   settingsFocusSection: null,
+  agentSettingsFocus: null,
   paneStatus: {},
   paneShell: {},
   paneCwd: {},
   agentStates: {},
   pendingAgentStarts: {},
+  paneDetectedAgents: {},
+  agentLaunchIssues: {},
   paneAutoTitles: {},
   focusedPaneId: null,
   draggingPaneId: null,
@@ -848,10 +862,12 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
     const pendingAgentStarts = { ...s.pendingAgentStarts };
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneDetectedAgents[pid]; delete agentLaunchIssues[pid]; delete paneAutoTitles[pid];
     });
     // Fresh pane ids force a TerminalView remount (respawn in the new cwd) —
     // pane-keyed metadata has to follow the id change or titles/pending startup
@@ -872,7 +888,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const firstPane = collectPaneIds(layout)[0] ?? null;
     if (firstPane) requestAnimationFrame(() => focusTerminal(firstPane));
     const next = {
-      ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles,
+      ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneDetectedAgents, agentLaunchIssues, paneAutoTitles,
       maximizedPaneId: null,
       focusedPaneId: firstPane
     };
@@ -885,10 +901,12 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
     const pendingAgentStarts = { ...s.pendingAgentStarts };
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     if (ws?.layout) collectPaneIds(ws.layout).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneDetectedAgents[pid]; delete agentLaunchIssues[pid]; delete paneAutoTitles[pid];
     });
     const remote = { ...s.remote };
     const remoteTasks = { ...s.remoteTasks };
@@ -915,7 +933,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = s.activeWorkspaceId === id
       ? (workspaces[0]?.id ?? null)
       : s.activeWorkspaceId;
-    const next = { ...s, workspaces, workspaceGroups: grouped.groups, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
+    const next = { ...s, workspaces, workspaceGroups: grouped.groups, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneDetectedAgents, agentLaunchIssues, paneAutoTitles, remote, remoteTasks, remoteMembers, activeWorkspaceId, maximizedPaneId: null };
     persist(next);
     return next;
   }),
@@ -934,19 +952,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
     const pendingAgentStarts = { ...s.pendingAgentStarts };
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     collectPaneIds(ws?.layout ?? null).forEach((pid) => {
-      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
+      releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneDetectedAgents[pid]; delete agentLaunchIssues[pid]; delete paneAutoTitles[pid];
     });
     const workspaces = s.workspaces.map((w) =>
       w.id === s.activeWorkspaceId ? { ...w, layout } : w);
-    const next = { ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, maximizedPaneId: null };
+    const next = { ...s, workspaces, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneDetectedAgents, agentLaunchIssues, paneAutoTitles, maximizedPaneId: null };
     persist(next);
     return next;
   }),
 
-  splitActivePane: (paneId, direction) => {
+  splitActivePane: (paneId, direction, options) => {
     const current = get();
     const active = current.workspaces.find((w) => w.id === current.activeWorkspaceId);
     if (!active?.layout || !collectPaneIds(active.layout).includes(paneId)) return;
@@ -954,6 +974,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Remote-Workspace mischen. Das Remote-Gegenstück ist ein weiteres Terminal
     // im Projekt — mit derselben Richtung, damit „rechts"/„darunter" auf jedem
     // Weg (Knopf, Tastenkürzel, Palette) dasselbe bedeutet.
+    // Remote panes have no agent start: the profile is dropped on purpose.
     if (active.kind === 'remote') { current.createRemotePane(paneId, direction); return; }
     set((s) => {
       const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
@@ -961,13 +982,17 @@ export const useStore = create<StoreState>((set, get) => ({
       const newPaneId = nextPaneId();
       const workspaces = s.workspaces.map((w) =>
         w.id === ws.id ? { ...w, layout: splitPane(ws.layout!, paneId, direction, newPaneId, nextSplitId()) } : w);
+      const pendingAgentStarts = options?.profile
+        ? { ...s.pendingAgentStarts, [newPaneId]: { profile: options.profile, cwd: s.paneCwd[paneId] ?? ws.cwd } }
+        : s.pendingAgentStarts;
       // The old terminal changes width. Force one final atomic fit/PTY resize and
       // repaint after React has committed the split instead of relying solely on
       // ResizeObserver timing.
       refreshTerminalLayoutAfterCommit(paneId);
       // The new pane takes over: store focus plus DOM focus once it has mounted.
+      // A maximized pane would keep the new one hidden, so leave maximization.
       requestAnimationFrame(() => focusTerminal(newPaneId));
-      const next = { ...s, workspaces, focusedPaneId: newPaneId };
+      const next = { ...s, workspaces, pendingAgentStarts, focusedPaneId: newPaneId, maximizedPaneId: null };
       persist(next);
       return next;
     });
@@ -1006,6 +1031,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus }; delete paneStatus[paneId];
     const paneShell = { ...s.paneShell }; delete paneShell[paneId];
     const pendingAgentStarts = { ...s.pendingAgentStarts }; delete pendingAgentStarts[paneId];
+    const paneDetectedAgents = { ...s.paneDetectedAgents }; delete paneDetectedAgents[paneId];
+    const agentLaunchIssues = { ...s.agentLaunchIssues }; delete agentLaunchIssues[paneId];
     const paneCwd = { ...s.paneCwd }; delete paneCwd[paneId];
     const paneAutoTitles = { ...s.paneAutoTitles }; delete paneAutoTitles[paneId];
     let successor: string | null = null;
@@ -1040,6 +1067,8 @@ export const useStore = create<StoreState>((set, get) => ({
       paneShell,
       paneCwd,
       pendingAgentStarts,
+      paneDetectedAgents,
+      agentLaunchIssues,
       paneAutoTitles,
       focusedPaneId,
       maximizedPaneId: s.maximizedPaneId === paneId ? null : s.maximizedPaneId,
@@ -1068,6 +1097,16 @@ export const useStore = create<StoreState>((set, get) => ({
     persist(next);
     return next;
   }),
+
+  setAgentProfiles: (profiles) => {
+    const agentProfiles = normalizeAgentProfiles(profiles);
+    get().updateSettings({ agentProfiles, agentRemoteControl: deriveAgentRemoteControl(agentProfiles) });
+  },
+  setAgentSettingsFocus: (profileId) => set({ agentSettingsFocus: profileId }),
+  openAgentSettings: (profileId) => {
+    get().setSettingsOpen(true, 'agents');
+    set({ agentSettingsFocus: profileId ?? null });
+  },
 
   setSettingsOpen: (open, focusSection = null) => set({ settingsOpen: open, settingsFocusSection: open ? focusSection : null }),
   clearSettingsFocusSection: () => set({ settingsFocusSection: null }),
@@ -1208,7 +1247,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),
 
-  startAgentInPane: (paneId, command, inputPrefix = '\x05\x15') => {
+  startAgentInPane: (paneId, command, inputPrefix = '\x05\x15', displayCommand = command) => {
     const s = get();
     const ws = s.workspaces.find(w => w.layout && collectPaneIds(w.layout).includes(paneId));
     if (!ws || ws.kind === 'remote' || s.paneShell[paneId] !== 'atPrompt' || s.agentStates[paneId]?.sessionId) return false;
@@ -1218,14 +1257,31 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ activeWorkspaceId: ws.id, focusedPaneId: paneId,
       paneShell: { ...s.paneShell, [paneId]: 'running' } });
     // Track the CLI name so the internal bootstrap path never becomes the pane label.
-    trackTerminalInput(paneId, `\x05\x15${s.agentStates[paneId]?.provider ?? command}\r`);
+    trackTerminalInput(paneId, `\x05\x15${displayCommand}\r`);
     window.api.input({ paneId, data });
     return true;
   },
   finishAgentStart: (paneId) => set(s => {
     const pendingAgentStarts = { ...s.pendingAgentStarts };
     delete pendingAgentStarts[paneId];
-    return { pendingAgentStarts };
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    delete paneDetectedAgents[paneId];
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
+    delete agentLaunchIssues[paneId];
+    return { pendingAgentStarts, paneDetectedAgents, agentLaunchIssues };
+  }),
+  setAgentLaunchIssue: (paneId, issue) => set((s) => {
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
+    if (issue) agentLaunchIssues[paneId] = issue;
+    else delete agentLaunchIssues[paneId];
+    return { agentLaunchIssues };
+  }),
+  setPaneDetectedAgent: (paneId, agent) => set((s) => {
+    if ((s.paneDetectedAgents[paneId] ?? null) === agent) return s;
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    if (agent) paneDetectedAgents[paneId] = agent;
+    else delete paneDetectedAgents[paneId];
+    return { paneDetectedAgents };
   }),
 
   openPreview: (source) => set((s) => ({
@@ -1506,6 +1562,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const paneStatus = { ...s.paneStatus };
     const paneShell = { ...s.paneShell };
     const pendingAgentStarts = { ...s.pendingAgentStarts };
+    const paneDetectedAgents = { ...s.paneDetectedAgents };
+    const agentLaunchIssues = { ...s.agentLaunchIssues };
     const paneCwd = { ...s.paneCwd };
     const paneAutoTitles = { ...s.paneAutoTitles };
     const remote = { ...s.remote };
@@ -1517,7 +1575,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const workspaces = s.workspaces.filter((w) => {
       if (w.kind !== 'remote' || w.remote?.serverId !== serverId) return true;
       collectPaneIds(w.layout).forEach((pid) => {
-        releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneAutoTitles[pid];
+        releasePane(pid); delete paneStatus[pid]; delete paneShell[pid]; delete paneCwd[pid]; delete pendingAgentStarts[pid]; delete paneDetectedAgents[pid]; delete agentLaunchIssues[pid]; delete paneAutoTitles[pid];
       });
       const connKey = remoteConnKey(serverId, workspaceScopeKey(w.remote));
       delete remote[connKey];
@@ -1535,7 +1593,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const activeWorkspaceId = grouped.workspaces.some((w) => w.id === s.activeWorkspaceId)
       ? s.activeWorkspaceId
       : (grouped.workspaces[0]?.id ?? null);
-    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups, settings, remote, remoteTasks, remoteMembers, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneAutoTitles, activeWorkspaceId };
+    const next = { ...s, workspaces: grouped.workspaces, workspaceGroups: grouped.groups, settings, remote, remoteTasks, remoteMembers, paneStatus, paneShell, paneCwd, pendingAgentStarts, paneDetectedAgents, agentLaunchIssues, paneAutoTitles, activeWorkspaceId };
     persist(next);
     return next;
   }),

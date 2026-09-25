@@ -6,6 +6,7 @@ import {
   parseRemoteFsWrite, parseRemotePaneRef, parseRemoteRef, parseRemoteScopeRef, parseScrollbackSave,
   parseServerConfig, parseServerRef, isSafeRemoteFsPath
 } from '../src/main/ipc-validate';
+import { builtinAgentProfile } from '../src/shared/agent-profiles';
 
 // Anders als der Rest von src/main importiert ipc-validate kein Electron —
 // deshalb braucht diese Datei keinen vi.mock('electron'), wie ihn etwa
@@ -382,10 +383,11 @@ describe('parseRemoteFsRename', () => {
   });
 });
 
- it('validates agent launches as local-only spawn requests', () => {
+ it('validates agent launches as local-only spawn requests carrying a valid profile', () => {
   const base = { paneId: 'new', cwd: '/tmp', cols: 80, rows: 24 };
-  expect(parsePtySpawn({ ...base, agent: 'opencode' })).toEqual({ ...base, agent: 'opencode' });
-  expect(parsePtySpawn({ ...base, agent: 'codex' })).toEqual({ ...base, agent: 'codex' });
-  expect(parsePtySpawn({ ...base, agent: 'other' })).toBeNull();
-  expect(parsePtySpawn({ ...base, agent: 'claude', target: { kind: 'remote', serverId: 's', scope: { kind: 'user' }, remotePaneId: 'p' } })).toBeNull();
+  const profile = builtinAgentProfile('opencode');
+  expect(parsePtySpawn({ ...base, agentProfile: profile })).toEqual({ ...base, agentProfile: profile });
+  expect(parsePtySpawn({ ...base, agentProfile: { ...profile, command: '' } })).toBeNull();
+  expect(parsePtySpawn({ ...base, agent: 'codex' })).toBeNull();
+  expect(parsePtySpawn({ ...base, agentProfile: profile, target: { kind: 'remote', serverId: 's', scope: { kind: 'user' }, remotePaneId: 'p' } })).toBeNull();
 });

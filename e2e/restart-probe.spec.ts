@@ -60,8 +60,9 @@ test('restore notice stays singular across restarts and never appears on a fresh
 
   // Probe: add a brand-new pane (split) — it has no saved scrollback, so exactly
   // one of the two panes must show the restored history and the other must be clean.
-  await w3.locator('.pane').first().hover();
-  await w3.locator('.pane .pane-btn[title="Split into left & right"]').first().click();
+  // Task 8 replaced the dedicated split button with the "+" new-pane menu.
+  await w3.locator('.pane').first().getByRole('button', { name: 'New pane', exact: true }).click();
+  await w3.getByRole('menu', { name: 'New pane' }).getByRole('button', { name: 'Open Terminal to the right' }).click();
   await expect(w3.locator('.pane')).toHaveCount(2);
   await w3.waitForTimeout(1200);
   const paneTexts: string[] = [];

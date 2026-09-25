@@ -47,4 +47,15 @@ describe('i18n catalogs', () => {
       .filter(({ en, de }) => JSON.stringify(en) !== JSON.stringify(de));
     expect(mismatches).toEqual([]);
   });
+
+  // Generic and OpenCode agents share the 'unsupported' phase: its texts must
+  // not name one adapter, and the start hints must quote the label the overview
+  // really shows for them.
+  it('agent texts for agents without live status are adapter-neutral and name the real overview label', () => {
+    for (const catalog of [en, de]) {
+      expect(catalog.agent.hint.unsupported).not.toContain('OpenCode');
+      expect(catalog.agent.genericHint).toContain(catalog.agent.phase.unsupported);
+      expect(catalog.agent.opencodeHint).toContain(catalog.agent.phase.unsupported);
+    }
+  });
 });

@@ -2,6 +2,15 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.0 – 2026-09-25
+- feat: Open a new pane to the right or below from the `+` menu in every pane header: a plain terminal or any configured AI agent. The command palette offers the same entries. Keyboard: arrow keys to choose, Enter opens to the right, Shift+Enter below.
+- feat: Configure AI agents in Settings. Claude Code, Codex and OpenCode are built-in profiles; add your own (for example OpenCode with a local Ollama model) with a base, program, arguments, environment variables and an icon. Duplicate, reorder, hide from the menu, check whether the program is installed, reset or delete profiles. Phone access is set per profile.
+- feat: Agent panes show the agent's logo in the header, also when the CLI was started by typing its command. The agent overview and the scheduled task form show the same logos.
+- fix: A new agent pane whose program is missing stays open as a normal shell and offers Edit profile and Try again instead of leaving a dead pane.
+- fix: Clearing windows starts a new conversation in idle Claude Code (`/clear`), Codex and OpenCode (`/new`) panes. Agents that are working or waiting for approval, and agents that have not started a conversation yet, are left untouched; the confirmation names the counts.
+- fix: Context menus are fully keyboard accessible and return focus to where they were opened.
+- note: Arguments are quoted per shell. Windows PowerShell 5.1 and `.cmd` launchers cannot pass some characters (quotes, `%`, `& | < > ^ ( )`) reliably; such profiles are rejected with an explanation instead of starting with broken arguments.
+
 ## 0.18.2 – 2026-09-11
 - fix: Keep the workspace busy indicator from spinning on after Codex has finished. The decorative star field in the empty Codex composer also draws into the column between the prompt marker and its placeholder text; that column is now blanked instead of dropped, so the idle animation no longer reads as new output. Real output, typing and progress updates still register immediately.
 

@@ -35,9 +35,20 @@ else process.exit(1);
       (window as unknown as { __store: { getState(): { setSettingsOpen(open: boolean): void } } }).__store.getState().setSettingsOpen(true);
     });
     await win.getByRole('button', { name: 'AI agents', exact: true }).click();
-    await expect(win.locator('#codex-remote')).not.toBeChecked();
-    await win.locator('#codex-remote').check();
-    await win.locator('#claude-remote').check();
+    // Task 9 moved the phone option from a settings-level checkbox per provider
+    // into each profile's own editor ("Start new sessions with phone access"),
+    // and the Codex phone service group (pair/check) now lives alongside the
+    // profile list rather than next to a per-provider checkbox. Persistence is
+    // unchanged: settings.agentRemoteControl is still derived from the
+    // claude/codex profiles' remoteControl field and saved with the rest of
+    // settings.
+    const settings = win.locator('.agent-profile-list');
+    const editor = win.locator('.agent-profile-editor');
+    await settings.locator('.agent-profile-row').filter({ hasText: 'Codex' }).click();
+    await expect(editor.getByLabel('Start new sessions with phone access')).not.toBeChecked();
+    await editor.getByLabel('Start new sessions with phone access').check();
+    await settings.locator('.agent-profile-row').filter({ hasText: 'Claude Code' }).click();
+    await editor.getByLabel('Start new sessions with phone access').check();
     await expect.poll(() => win.evaluate(async () => (await window.api.loadState()).settings.agentRemoteControl)).toEqual({ codex: true, claude: true });
     await win.getByRole('button', { name: 'Check service', exact: true }).click();
     await expect(win.getByText('The local Codex service is running.', { exact: false })).toBeVisible();
@@ -47,7 +58,8 @@ else process.exit(1);
     expect(JSON.stringify(await win.evaluate(() => window.api.loadState()))).not.toContain('ABCD-EFGH');
     expect(await win.locator('body').innerText()).not.toContain('INTERNAL-SECRET');
     await win.screenshot({ path: join(tmpdir(), 'dmws-agent-settings.png') });
-    await win.locator('#codex-remote').uncheck();
+    await settings.locator('.agent-profile-row').filter({ hasText: 'Codex' }).click();
+    await editor.getByLabel('Start new sessions with phone access').uncheck();
     await expect.poll(() => win.evaluate(async () => (await window.api.loadState()).settings.agentRemoteControl)).toEqual({ codex: false, claude: true });
     // Turning off automatic startup must not terminate the shared daemon.
     const calls = readFileSync(log, 'utf8');

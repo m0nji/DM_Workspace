@@ -1,5 +1,8 @@
 import type { AgentProvider } from './agent-state';
 import type { ShortcutAction } from './shortcuts';
+import type { AgentProfile } from './agent-profiles';
+
+export type AgentCheck = 'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'unsupported-argument' | 'check-failed';
 
 export type CodexRemoteAction = 'status' | 'pair';
 export type CodexRemoteResult =
@@ -117,7 +120,8 @@ export const TERMINAL_FONT_SIZE_MIN = 10;
 export const TERMINAL_FONT_SIZE_MAX = 32;
 
 export interface Settings {
-  agentRemoteControl?: { codex?: boolean; claude?: boolean }; // app-launched sessions on this computer only
+  agentRemoteControl?: { codex?: boolean; claude?: boolean }; // app-launched sessions on this computer only; derived from agentProfiles once saved
+  agentProfiles?: AgentProfile[]; // order = order in the new-pane menu; absent => builtin profiles (resolveAgentProfiles)
 
   terminalFontSize?: number;   // px; absent => 13, changed live without restarting shells
   themeId: string;             // id from BUILTIN_THEMES (src/shared/themes.ts)
@@ -495,13 +499,15 @@ export type SpawnTarget =
   | { kind: 'remote'; serverId: string; scope: SpawnTargetScope; remotePaneId: string };
 
 export interface PtySpawnRequest {
-  agent?: AgentProvider;
+  agentProfile?: AgentProfile;
   paneId: string;
   cwd: string;
   cols: number;
   rows: number;
   target?: SpawnTarget;
 }
+// The shell always stays open. A failed agent check is reported, not thrown.
+export interface PtySpawnResult { agent?: 'started' | AgentCheck }
 export interface PtyDataEvent {
   paneId: string;
   data: string;
@@ -536,12 +542,13 @@ export interface RendererApi {
   reconnectAgentStatus(paneId: string): Promise<void>;
   endAgentSession(paneId: string, generation: string): Promise<void>;
   codexRemote(action: 'status' | 'pair'): Promise<CodexRemoteResult>;
-  checkAgentStart(paneId: string, provider: AgentProvider, cwd?: string): Promise<'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'check-failed'>;
-  prepareAgentStatus(paneId: string, provider?: AgentProvider): Promise<{ command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }>;
+  checkAgentStart(paneId: string, profile: AgentProfile, cwd?: string): Promise<AgentCheck>;
+  checkAgentProfile(profile: AgentProfile): Promise<AgentCheck>;
+  prepareAgentStatus(paneId: string, profile: AgentProfile): Promise<{ command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }>;
   getAgentState(paneId: string): Promise<import('./agent-state').AgentState | null>;
   onAgentState(paneId: string, cb: (state: import('./agent-state').AgentState | null) => void): () => void;
   agentShellReturned(paneId: string): void;
-  spawn(req: PtySpawnRequest): Promise<void>;
+  spawn(req: PtySpawnRequest): Promise<PtySpawnResult>;
   input(req: PtyInputRequest): void;
   resize(req: PtyResizeRequest): void;
   kill(paneId: string): void;

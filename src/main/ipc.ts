@@ -1,8 +1,10 @@
 import { codexRemoteAction } from './agent-remote';
 import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
+import { parseAgentProfile } from '../shared/agent-profiles';
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import { join, dirname } from 'path';
 import { AgentStatusBridge } from './agent-status-bridge';
 import { PtyManager, resolveWindowsShell } from './pty-manager';
@@ -27,7 +29,7 @@ import {
 import { AuthManager } from './remote/auth-manager';
 import { RemoteManager } from './remote/remote-manager';
 import type {
-  AppState, PtyDataEvent, PtyExitEvent, WindowBounds
+  AppState, PtyDataEvent, PtyExitEvent, PtySpawnResult, WindowBounds
 } from '../shared/types';
 
 // Ein Payload, der die Prüfung nicht besteht, ist immer ein Bug im Renderer (die
@@ -218,16 +220,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   const localPty = new PtyManager();
   const router = new BackendRouter(localPty);
   const agents = new AgentStatusBridge(join(app.getPath('userData'), 'agent-status', randomUUID()),
-    event => getWindow()?.webContents.send('agent:state', event),
-    () => loadStateFromFile(STATE_FILE()).settings.agentRemoteControl ?? {});
+    event => getWindow()?.webContents.send('agent:state', event));
+  const defaultShell = (): string => process.platform === 'win32' ? resolveWindowsShell(process.env.PATH) : process.env.SHELL || '/bin/zsh';
   let remoteActionPending = false;
   handle('agent:codex-remote', async (_e, action: unknown) => {
     if (action !== 'status' && action !== 'pair') throw new Error('Invalid remote action');
     if (remoteActionPending) throw new Error('Remote action already in progress');
     remoteActionPending = true;
     try {
-      const shell = process.platform === 'win32' ? resolveWindowsShell(process.env.PATH) : process.env.SHELL || '/bin/zsh';
-      return await codexRemoteAction(shell, action);
+      return await codexRemoteAction(defaultShell(), action);
     } finally { remoteActionPending = false; }
   });
   handle('agent:stop-status', (_e, paneId: unknown) => {
@@ -250,20 +251,27 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     // A different terminal must never lose its registration after an old exit.
     if (!localPty.sessionInfo(paneId)) { agents.release(paneId); agents.rememberEnded(paneId, registration); }
   });
-  handle('agent:check-start', async (_e, paneId: unknown, provider: unknown, cwd: unknown) => {
-    if (!isNonEmptyString(paneId) || (provider !== 'claude' && provider !== 'codex' && provider !== 'opencode')) throw new Error('Invalid agent start');
+  handle('agent:check-start', async (_e, paneId: unknown, rawProfile: unknown, cwd: unknown) => {
+    const profile = parseAgentProfile(rawProfile);
+    if (!isNonEmptyString(paneId) || !profile) throw new Error('Invalid agent start');
     const session = localPty.sessionInfo(paneId);
     if (!session) return 'check-failed';
     if (cwd !== undefined && !isNonEmptyString(cwd)) throw new Error('Invalid agent folder');
-    const result = await checkAgentRequirements(session.shell, provider, process.env, expandTilde(cwd as string | undefined ?? session.cwd));
+    const result = await checkAgentRequirements(session.shell, profile, process.env, expandTilde(cwd as string | undefined ?? session.cwd));
     return localPty.sessionInfo(paneId) === session ? result : 'check-failed';
   });
-  handle('agent:prepare', async (_e, paneId: unknown, provider: unknown = 'claude') => {
-    if (provider !== 'claude' && provider !== 'codex' && provider !== 'opencode') throw new Error('Invalid agent provider');
+  handle('agent:check-profile', async (_e, rawProfile: unknown) => {
+    const profile = parseAgentProfile(rawProfile);
+    if (!profile) throw new Error('Invalid agent profile');
+    return checkAgentRequirements(defaultShell(), profile, process.env, homedir());
+  });
+  handle('agent:prepare', async (_e, paneId: unknown, rawProfile: unknown) => {
+    const profile = parseAgentProfile(rawProfile);
+    if (!profile) throw new Error('Invalid agent profile');
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
     const session = localPty.sessionInfo(paneId);
     if (!session) throw new Error('No local terminal session');
-    const setup = await agents.prepare(paneId, session.shell, session.nonce, provider);
+    const setup = await agents.prepare(paneId, session.shell, session.nonce, profile);
     if (localPty.sessionInfo(paneId) !== session) {
       agents.release(paneId);
       throw new Error('Terminal session changed');
@@ -322,29 +330,31 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
 
   const agentStarting = new Map<string, object>();
-  handle('pty:spawn', async (_e, raw: unknown) => {
+  handle('pty:spawn', async (_e, raw: unknown): Promise<PtySpawnResult> => {
     const req = parsePtySpawn(raw);
-    if (!req) { rejectPayload('pty:spawn', raw); return; }
-    if (req.agent && localPty.sessionInfo(req.paneId)) throw new Error('Agent start requires a new terminal');
+    if (!req) { rejectPayload('pty:spawn', raw); return {}; }
+    const profile = req.agentProfile;
+    if (profile && localPty.sessionInfo(req.paneId)) throw new Error('Agent start requires a new terminal');
     pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows, target: req.target });
-    if (req.agent) {
-      const session = localPty.sessionInfo(req.paneId);
-      if (session) agentStarting.set(req.paneId, session);
-      try {
-        if (!session) throw new Error('No local terminal session');
-        const check = await checkAgentRequirements(session.shell, req.agent, process.env, session.cwd);
-        if (localPty.sessionInfo(req.paneId) !== session) throw new Error('Terminal session changed');
-        if (check !== 'ready') throw new Error(`Agent start: ${check}`);
-        await launchPreparedAgent(req.paneId, req.agent, localPty, agents);
-      } catch (error) {
-        if (localPty.sessionInfo(req.paneId) === session) {
-          agents.release(req.paneId);
-          localPty.kill(req.paneId);
-        }
-        throw error;
-      } finally {
-        if (agentStarting.get(req.paneId) === session) agentStarting.delete(req.paneId);
+    if (!profile) return {};
+    const session = localPty.sessionInfo(req.paneId);
+    if (session) agentStarting.set(req.paneId, session);
+    try {
+      if (!session) throw new Error('No local terminal session');
+      const check = await checkAgentRequirements(session.shell, profile, process.env, session.cwd);
+      if (localPty.sessionInfo(req.paneId) !== session) throw new Error('Terminal session changed');
+      // A missing program leaves a usable shell; the renderer shows a notice.
+      if (check !== 'ready') return { agent: check };
+      await launchPreparedAgent(req.paneId, profile, localPty, agents);
+      return { agent: 'started' };
+    } catch (error) {
+      if (localPty.sessionInfo(req.paneId) === session) {
+        agents.release(req.paneId);
+        localPty.kill(req.paneId);
       }
+      throw error;
+    } finally {
+      if (agentStarting.get(req.paneId) === session) agentStarting.delete(req.paneId);
     }
   });
   on('pty:input', (_e, raw: unknown) => {

@@ -22,8 +22,8 @@ test('overview updates attention, reveals hidden agents and supports keyboard an
     }));
     await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.b1)).toBe('atPrompt');
     await win.evaluate(() => window.__store.setState({ agentStates: {
-      a1: { provider: 'claude', status: 'working', sessionId: 'a', event: 'UserPromptSubmit', updatedAt: Date.now() },
-      b1: { provider: 'codex', status: 'needs-input', sessionId: 'b', event: 'PermissionRequest', updatedAt: Date.now() }
+      a1: { adapter: 'claude', profileId: 'claude', profileName: 'Claude Code', icon: { kind: 'logo', logo: 'claude' }, status: 'working', sessionId: 'a', event: 'UserPromptSubmit', updatedAt: Date.now() },
+      b1: { adapter: 'codex', profileId: 'codex', profileName: 'Codex', icon: { kind: 'logo', logo: 'openai' }, status: 'needs-input', sessionId: 'b', event: 'PermissionRequest', updatedAt: Date.now() }
     } }));
     await expect(trigger.locator('.agent-attention-count')).toHaveText('1');
     await trigger.click();
@@ -40,7 +40,7 @@ test('overview updates attention, reveals hidden agents and supports keyboard an
     await expect.poll(() => win.evaluate(() => window.__store.getState().activeWorkspaceId)).toBe('b');
     await expect(win.locator('.pane:visible .xterm-helper-textarea')).toBeFocused();
     await trigger.click();
-    await win.evaluate(() => window.__store.getState().setAgentState('b1', { provider: 'codex', status: 'completed', sessionId: 'b', event: 'Stop', updatedAt: Date.now() }));
+    await win.evaluate(() => window.__store.getState().setAgentState('b1', { adapter: 'codex', profileId: 'codex', profileName: 'Codex', icon: { kind: 'logo', logo: 'openai' }, status: 'completed', sessionId: 'b', event: 'Stop', updatedAt: Date.now() }));
     await expect(trigger.locator('.agent-attention-count')).toHaveCount(0);
     await expect(rows.last()).toContainText('Response ended');
     await win.screenshot({ path: '/tmp/dmws-agent-overview.png' });

@@ -2,16 +2,18 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { PSREADLINE_CLEAR_INPUT_SEQUENCE } from '../shared/psreadline-heal';
-import type { Settings } from '../shared/types';
 import { codexSetup } from './codex-status-setup';
 import { join } from 'node:path';
 import { claudeState, codexState, type AgentState, type AgentStateEvent } from '../shared/agent-state';
+import { builtinAgentProfile, supportsRemoteControl, type AgentProfile } from '../shared/agent-profiles';
+import { buildAgentCommand } from './agent-command';
+import { quotePosix, quotePowerShell, shellKind } from './shell-quote';
 
 // SessionStart does not support HTTP hooks. Bind on the first submitted prompt.
 const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
   'PostToolUseFailure', 'PostToolBatch', 'Notification', 'Elicitation', 'ElicitationResult', 'Stop', 'StopFailure', 'SessionEnd'];
 interface Registration {
-  paneId: string; token: string; remoteEnabled: boolean; settingsPath: string; command: string; launchCommand: string;
+  paneId: string; token: string; profileKey: string; settingsPath: string; command: string; launchCommand: string;
   turnId?: string; retiredTurns: Set<string>; state: AgentState; retired: Set<string>; waiting: Set<string>; nonce: string; interrupted: boolean;
 }
 export interface AgentSetup { command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }
@@ -23,8 +25,7 @@ export class AgentStatusBridge {
   private endedStates = new Map<string, AgentState>();
   private registrations = new Map<string, Registration>();
   private byToken = new Map<string, Registration>();
-  constructor(private readonly dir: string, private readonly send: (event: AgentStateEvent) => void,
-    private readonly remoteSettings: () => NonNullable<Settings['agentRemoteControl']> = () => ({})) {}
+  constructor(private readonly dir: string, private readonly send: (event: AgentStateEvent) => void) {}
 
   private listen(): Promise<number> {
     if (this.closed) return Promise.reject(new Error('Agent bridge is closed'));
@@ -50,55 +51,56 @@ export class AgentStatusBridge {
     return this.starting;
   }
 
-  async prepare(paneId: string, shell: string, nonce: string, provider: AgentState['provider'] = 'claude'): Promise<AgentSetup> {
-    const powershell = /(?:^|[/\\])(?:powershell|pwsh)(?:\.exe)?$/i.test(shell);
-    if (!powershell && !/(?:^|[/\\])(?:bash|zsh|sh)(?:\.exe)?$/i.test(shell)) {
-      throw new Error('Unsupported shell for agent status setup');
-    }
+  async prepare(paneId: string, shell: string, nonce: string, profile: AgentProfile = builtinAgentProfile('claude')): Promise<AgentSetup> {
+    const kind = shellKind(shell);
+    if (!kind) throw new Error('Unsupported shell for agent status setup');
     if (!/^[a-f0-9]{64}$/.test(nonce)) throw new Error('Invalid terminal nonce');
+    const powershell = kind === 'powershell';
     const inputPrefix = powershell && process.platform === 'win32' ? PSREADLINE_CLEAR_INPUT_SEQUENCE : '\x05\x15';
-    const port = provider === 'opencode' ? 0 : await this.listen();
+    const adapter = profile.adapter;
+    const hooked = adapter === 'claude' || adapter === 'codex';
+    const port = hooked ? await this.listen() : 0;
     if (this.closed) throw new Error('Agent bridge is closed');
-    const remote = this.remoteSettings();
-    const remoteEnabled = provider === 'codex' ? remote.codex === true : provider === 'claude' && remote.claude === true;
+    const remote = supportsRemoteControl(adapter) && profile.remoteControl === true;
+    // Any profile edit (args, env, phone option, name) needs a fresh start file.
+    const profileKey = JSON.stringify(profile);
     let existing = this.registrations.get(paneId);
-    if (existing?.state.event === 'shell' && existing.remoteEnabled !== remoteEnabled) {
+    if (existing && existing.profileKey !== profileKey) {
+      if (existing.state.sessionId) throw new Error('End the active agent session before switching agents');
       this.release(paneId);
       existing = undefined;
     }
-    if (existing?.state.provider === provider && existing.state.event === 'shell') {
+    if (existing && existing.state.event === 'shell') {
       existing.state.paused = false;
       existing.state.generation = randomBytes(16).toString('hex');
       this.update(existing, 'unknown', 'setup', null);
     }
-    if (existing?.state.provider === provider) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand, inputPrefix };
-    if (existing) {
-      if (existing.state.sessionId) throw new Error('End the active agent session before switching providers');
-      this.release(paneId);
-    }
+    if (existing) return { command: existing.command, settingsPath: existing.settingsPath, launchCommand: existing.launchCommand, inputPrefix };
     mkdirSync(this.dir, { recursive: true, mode: 0o700 });
     const token = randomBytes(32).toString('hex');
-    const settingsPath = join(this.dir, `${randomBytes(16).toString('hex')}.${provider === 'codex' ? 'cjs' : 'json'}`);
+    const settingsPath = join(this.dir, `${randomBytes(16).toString('hex')}.${adapter === 'codex' ? 'cjs' : 'json'}`);
     const hook = { type: 'http', url: `http://127.0.0.1:${port}/claude`, timeout: 1,
       headers: { Authorization: `Bearer ${token}`, 'X-DMWS-Terminal': '$DMWS_AGENT_NONCE' },
       allowedEnvVars: ['DMWS_AGENT_NONCE'] };
     const hooks = Object.fromEntries(EVENTS.map(event => [event, [{ hooks: [hook] }]]));
-    const codex = provider === 'codex' ? codexSetup(settingsPath, port, token, powershell, remote.codex === true, nonce) : null;
-    writeFileSync(settingsPath, codex?.script ?? JSON.stringify(provider === 'opencode' ? {} : { hooks }), { mode: 0o600, flag: 'wx' });
-    const quoted = powershell ? settingsPath.replace(/'/g, "''") : settingsPath.replace(/'/g, "'\\''");
-    const command = provider === 'opencode' ? 'opencode' : codex?.command ?? `claude --settings '${quoted}'${remote.claude ? ' --remote-control' : ''}`;
+    const codex = adapter === 'codex'
+      ? codexSetup(settingsPath, port, token, powershell, remote, nonce, { program: profile.command, args: profile.args })
+      : null;
+    writeFileSync(settingsPath, codex?.script ?? JSON.stringify(adapter === 'claude' ? { hooks } : {}), { mode: 0o600, flag: 'wx' });
+    const command = buildAgentCommand({ profile, shell: kind, settingsPath, remote, codexCommand: codex?.command });
     // Keep PTY input below canonical line limits, even before readline is ready.
-    // The full Codex hook configuration stays in a private file, not an input line.
+    // The full command stays in a private file, not an input line.
     const startPath = `${settingsPath}.start`;
-    const startQuoted = powershell ? startPath.replace(/'/g, "''") : startPath.replace(/'/g, "'\\''");
+    const startQuoted = powershell ? quotePowerShell(startPath) : quotePosix(startPath);
     try { writeFileSync(startPath, command + '\n', { mode: 0o600, flag: 'wx' }); }
     catch (error) { rmSync(settingsPath, { force: true }); throw error; }
     const launchCommand = powershell
-      ? `& ([scriptblock]::Create([IO.File]::ReadAllText('${startQuoted}')))`
-      : `. '${startQuoted}'`;
+      ? `& ([scriptblock]::Create([IO.File]::ReadAllText(${startQuoted})))`
+      : `. ${startQuoted}`;
     const registration: Registration = {
-      paneId, token, remoteEnabled, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
-      state: { provider, generation: randomBytes(16).toString('hex'), status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
+      paneId, token, profileKey, settingsPath, nonce, waiting: new Set(), interrupted: false, command, launchCommand, retired: new Set(), retiredTurns: new Set(),
+      state: { adapter, profileId: profile.id, profileName: profile.name, icon: profile.icon,
+        generation: randomBytes(16).toString('hex'), status: 'unknown', sessionId: null, event: 'setup', updatedAt: Date.now() }
     };
     this.endedStates.delete(paneId);
     this.registrations.set(paneId, registration);
@@ -175,7 +177,7 @@ export class AgentStatusBridge {
     if (req.method !== 'POST' || !['/claude', '/codex'].includes(req.url ?? '')) { reply(404); return; }
     const token = req.headers.authorization?.replace(/^Bearer /, '');
     const r = token ? this.byToken.get(token) : undefined;
-    if (!r || req.url !== `/${r.state.provider}` || req.headers['x-dmws-terminal'] !== r.nonce) { reply(401); return; }
+    if (!r || req.url !== `/${r.state.adapter}` || req.headers['x-dmws-terminal'] !== r.nonce) { reply(401); return; }
     if (!req.headers['content-type']?.startsWith('application/json')) { reply(415); return; }
     let size = 0;
     let chunks: Buffer[] = [];
@@ -203,10 +205,10 @@ export class AgentStatusBridge {
       if (typeof session !== 'string' || !session || session.length > 256 || typeof event !== 'string') {
         reply(400); return;
       }
-      const status = r.state.provider === 'codex' ? codexState(input) : r.state.provider === 'claude' ? claudeState(input) : null;
+      const status = r.state.adapter === 'codex' ? codexState(input) : r.state.adapter === 'claude' ? claudeState(input) : null;
       if (status === null || r.retired.has(session)) { reply(200); return; }
       const turn = input.turn_id;
-      if (r.state.provider === 'codex' && event !== 'SessionEnd') {
+      if (r.state.adapter === 'codex' && event !== 'SessionEnd') {
         if (typeof turn !== 'string' || !turn || turn.length > 256) { reply(400); return; }
         if (r.retiredTurns.has(turn) || (event !== 'UserPromptSubmit' && turn !== r.turnId)) { reply(200); return; }
         if (event === 'UserPromptSubmit' && turn !== r.turnId) {

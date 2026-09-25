@@ -1,5 +1,9 @@
+import { posixWord, powerShellApplication, quotePosix, quoteWindowsNative } from './shell-quote';
+
 // Native Codex command hooks: no user config changes and no approval decisions.
-export function codexSetup(path: string, port: number, token: string, powershell: boolean, remote = false, nonce?: string): { command: string; script: string } {
+export function codexSetup(path: string, port: number, token: string, powershell: boolean, remote = false, nonce?: string, launch: { program?: string; args?: string[] } = {}): { command: string; script: string } {
+  const program = launch.program ?? 'codex';
+  const extraArgs = launch.args ?? [];
   // Base64 keeps paths out of shell syntax on both POSIX and Windows shells.
   const hookCommand = `node -e "require(Buffer.from('${Buffer.from(path).toString('base64')}','base64').toString())"`;
   const events = ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'PreCompact', 'PostCompact', 'Stop', 'Interrupt', 'SessionEnd'];
@@ -35,7 +39,7 @@ process.stdin.on('end', () => {
   // --% expands this one environment value even in Windows PowerShell 5.1.
   // Set it inside the child scope and restore it when the TUI disconnects.
   const remoteArgs = remote ? `--remote unix:// ${powershell ? '--cd "%DMWS_CODEX_CWD%" ' : ''}` : '';
-  const nativeCodex = '& (Get-Command codex -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source';
+  const nativeCodex = `& ${powerShellApplication(program)}`;
   if (powershell) {
     const lines = [
       '& {',
@@ -47,13 +51,14 @@ process.stdin.on('end', () => {
         '$env:DMWS_CODEX_CWD = (Get-Location).Path',
         'try {'
       ] : []),
-      `${nativeCodex} --% ${remoteArgs}-c "${windowsQuoted}"`,
+      `${nativeCodex} --% ${remoteArgs}-c "${windowsQuoted}"${extraArgs.map(arg => ` ${quoteWindowsNative(arg)}`).join('')}`,
       ...(remote ? ['} finally { $env:DMWS_CODEX_CWD = $dmwsPreviousCwd }'] : []),
       '}'
     ];
     return { command: lines.join('\n'), script };
   }
-  // Bypass personal shell wrappers, which may otherwise insert --remote twice.
-  const start = remote ? 'command codex remote-control start --json >/dev/null && ' : '';
-  return { command: `${start}command codex ${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'`, script };
+  const posixProgram = posixWord(program);
+  const start = remote ? `command ${posixProgram} remote-control start --json >/dev/null && ` : '';
+  const posixArgs = extraArgs.map(arg => ` ${quotePosix(arg)}`).join('');
+  return { command: `${start}command ${posixProgram} ${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'${posixArgs}`, script };
 }

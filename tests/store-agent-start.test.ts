@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useStore } from '../src/renderer/store';
 import { collectPaneIds } from '../src/shared/layout-tree';
+import { agentState } from './helpers/agent-state';
+import { builtinAgentProfile } from '../src/shared/agent-profiles';
 
 beforeEach(() => {
-  vi.stubGlobal('window', { api: { saveState: vi.fn(), input: vi.fn() } });
+  vi.stubGlobal('window', { api: { saveState: vi.fn(), input: vi.fn(), kill: vi.fn() } });
   vi.stubGlobal('requestAnimationFrame', () => 0);
   useStore.setState({ workspaces: [{ id: 'w', name: 'Project', cwd: '/base', layout: { type: 'pane', id: 'source' } }],
-    activeWorkspaceId: 'w', paneCwd: { source: '/actual/project' }, paneShell: { source: 'atPrompt' }, agentStates: {}, pendingAgentStarts: {}, maximizedPaneId: 'source' });
+    activeWorkspaceId: 'w', paneCwd: { source: '/actual/project' }, paneShell: { source: 'atPrompt' }, agentStates: {}, pendingAgentStarts: {}, agentLaunchIssues: {}, maximizedPaneId: 'source' });
 });
 
 it('starts in the existing prompt without changing layout, cwd or maximization', () => {
@@ -34,9 +36,36 @@ it('does not write a start command into a busy, unknown, closed or remote termin
 it('rejects a second launch and an already connected agent even with a stale prompt marker', () => {
   expect(useStore.getState().startAgentInPane('source', 'first')).toBe(true);
   expect(useStore.getState().startAgentInPane('source', 'second')).toBe(false);
-  useStore.setState({ paneShell: { source: 'atPrompt' }, agentStates: { source: {
-    provider: 'codex', status: 'working', sessionId: 'active', event: 'UserPromptSubmit', updatedAt: 1
-  } } });
+  useStore.setState({ paneShell: { source: 'atPrompt' }, agentStates: { source:
+    agentState({ status: 'working', sessionId: 'active', event: 'UserPromptSubmit' })
+  } });
   expect(useStore.getState().startAgentInPane('source', 'third')).toBe(false);
   expect(window.api.input).toHaveBeenCalledTimes(1);
+});
+
+it('queues a profile start for the new pane in the source folder', () => {
+  const profile = builtinAgentProfile('claude');
+  useStore.getState().splitActivePane('source', 'v', { profile });
+  const state = useStore.getState();
+  const newId = state.focusedPaneId!;
+  expect(newId).not.toBe('source');
+  expect(state.workspaces[0].layout).toMatchObject({ type: 'split', direction: 'v' });
+  expect(state.pendingAgentStarts[newId]).toEqual({ profile, cwd: '/actual/project' });
+});
+
+it('splits without a queued start when no profile is given and clears issues with the pane', () => {
+  useStore.getState().splitActivePane('source', 'h');
+  const newId = useStore.getState().focusedPaneId!;
+  expect(useStore.getState().pendingAgentStarts[newId]).toBeUndefined();
+  useStore.getState().setAgentLaunchIssue(newId, { profile: builtinAgentProfile('codex'), check: 'missing-cli' });
+  useStore.getState().closeActivePane(newId);
+  expect(useStore.getState().agentLaunchIssues[newId]).toBeUndefined();
+});
+
+it('leaves a maximized pane so the new pane is visible, with and without a profile', () => {
+  useStore.getState().splitActivePane('source', 'v', { profile: builtinAgentProfile('claude') });
+  expect(useStore.getState().maximizedPaneId).toBeNull();
+  useStore.setState({ maximizedPaneId: 'source' });
+  useStore.getState().splitActivePane('source', 'h');
+  expect(useStore.getState().maximizedPaneId).toBeNull();
 });

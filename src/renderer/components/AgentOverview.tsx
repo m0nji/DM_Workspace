@@ -1,5 +1,4 @@
 import { agentLabelKey, agentNeedsAttention } from '../../shared/agent-presentation';
-import { AGENT_NAMES } from '../../shared/agent-state';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +7,7 @@ import { agentOverview } from '../agent-overview';
 import { paneDisplayName } from '../pane-display-name';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
+import { AgentLogo } from './AgentLogo';
 
 export function AgentOverview(): React.JSX.Element {
   const { t } = useTranslation();
@@ -38,7 +38,7 @@ export function AgentOverview(): React.JSX.Element {
             }}>
             <span className="agent-overview-name">{paneDisplayName(workspace.paneTitles?.[paneId] || titles[paneId] || '', cwd[paneId] ?? workspace.cwd) || t('palette.paneNumber', { number: position })}</span>
             <span>{workspace.name} · {t('palette.paneNumber', { number: position })}</span>
-            <span className="agent-overview-state">{AGENT_NAMES[state.provider]} · {t(agentLabelKey(state, shell[paneId]))}</span>
+            <span className="agent-overview-state"><AgentLogo icon={state.icon} name={state.profileName} decorative /> {state.profileName} · {t(agentLabelKey(state, shell[paneId]))}</span>
             <span>{t('agent.overview.reported', { time: new Date(state.updatedAt).toLocaleTimeString() })}</span>
           </button>)}
         </span>

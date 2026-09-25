@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { buildCommandList } from '../command-list';
 import { Icon } from './Icon';
+import { useAgentProfiles } from '../use-agent-profiles';
 
 const isMac = navigator.userAgent.includes('Mac');
 
@@ -41,6 +42,7 @@ export function CommandPalette(): React.JSX.Element | null {
   const shortcutBindings = useStore((s) => s.settings.shortcutBindings);
   // Der Remote-Zustand entscheidet, ob ein Eintrag seinen Sperrgrund nennt.
   const remote = useStore((s) => s.remote);
+  const agentProfiles = useAgentProfiles();
 
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,12 +55,12 @@ export function CommandPalette(): React.JSX.Element | null {
   const commands = useMemo(
     () => buildCommandList({
       actions: useStore.getState(),
-      workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles,
+      workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles, agentProfiles,
       t,
       isMac,
       close: () => setOpen(false)
     }),
-    [workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles, setOpen, t]
+    [workspaces, workspaceGroups, templates, activeWorkspaceId, focusedPaneId, shortcutBindings, remote, paneCwd, paneAutoTitles, agentProfiles, setOpen, t]
   );
 
   const filtered = useMemo(() => {

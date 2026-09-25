@@ -47,29 +47,29 @@ test('Claude setup and explicit events drive only the target pane, with no silen
       expect(response.status).toBe(200);
     };
     await emit('UserPromptSubmit');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Working');
     await win.waitForTimeout(2500); // Deliberately exceed the terminal-output silence window.
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Working');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
     await emit('PermissionRequest');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Needs input');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
     await expect(dialog.getByRole('button', { name: 'Start agent', exact: true })).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Go to terminal', exact: true }).click();
     await expect(panes.first().getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
     await emit('PostToolUse');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Needs input');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Needs input');
     await emit('PostToolBatch');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Working');
     await win.screenshot({ path: '/tmp/dmws-agent-panes.png' });
     await emit('Stop');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Response ended');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Response ended');
     await emit('StopFailure');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Error');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Error');
     await emit('SessionEnd');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Session ending');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Session ending');
     await win.evaluate(() => window.api.agentShellReturned('agent1'));
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Claude Code · Session ended');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Session ended');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
     await expect(dialog.getByRole('button', { name: 'Restart', exact: true })).toBeFocused();
     await win.keyboard.press('Tab');
@@ -79,7 +79,8 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await expect(dialog.locator('code')).toContainText('codex -c');
     await expect(dialog).toContainText('/hooks');
     await win.screenshot({ path: '/tmp/dmws-codex-setup.png' });
-    const setup = await win.evaluate(() => window.api.prepareAgentStatus('agent1', 'codex'));
+    const setup = await win.evaluate(() => window.api.prepareAgentStatus('agent1',
+      { id: 'codex', adapter: 'codex', name: 'Codex', icon: { kind: 'logo', logo: 'openai' }, command: 'codex', args: [], env: {}, showInMenu: true }));
     await dialog.getByRole('button', { name: 'Copy start command' }).click();
     const codexHookScript = readFileSync(setup.settingsPath, 'utf8');
     const postCodex = async (hook_event_name: string) => {
@@ -89,22 +90,22 @@ test('Claude setup and explicit events drive only the target pane, with no silen
       expect(code).toBe(0);
     };
     await postCodex('UserPromptSubmit');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Working');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Working');
     await postCodex('PermissionRequest');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Unknown');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Unknown');
     await postCodex('Stop');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Response ended');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Response ended');
     await expect(panes.nth(1).locator('.pane-agent-status')).toHaveText('Agent');
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
     await dialog.getByRole('button', { name: 'Pause status reporting', exact: true }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Status paused');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Status paused');
     await expect(panes).toHaveCount(2);
     await win.getByRole('button', { name: 'Agent overview', exact: true }).click();
     await expect(win.locator('.agent-overview-row')).toHaveCount(0);
     await win.getByRole('alertdialog').getByRole('button', { name: 'Close', exact: true }).click();
     // Events continue while paused without restoring the overview entry.
     await postCodex('UserPromptSubmit');
-    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Codex · Status paused');
+    await expect(panes.first().locator('.pane-agent-status')).toHaveText('Status paused');
   } finally { await app.close(); }
 });

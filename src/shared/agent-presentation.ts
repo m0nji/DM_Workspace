@@ -9,7 +9,7 @@ export function agentPhase(state: AgentState, shell?: PaneShellState): AgentPhas
   if (state.event === 'SessionEnd') return 'ending';
   if (state.paused) return 'paused';
   if (state.event === 'setup' && shell === 'atPrompt') return 'ready';
-  if (state.provider === 'opencode') return 'unsupported';
+  if (state.adapter === 'opencode' || state.adapter === 'generic') return 'unsupported';
   if (state.event === 'interrupted' || state.event === 'Interrupt') return 'interrupted';
   return state.sessionId ? 'live' : 'waiting';
 }

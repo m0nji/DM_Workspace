@@ -192,6 +192,23 @@ describe('migrateSettings', () => {
     expect('busyIndicatorColor' in out).toBe(false);
     expect('busyIndicatorSpeedMs' in out).toBe(false);
   });
+
+  it('normalizes saved agent profiles and re-derives the legacy phone settings', () => {
+    const out = migrateSettings({
+      themeId: DEFAULT_THEME_ID, terminalOpacity: 0.9, agentRemoteControl: { claude: false },
+      agentProfiles: [
+        { id: 'claude', adapter: 'generic', name: 'Claude', icon: { kind: 'logo', logo: 'claude' }, command: 'claude', args: [], env: {}, showInMenu: true, remoteControl: true },
+        { id: 'custom-a', adapter: 'generic', name: 'Aider', icon: { kind: 'letter', letter: 'A', color: '#112233' }, command: 'aider', args: [], env: {}, showInMenu: false },
+        { id: 'custom-bad', adapter: 'nope' }
+      ]
+    });
+    expect(out.agentProfiles?.map(p => [p.id, p.adapter])).toEqual([['codex', 'codex'], ['opencode', 'opencode'], ['claude', 'claude'], ['custom-a', 'generic']]);
+    expect(out.agentRemoteControl).toEqual({ claude: true });
+  });
+
+  it('leaves agentProfiles absent when none were saved', () => {
+    expect(migrateSettings({ themeId: DEFAULT_THEME_ID, terminalOpacity: 0.9 })).not.toHaveProperty('agentProfiles');
+  });
 });
 
 

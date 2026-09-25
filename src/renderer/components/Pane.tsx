@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useStore, remotePaneCloseBlock, remotePaneCreateBlock, REMOTE_MAX_PANES,
@@ -10,6 +10,13 @@ import { SearchBar } from './SearchBar';
 import { basename } from '../../shared/fs-path';
 import { isRemotePaneKey } from '../../shared/remote-pane-key';
 import { paneDisplayName } from '../pane-display-name';
+import { launchIssueKey, startProfileInPane } from '../agent-start';
+import { resolveAgentProfiles } from '../../shared/agent-profiles';
+import { focusTerminal } from '../terminal-registry';
+import { AgentLogo } from './AgentLogo';
+import { paneAgentIdentity } from '../pane-agent-identity';
+import { useAgentProfiles } from '../use-agent-profiles';
+import { NewPaneMenu } from './NewPaneMenu';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -21,24 +28,10 @@ const svg = {
   strokeLinejoin: 'round' as const
 };
 
-// Split into left + right (vertical divider).
-function SplitLeftRight(): React.JSX.Element {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
-      <line x1="8" y1="3" x2="8" y2="13" />
-    </svg>
-  );
-}
-
-// Split into top + bottom (horizontal divider).
-function SplitTopBottom(): React.JSX.Element {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" {...svg}>
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
-      <line x1="2.5" y1="8" x2="13.5" y2="8" />
-    </svg>
-  );
+function Plus(): React.JSX.Element {
+  return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+    <path d="M8 3v10M3 8h10" />
+  </svg>;
 }
 
 function Maximize(): React.JSX.Element {
@@ -184,8 +177,40 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
     setEditingLabel(false);
   };
 
+  const agentState = useStore((s) => s.agentStates[paneId]);
+  const detectedAgent = useStore((s) => s.paneDetectedAgents[paneId]);
+  const paneShellState = useStore((s) => s.paneShell[paneId]);
+  const profiles = useAgentProfiles();
+  const identity = paneAgentIdentity(agentState, detectedAgent, profiles, paneShellState);
+
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const closeMenu = useCallback(() => { setMenuAnchor(null); requestAnimationFrame(() => focusTerminal(paneId)); }, [paneId]);
+
+  const launchIssue = useStore((s) => s.agentLaunchIssues[paneId]);
+  // One retry at a time: a second click during the check would type a second
+  // start line. The ref blocks clicks before the disabled state has rendered.
+  const retrying = React.useRef(false);
+  const [retryPending, setRetryPending] = useState(false);
+  const retryLaunch = async (): Promise<void> => {
+    if (!launchIssue || retrying.current) return;
+    retrying.current = true;
+    setRetryPending(true);
+    try {
+      const s = useStore.getState();
+      // Use the profile as it is now: the user may just have fixed it.
+      const profile = resolveAgentProfiles(s.settings).find(p => p.id === launchIssue.profile.id) ?? launchIssue.profile;
+      const result = await startProfileInPane(paneId, profile, s.paneCwd[paneId] ?? cwd);
+      if (result === 'started') { s.setAgentLaunchIssue(paneId, null); requestAnimationFrame(() => focusTerminal(paneId)); }
+      else if (result !== 'cancelled') s.setAgentLaunchIssue(paneId, { profile, check: result });
+    } finally {
+      retrying.current = false;
+      setRetryPending(false);
+    }
+  };
+
   return (
     <div
+      data-pane-id={paneId}
       className={['pane',
         `status-${status}`,
         focused ? 'focused' : '',
@@ -233,6 +258,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         }}
       >
         <span className={`status-dot ${status}`} title={t(`pane.status.${status}`)} />
+        {identity && <AgentLogo icon={identity.icon} name={identity.name} />}
         <div className={`pane-heading ${label ? 'has-label' : ''}`}>
           <span className="pane-title pane-title-full" title={folder}>{folder}</span>
           <span className="pane-title pane-title-short" title={folder}>{folderName}</span>
@@ -274,33 +300,22 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
           aria-label={t(manualLabel ? 'pane.editLabel' : automatic ? 'pane.overrideLabel' : 'pane.addLabel')}
           onClick={() => setEditingLabel(true)}
         ><Label /></button>
-        {/* Lokal: Splitten. Remote: ein neues Terminal IM PROJEKT — ein Split
-            würde eine lokale Shell in den Remote-Workspace mischen. Die Wahl
-            der Seite gibt es trotzdem auf beiden Wegen: remote entscheidet sie,
-            wo die vom Server gemeldete Pane im lokalen Layout landet. */}
-        {isRemote ? (
-          <>
-            <button
-              className="pane-btn"
-              disabled={!!createBlock}
-              title={withReason(t('pane.newRemoteTerminalRight'), createBlock)}
-              onClick={() => createRemotePane(paneId, 'h')}
-            ><SplitLeftRight /></button>
-            <button
-              className="pane-btn"
-              disabled={!!createBlock}
-              title={withReason(t('pane.newRemoteTerminalBelow'), createBlock)}
-              onClick={() => createRemotePane(paneId, 'v')}
-            ><SplitTopBottom /></button>
-          </>
-        ) : (
-          <>
-            <button className="pane-btn" title={t('pane.splitHorizontal')}
-                    onClick={() => splitActivePane(paneId, 'h')}><SplitLeftRight /></button>
-            <button className="pane-btn" title={t('pane.splitVertical')}
-                    onClick={() => splitActivePane(paneId, 'v')}><SplitTopBottom /></button>
-          </>
-        )}
+        {/* One entry point for new panes. Remote: "Terminal" creates a server
+            terminal in the project (same direction semantics); agent rows are
+            disabled because remote panes have no hook bridge. */}
+        <button className="pane-btn" aria-haspopup="menu" aria-expanded={!!menuAnchor}
+          title={t('pane.newPane')} aria-label={t('pane.newPane')}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => setMenuAnchor(e.currentTarget.getBoundingClientRect())}><Plus /></button>
+        {menuAnchor && <NewPaneMenu anchor={menuAnchor} profiles={profiles} remote={isRemote}
+          terminalBlockedReason={createBlock ? t(`pane.remoteBlocked.${createBlock}`, { max: REMOTE_MAX_PANES }) : null}
+          onOpen={(entry, direction) => {
+            setMenuAnchor(null);
+            if (isRemote) createRemotePane(paneId, direction);
+            else splitActivePane(paneId, direction, entry.kind === 'agent' ? { profile: entry.profile } : undefined);
+          }}
+          onManage={() => { setMenuAnchor(null); useStore.getState().openAgentSettings(); }}
+          onClose={closeMenu} />}
         <button className="pane-btn" title={maximized ? t('pane.restore') : t('pane.maximize')}
                 onClick={() => toggleMaximize(paneId)}>{maximized ? <Restore /> : <Maximize />}</button>
         <button
@@ -310,6 +325,18 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
           onClick={() => requestClosePane(paneId)}
         ><Close /></button>
       </div>
+      {launchIssue && (
+        <div className="pane-launch-issue" role="status">
+          {/* launchIssueKey returns a plain `string` (it also serves callers outside
+              i18next), so the strictly-typed `t` needs an explicit escape hatch here —
+              the key is always one of the real agent.* keys checked by tests/i18n-catalog.test.ts. */}
+          <span>{t(launchIssueKey(launchIssue.check) as never, { command: launchIssue.profile.command, name: launchIssue.profile.name })}</span>
+          <button type="button" className="btn-link" onClick={() => useStore.getState().openAgentSettings(launchIssue.profile.id)}>{t('pane.launchIssue.edit')}</button>
+          <button type="button" className="btn-link" disabled={retryPending} onClick={() => void retryLaunch()}>{t('pane.launchIssue.retry')}</button>
+          <button type="button" className="pane-btn" aria-label={t('pane.launchIssue.dismiss')} title={t('pane.launchIssue.dismiss')}
+            onClick={() => useStore.getState().setAgentLaunchIssue(paneId, null)}><Close /></button>
+        </div>
+      )}
       <div className="pane-body">
         <SearchBar paneId={paneId} />
         <TerminalView paneId={paneId} cwd={cwd} active={active} />

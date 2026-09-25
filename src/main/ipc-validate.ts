@@ -2,6 +2,7 @@ import type {
   AgentDonePayload, PtyInputRequest, PtyResizeRequest, PtySpawnRequest, ServerConfig,
   SpawnTarget, SpawnTargetScope
 } from '../shared/types';
+import { parseAgentProfile } from '../shared/agent-profiles';
 
 // Laufzeitprüfung für IPC-Payloads.
 //
@@ -95,9 +96,11 @@ export function parsePtySpawn(raw: unknown): PtySpawnRequest | null {
     if (target === null) return null;
     req.target = target;
   }
-  if (raw.agent !== undefined) {
-    if ((raw.agent !== 'claude' && raw.agent !== 'codex' && raw.agent !== 'opencode') || req.target?.kind === 'remote') return null;
-    req.agent = raw.agent;
+  if (raw.agent !== undefined) return null; // pre-profile payload shape
+  if (raw.agentProfile !== undefined) {
+    const profile = parseAgentProfile(raw.agentProfile);
+    if (!profile || req.target?.kind === 'remote') return null;
+    req.agentProfile = profile;
   }
   return req;
 }

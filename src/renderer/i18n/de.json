@@ -17,6 +17,8 @@
       "error": "Fehler"
     },
     "provider": "Agent",
+    "chooseProfile": "Agent auswählen",
+    "profileMissing": "Den Agenten „{{name}}“ gibt es nicht mehr. Wähle einen Agenten zum Starten.",
     "codexHint": "Startet Codex in dieser Pane. Benötigt Codex und Node.js. Beim ersten Start die DM-Workspace-Hooks in Codex mit /hooks prüfen und ihnen vertrauen.",
     "codexLimits": "Codex-Freigabeereignisse bestätigen keinen Eingabebedarf und werden als „Unbekannt“ angezeigt, bis ein weiteres Ereignis vorliegt. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",
     "overview": {
@@ -34,16 +36,18 @@
     "showCommand": "Startbefehl anzeigen (manuell)",
     "startFolder": "Aktuelle Pane im Ordner: {{cwd}}",
     "startErrors": {
-      "missing-cli": "Der gewählte Agent wurde in der Shell nicht gefunden. Installiere Claude Code, Codex bzw. OpenCode oder ergänze den PATH, dann versuche es erneut.",
+      "missing-cli": "„{{command}}“ wurde in deiner Shell nicht gefunden. Installiere das Programm oder ergänze PATH und versuche es erneut.",
       "missing-node": "Codex benötigt Node.js für die Statusanbindung. Installiere Node.js bzw. ergänze den PATH und versuche es erneut.",
       "unsupported-shell": "Der direkte Start unterstützt zsh, bash, sh und PowerShell. Öffne ein Terminal mit einer dieser Shells.",
+      "unsupported-argument": "Ein Argument kann in dieser Shell nicht zuverlässig übergeben werden. Windows PowerShell 5.1 und .cmd-Starter übergeben Anführungszeichen, %-Zeichen oder einen abschließenden Backslash nach Leerzeichen nicht zuverlässig; .cmd-Starter scheitern außerdem an & | < > ^ ( ). Verwende PowerShell 7.3 oder neuer oder ändere das Argument.",
       "check-failed": "Die Installation konnte nicht geprüft werden. Warte, bis das Terminal gestartet ist, und versuche es erneut. Prüfe bei erneutem Fehler auch das Shell-Startprofil."
     },
     "stop": "Statusanzeige pausieren",
     "stopHint": "Pausiert die Statusanzeige und blendet die Sitzung aus der Übersicht aus. Die CLI und der Empfang ihrer Statusmeldungen laufen weiter. Du kannst dieselbe Sitzung anschließend wieder verbinden.",
     "runningWithoutStatus": "In dieser Pane läuft ein Programm ohne wiederverbindbare Statusanbindung. Beende es zuerst im Terminal. Sobald der normale Shell-Prompt erscheint, kannst du hier eine neue Agentensitzung starten.",
     "stopError": "Die Statusanbindung konnte nicht beendet werden. Bitte erneut versuchen.",
-    "opencodeHint": "Startet OpenCode in dieser Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Unbekannt“.",
+    "opencodeHint": "Startet OpenCode in dieser Pane. OpenCode muss in deiner Shell installiert sein. Eine Live-Statusanbindung ist noch nicht vorhanden; die Übersicht zeigt „Kein Live-Status“.",
+    "genericHint": "Startet dieses Programm in der Pane. Eine Live-Statusanzeige gibt es nur für Profile mit Basis Claude Code oder Codex; die Übersicht zeigt „Kein Live-Status“.",
     "details": "Hinweise zum Status",
     "phase": {
       "ready": "Start vorbereitet",
@@ -61,7 +65,7 @@
       "paused": "Die CLI läuft weiter. Ihre Statusmeldungen werden im Hintergrund weiter empfangen; diese Sitzung ist aus der Übersicht ausgeblendet. Mit „Wiederverbinden“ schaltest du die Anzeige für dieselbe Sitzung wieder ein.",
       "ended": "Die Agentensitzung ist beendet und aus der aktiven Übersicht entfernt. Du kannst in derselben Pane eine neue Sitzung starten.",
       "ending": "Der Agent hat sein Sitzungsende gemeldet. Warte, bis die Shell wieder bereit ist.",
-      "unsupported": "OpenCode läuft ohne Live-Statusadapter. DM Workspace kann den Prozess starten und beenden, aber weder Arbeit noch Rückfragen oder Antwortende anzeigen.",
+      "unsupported": "Dieser Agent läuft ohne Live-Statusadapter. DM Workspace kann den Prozess starten und beenden, aber weder Arbeit noch Rückfragen oder Antwortende anzeigen.",
       "interrupted": "Die Sitzung wurde unterbrochen. Ob der Agent weiterarbeitet, ist erst nach einer neuen Statusmeldung bekannt."
     },
     "reconnect": "Wiederverbinden",
@@ -289,6 +293,87 @@
       "openClaude": "Claude im Browser öffnen",
       "opencodeHint": "OpenCode bietet gemeinsamen Terminal- und Browserzugriff über einen eigenen Webserver. Eine integrierte Handy-Kopplung ist hier noch nicht verfügbar. Netzwerkzugriff erfordert einen geschützten Server; unter Windows empfiehlt OpenCode WSL.",
       "openGuide": "Webzugriff einrichten – Anleitung",
+      "showInMenu": "im Menü",
+      "found": "gefunden",
+      "notFound": "nicht gefunden",
+      "checking": "wird geprüft …",
+      "checkProblem": "Prüfung fehlgeschlagen",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "edit": "Bearbeiten",
+      "actionsFor": "Aktionen für {{name}}",
+      "showInMenuFor": "Im Menü anzeigen: {{name}}",
+      "add": "Agent hinzufügen",
+      "addCustom": "+ Eigener Agent",
+      "customDefaultName": "Eigener Agent",
+      "copySuffix": " (Kopie)",
+      "duplicate": "Duplizieren",
+      "reset": "Zurücksetzen",
+      "delete": "Löschen",
+      "deleteMenu": "Löschen…",
+      "deleteTitle": "Agent löschen?",
+      "deleteMessage": "„{{name}}“ wird aus dem Menü und dem Agent-Dialog entfernt. Laufende Sitzungen laufen weiter.",
+      "checkProfile": "Prüfen",
+      "codexService": "Codex-Handy-Dienst",
+      "commandHint": "Programmname oder vollständiger Pfad. ~ wird nicht erweitert.",
+      "secretsWarning": "Keine API-Keys eintragen: Die Werte liegen unverschlüsselt in state.json.",
+      "envAdd": "+ Variable",
+      "envRemove": "Variable entfernen",
+      "previewHooks": "+ Status-Hooks",
+      "fields": {
+        "name": "Name",
+        "adapter": "Basis",
+        "command": "Programm",
+        "args": "Argumente",
+        "env": "Umgebung",
+        "envName": "Variablenname",
+        "envValue": "Wert",
+        "icon": "Icon",
+        "letter": "Buchstabe",
+        "color": "Farbe",
+        "preview": "Vorschau"
+      },
+      "adapter": {
+        "claude": "Claude Code",
+        "codex": "Codex",
+        "opencode": "OpenCode",
+        "generic": "Anderes CLI"
+      },
+      "adapterHint": {
+        "claude": "Statusanzeige verfügbar.",
+        "codex": "Statusanzeige verfügbar. Benötigt Node.js.",
+        "opencode": "Keine Live-Statusanzeige.",
+        "generic": "Beliebiges Terminalprogramm. Keine Live-Statusanzeige."
+      },
+      "logo": {
+        "claude": "Claude",
+        "openai": "OpenAI",
+        "opencode": "OpenCode",
+        "ollama": "Ollama",
+        "letter": "Buchstabe"
+      },
+      "errors": {
+        "name": {
+          "required": "Bitte einen Namen eingeben."
+        },
+        "command": {
+          "required": "Bitte ein Programm eingeben."
+        },
+        "args": {
+          "unclosed": "Ein Anführungszeichen ist nicht geschlossen.",
+          "empty": "Leere Argumente sind nicht erlaubt."
+        },
+        "env": {
+          "name": "Variablennamen bestehen aus Buchstaben, Ziffern und _, beginnen nicht mit einer Ziffer und nicht mit DMWS_.",
+          "duplicate": "Jede Variable darf nur einmal vorkommen."
+        },
+        "icon": {
+          "letter": "Bitte genau einen Buchstaben eingeben."
+        },
+        "form": {
+          "invalid": "Dieses Profil ist ungültig."
+        }
+      },
       "error": {
         "unavailable": "Codex konnte nicht erreicht werden. Prüfe Installation und Anmeldung und aktualisiere Codex. Unter Windows eine normale, nicht als Administrator gestartete App verwenden.",
         "connection": "Der Dienst konnte die Remote-Verbindung noch nicht herstellen. Prüfe das Netzwerk und beende gegebenenfalls ChatGPT Desktop; versuche es danach erneut.",
@@ -310,6 +395,8 @@
     },
     "cmd": {
       "newWorkspace": "Neuer Workspace",
+      "newPaneRight": "Neue Pane rechts: {{name}}",
+      "newPaneBelow": "Neue Pane unten: {{name}}",
       "newRemoteTerminalRight": "Neues Terminal in diesem Projekt, rechts daneben",
       "newRemoteTerminalBelow": "Neues Terminal in diesem Projekt, darunter",
       "splitHorizontal": "Fokussierten Bereich links und rechts teilen",
@@ -471,8 +558,16 @@
     "overrideLabel": "Automatische Beschriftung überschreiben",
     "automaticLabel": "Automatisch aus Befehl oder erstem Prompt",
     "labelPlaceholder": "Wofür wird dieser Bereich genutzt?",
-    "splitHorizontal": "Links und rechts teilen",
-    "splitVertical": "Oben und unten teilen",
+    "newPane": "Neue Pane",
+    "newPaneMenu": {
+      "title": "Neue Pane",
+      "terminal": "Terminal",
+      "right": "{{name}} rechts öffnen",
+      "below": "{{name}} unten öffnen",
+      "manage": "Agenten verwalten …",
+      "localOnly": "Agenten nur in lokalen Workspaces"
+    },
+    "launchIssue": { "edit": "Profil bearbeiten", "retry": "Erneut versuchen", "dismiss": "Ausblenden" },
     "maximize": "Maximieren",
     "restore": "Wiederherstellen",
     "swapWith": "Tauschen mit „{{name}}“",
@@ -480,8 +575,6 @@
     "closeTitle": "Fenster schließen?",
     "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
     "closeConfirm": "Fenster schließen",
-    "newRemoteTerminalRight": "Neues Terminal im Projekt (rechts daneben)",
-    "newRemoteTerminalBelow": "Neues Terminal im Projekt (darunter)",
     "remoteBlocked": {
       "offline": "Nicht verbunden",
       "viewer": "Nur Lesezugriff",
@@ -669,7 +762,14 @@
     "scrollToBottom": "Nach unten scrollen",
     "clearAllTitle": "Alle Fenster leeren?",
     "clearAllMessage": "Alle Bereiche in diesem Workspace werden geleert und ihr Scrollback-Verlauf geht verloren.",
+    "clearAllResetCount_one": "{{count}} Agent startet eine neue Unterhaltung.",
+    "clearAllResetCount_other": "{{count}} Agenten starten eine neue Unterhaltung.",
+    "clearAllBusyCount_one": "{{count}} Agent arbeitet gerade und bleibt unverändert.",
+    "clearAllBusyCount_other": "{{count}} Agenten arbeiten gerade und bleiben unverändert.",
     "clearAllConfirm": "Alle leeren",
+    "clearWindowResetTitle": "Neue Unterhaltung für {{name}} starten und Fenster leeren?",
+    "clearWindowResetMessage": "Das Fenster und die Unterhaltung des Agenten werden geleert; das kann nicht rückgängig gemacht werden.",
+    "clearWindowResetConfirm": "Neue Unterhaltung starten",
     "startFailed": "Terminal konnte nicht gestartet werden",
     "startFailedHint": "Prüfe, ob deine Shell installiert und der Arbeitsordner erreichbar ist. Versuche es dann erneut.",
     "startFailedRemoteHint": "Prüfe oben die Serververbindung und versuche es dann erneut.",

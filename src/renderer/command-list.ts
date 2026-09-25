@@ -8,6 +8,7 @@ import {
   type RemoteBlockReason, type RemoteConnectionState, type StoreState
 } from './store';
 import type { Workspace, WorkspaceGroup, WorkspaceTemplate } from '../shared/types';
+import type { AgentProfile } from '../shared/agent-profiles';
 
 export interface CommandItem {
   id: string;
@@ -37,6 +38,7 @@ export interface CommandListInput {
   focusedPaneId: string | null;
   shortcutBindings: Partial<Record<ShortcutAction, string>> | undefined;
   remote: Record<string, RemoteConnectionState>;
+  agentProfiles?: AgentProfile[];    // Agentenprofile für "Neue Pane rechts/unten: <Name>"
   t: Translate;
   isMac: boolean;
   close: () => void;                 // Palette schließen, bevor die Aktion läuft
@@ -47,7 +49,7 @@ export interface CommandListInput {
 // die einzige Verzweigung dieses Arbeitspakets ohne Test.
 export function buildCommandList({
   actions: s, workspaces, templates, workspaceGroups, activeWorkspaceId, focusedPaneId,
-  shortcutBindings, remote, paneCwd, paneAutoTitles, t, isMac, close
+  shortcutBindings, remote, paneCwd, paneAutoTitles, agentProfiles = [], t, isMac, close
 }: CommandListInput): CommandItem[] {
   const bindings = resolveShortcuts(shortcutBindings, isMac);
   const hint = (a: ShortcutAction): string => formatShortcut(bindings[a], isMac);
@@ -119,6 +121,12 @@ export function buildCommandList({
         { id: 'split-h', title: t('palette.cmd.splitHorizontal'), category: catActions, hint: hint('splitHorizontal'), run: act(() => s.splitActivePane(focusedPaneId, 'h')) },
         { id: 'split-v', title: t('palette.cmd.splitVertical'), category: catActions, hint: hint('splitVertical'), run: act(() => s.splitActivePane(focusedPaneId, 'v')) }
       );
+      for (const profile of agentProfiles.filter(p => p.showInMenu)) {
+        list.push(
+          { id: `new-pane-h-${profile.id}`, title: t('palette.cmd.newPaneRight', { name: profile.name }), category: catActions, run: act(() => s.splitActivePane(focusedPaneId, 'h', { profile })) },
+          { id: `new-pane-v-${profile.id}`, title: t('palette.cmd.newPaneBelow', { name: profile.name }), category: catActions, run: act(() => s.splitActivePane(focusedPaneId, 'v', { profile })) }
+        );
+      }
     }
     list.push(
       { id: 'maximize', title: t('palette.cmd.toggleMaximize'), category: catActions, hint: hint('toggleMaximize'), run: act(() => s.toggleMaximize(focusedPaneId)) },

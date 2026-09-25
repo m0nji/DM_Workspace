@@ -1,8 +1,14 @@
+import type { AgentAdapter, AgentIcon } from './agent-profiles';
+
 export type AgentProvider = 'claude' | 'codex' | 'opencode';
-export const AGENT_NAMES: Record<AgentProvider, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
 export type AgentStatus = 'unknown' | 'working' | 'needs-input' | 'completed' | 'error';
 export interface AgentState {
-  provider: AgentProvider;
+  adapter: AgentAdapter;
+  // Snapshot at launch: a running pane keeps its name and icon even when the
+  // profile is edited or deleted afterwards.
+  profileId: string;
+  profileName: string;
+  icon: AgentIcon;
   paused?: boolean;
   generation?: string;
   status: AgentStatus;

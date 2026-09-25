@@ -3,6 +3,7 @@ import { buildCommandList, type CommandItem, type Translate } from '../src/rende
 import { useStore, remoteConnKey } from '../src/renderer/store';
 import { remotePaneKey } from '../src/shared/remote-pane-key';
 import type { RemotePaneInfo, RemoteRole, Workspace } from '../src/shared/types';
+import { builtinAgentProfiles, type AgentProfile } from '../src/shared/agent-profiles';
 
 // Die Palette ist reines UI, aber ihre Fallunterscheidung lokal/remote ist
 // Logik. buildCommandList ist genau deshalb aus der Komponente gelöst: hier
@@ -36,7 +37,7 @@ const remotePaneCreate = vi.fn();
 const remotePaneClose = vi.fn();
 const saveState = vi.fn();
 
-function build(): CommandItem[] {
+function build(agentProfiles?: AgentProfile[]): CommandItem[] {
   const s = useStore.getState();
   return buildCommandList({
     actions: s,
@@ -49,6 +50,7 @@ function build(): CommandItem[] {
     remote: s.remote,
     paneCwd: s.paneCwd,
     paneAutoTitles: s.paneAutoTitles,
+    agentProfiles,
     t,
     isMac: false,
     close: () => undefined
@@ -110,6 +112,14 @@ describe('buildCommandList', () => {
   it('bietet im lokalen Workspace beide Split-Befehle und kein Remote-Terminal', () => {
     expect(ids()).toEqual(expect.arrayContaining(['split-h', 'split-v', 'close-pane']));
     expect(ids()).not.toContain('new-remote-terminal-right');
+  });
+
+  it('bietet jedes Menüprofil rechts und unten an, aber nicht im Remote-Workspace', () => {
+    const local = build(builtinAgentProfiles()).map(c => c.id);
+    expect(local).toEqual(expect.arrayContaining(['new-pane-h-claude', 'new-pane-v-claude', 'new-pane-h-codex', 'new-pane-v-opencode']));
+    expect(build(builtinAgentProfiles()).find(c => c.id === 'new-pane-v-codex')?.title).toBe('palette.cmd.newPaneBelow');
+    connectRemote('editor');
+    expect(build(builtinAgentProfiles()).some(c => c.id.startsWith('new-pane-'))).toBe(false);
   });
 
   // Remote gibt es beide Richtungen ebenfalls — nur heissen sie „neues

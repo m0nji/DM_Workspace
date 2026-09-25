@@ -16,11 +16,13 @@ import {
   registerAgentEnd, unregisterAgentEnd, registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, refreshTerminalLayoutAfterCommit,
   registerTerminalFocus, unregisterTerminalFocus,
   registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh,
-  registerTerminalInputTracking, unregisterTerminalInputTracking
+  registerTerminalInputTracking, unregisterTerminalInputTracking, trackTerminalInput
 } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
 import { stripTrailingWhitespace, selectionAsCommand } from '../../shared/copy-text';
 import { collectPaneIds } from '../../shared/layout-tree';
+import { agentResetPlan, liveResetEntries } from '../agent-reset';
+import { builtinAgentProfile } from '../../shared/agent-profiles';
 // Eigenständige Terminal-Belange: jedes Modul hält Auf- und Abbau beieinander
 // und gibt seinen Disposer zurück (siehe die Disposer-Liste im Mount-Effect).
 import { registerE2EHooks } from '../terminal/e2e-hooks';
@@ -30,6 +32,7 @@ import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
 import { PSREADLINE_HEAL_SEQUENCE } from '../../shared/psreadline-heal';
+import { promptMarkerDecision, type AgentBootLaunch } from '../../shared/agent-boot-prompt';
 import {
   STUCK_MODE_RESET,
   sanitizeRestoredScrollback,
@@ -156,7 +159,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const [historyRestored, setHistoryRestored] = useState(false);
   const retryStartRef = useRef<(() => void) | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  // Snapshot the affected pane ids and the agentResetPlan at the moment the
+  // dialog opens: it drives both the counts shown in the message and exactly
+  // which panes get a reset command on confirm, so a state change while the
+  // dialog is open (e.g. an agent finishing) can't silently change the plan
+  // the user is looking at.
+  const [confirmClearAll, setConfirmClearAll] = useState<{ paneIds: string[]; plan: ReturnType<typeof agentResetPlan> } | null>(null);
+  const [confirmSingleReset, setConfirmSingleReset] = useState<{ paneId: string; command: string; name: string } | null>(null);
 
   // Acquire or release the WebGL renderer to match whether this pane should hold a
   // GPU context (see webglRef comment). Idempotent: re-acquiring an existing
@@ -249,7 +258,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     term.open(host);
 
     const autoTitleTracker = createPaneAutoTitleTracker({
-      onTitle: (title) => useStore.getState().setPaneAutoTitle(paneId, title)
+      onTitle: (title) => useStore.getState().setPaneAutoTitle(paneId, title),
+      onAgent: (agent) => useStore.getState().setPaneDetectedAgent(paneId, agent)
     });
 
     // GPU renderer. xterm's default DOM renderer chokes on high-throughput
@@ -322,6 +332,10 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     const HEAL_DELAY_MS = 30;
     let promptArmed = false;
     let healTimer: ReturnType<typeof setTimeout> | null = null;
+    // Set right before a queued agent profile is spawned into this (brand new)
+    // pane and updated by the spawn result; see the OSC prompt handler below
+    // and shared/agent-boot-prompt.ts for why it exists.
+    let agentBootLaunch: AgentBootLaunch | null = null;
     // User input and programmatic commands must retire the same prompt state.
     const trackInput = (data: string): void => {
       // Erst das Absenden einer Zeile kann ein Programm starten, das die Bytes
@@ -373,15 +387,28 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // capture for the next line the user types (a sudo password).
       if (isPromptPayload(data, window.api.promptNonce)) {
         autoTitleTracker.onShellPrompt();
-        window.api.agentShellReturned(paneId);
+        // A pane freshly spawned for an agent shows its shell's own first,
+        // ordinary boot prompt before the queued launch command has even been
+        // read by the shell — checkAgentRequirements and agents.prepare() can
+        // still be in flight (or their IPC round-trip merely still settling)
+        // when this marker's xterm parsing catches up. Reporting it as "shell"
+        // to the main process would retire the agent registration moments
+        // after it is created, marking the session ended before it started.
+        // Exactly one such boot prompt exists per spawn (nothing can run in a
+        // shell that does not exist yet); once consumed, every further marker
+        // reports normally.
+        const decision = promptMarkerDecision(agentBootLaunch);
+        agentBootLaunch = null;
+        if (decision.reportShellReturn) window.api.agentShellReturned(paneId);
         // Ab hier steht ein leerer lokaler Prompt — der einzige Zustand, in dem
-        // die Heilung gefahrlos gesendet werden darf.
-        promptArmed = true;
+        // die Heilung gefahrlos gesendet werden darf. Nicht aber, wenn der
+        // Agent schon gestartet ist: dann läse er die Heilungsbytes.
+        promptArmed = decision.shell === 'atPrompt';
         // Zusätzlich melden, damit die Navigation es sehen kann. promptArmed
         // bleibt lokal, weil die Heilung es synchron braucht; hier wird nur
         // gemeldet, nicht abgeleitet — was der Zustand bedeutet, entscheidet
         // shared/pane-busy.ts.
-        useStore.getState().setPaneShell(paneId, 'atPrompt');
+        useStore.getState().setPaneShell(paneId, decision.shell);
         // The local prompt is on screen, so no full-screen program owns the
         // terminal: an alt screen or mouse tracking still active here is stale —
         // left behind by a TUI that crashed or was killed (e.g. by an app
@@ -618,10 +645,25 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
         const cols = term.cols || 80;
         const rows = term.rows || 24;
         const agentStart = useStore.getState().pendingAgentStarts[paneId];
-        if (agentStart) term.options.disableStdin = true;
-        await window.api.spawn({ paneId, cwd: agentStart?.cwd ?? agentRestartCwd ?? cwd, cols, rows,
-          ...(target ? { target } : {}), ...(agentStart ? { agent: agentStart.provider } : {}) });
-        if (agentStart) useStore.getState().finishAgentStart(paneId);
+        if (agentStart) { term.options.disableStdin = true; agentBootLaunch = 'pending'; }
+        const result = await window.api.spawn({ paneId, cwd: agentStart?.cwd ?? agentRestartCwd ?? cwd, cols, rows,
+          ...(target ? { target } : {}), ...(agentStart ? { agentProfile: agentStart.profile } : {}) });
+        if (agentStart) {
+          useStore.getState().finishAgentStart(paneId);
+          const launch = result?.agent;
+          // Boot prompt not parsed yet: tell its marker how the launch went.
+          if (agentBootLaunch !== null) agentBootLaunch = launch === 'started' ? 'started' : 'failed';
+          // A closed pane keeps neither a running state nor a launch notice.
+          if (launch === 'started' && !disposed) {
+            // Main typed the launch line, so no renderer input has marked the
+            // pane running. Do it like startAgentInPane: 'running' plus the
+            // CLI name for the title tracker (queued until the boot prompt).
+            trackInput(`\x05\x15${agentStart.profile.command}\r`);
+          }
+          if (launch && launch !== 'started' && !disposed) {
+            useStore.getState().setAgentLaunchIssue(paneId, { profile: agentStart.profile, check: launch });
+          }
+        }
         if (disposed || processEnded) return;
         setStartError(null);
         term.options.disableStdin = false;
@@ -937,8 +979,29 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       },
       { label: t('menu.selectAll'), onClick: () => { term?.selectAll(); term?.focus(); } },
       { label: '-' },
-      { label: t('menu.clearWindow'), onClick: () => { clearTerminal(paneId); term?.focus(); } },
-      { label: t('menu.clearAllWindows'), onClick: () => { term?.focus(); setConfirmClearAll(true); } },
+      {
+        label: t('menu.clearWindow'),
+        onClick: () => {
+          term?.focus();
+          const s = useStore.getState();
+          const plan = agentResetPlan([paneId], { agentStates: s.agentStates, paneShell: s.paneShell, paneDetectedAgents: s.paneDetectedAgents });
+          const resetEntry = plan.reset[0];
+          if (!resetEntry) { clearTerminal(paneId); return; }
+          const detected = s.paneDetectedAgents[paneId];
+          const name = s.agentStates[paneId]?.profileName ?? (detected ? builtinAgentProfile(detected).name : '');
+          setConfirmSingleReset({ paneId, command: resetEntry.command, name });
+        }
+      },
+      {
+        label: t('menu.clearAllWindows'),
+        onClick: () => {
+          term?.focus();
+          const s = useStore.getState();
+          const paneIds = collectPaneIds(s.activeWorkspace()?.layout ?? null);
+          const plan = agentResetPlan(paneIds, { agentStates: s.agentStates, paneShell: s.paneShell, paneDetectedAgents: s.paneDetectedAgents });
+          setConfirmClearAll({ paneIds, plan });
+        }
+      },
       // Unstick the terminal's input/mouse modes without wiping its contents — e.g.
       // after a TUI crashed and left mouse tracking on, hijacking the wheel.
       { label: t('menu.resetTerminal'), onClick: () => { term?.write(STUCK_MODE_RESET); term?.focus(); } },
@@ -977,15 +1040,53 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       {confirmClearAll && (
         <ConfirmDialog
           title={t('terminal.clearAllTitle')}
-          message={t('terminal.clearAllMessage')}
+          message={[
+            confirmClearAll.plan.reset.length > 0 ? t('terminal.clearAllResetCount', { count: confirmClearAll.plan.reset.length }) : null,
+            confirmClearAll.plan.busy.length > 0 ? t('terminal.clearAllBusyCount', { count: confirmClearAll.plan.busy.length }) : null,
+            t('terminal.clearAllMessage')
+          ].filter(Boolean).join(' ')}
           confirmLabel={t('terminal.clearAllConfirm')}
           tone="danger"
           onConfirm={() => {
-            const ws = useStore.getState().activeWorkspace();
-            clearTerminals(collectPaneIds(ws?.layout ?? null));
-            setConfirmClearAll(false);
+            const { paneIds, plan } = confirmClearAll;
+            // Clear every affected pane's display first, then send each reset
+            // pane its new-conversation command — so the agent's fresh prompt
+            // never lands on the old scrollback.
+            clearTerminals(paneIds);
+            // A reset pane may have been closed between opening this dialog
+            // and confirming it — drop it rather than sending a command into
+            // a pane that no longer exists.
+            const livePaneIds = useStore.getState().workspaces.flatMap((ws) => collectPaneIds(ws.layout));
+            for (const { paneId: resetPaneId, command } of liveResetEntries(plan.reset, livePaneIds)) {
+              const data = `${command}\r`;
+              trackTerminalInput(resetPaneId, data);
+              window.api.input({ paneId: resetPaneId, data });
+            }
+            setConfirmClearAll(null);
           }}
-          onCancel={() => setConfirmClearAll(false)}
+          onCancel={() => setConfirmClearAll(null)}
+        />
+      )}
+      {confirmSingleReset && (
+        <ConfirmDialog
+          title={t('terminal.clearWindowResetTitle', { name: confirmSingleReset.name })}
+          message={t('terminal.clearWindowResetMessage')}
+          confirmLabel={t('terminal.clearWindowResetConfirm')}
+          tone="danger"
+          onConfirm={() => {
+            const { paneId: resetPaneId, command } = confirmSingleReset;
+            clearTerminal(resetPaneId);
+            // Same cheap guard as "Alle Fenster leeren": skip the command if
+            // this pane was closed while the dialog was open.
+            const livePaneIds = useStore.getState().workspaces.flatMap((ws) => collectPaneIds(ws.layout));
+            if (liveResetEntries([{ paneId: resetPaneId, command }], livePaneIds).length > 0) {
+              const data = `${command}\r`;
+              trackTerminalInput(resetPaneId, data);
+              window.api.input({ paneId: resetPaneId, data });
+            }
+            setConfirmSingleReset(null);
+          }}
+          onCancel={() => setConfirmSingleReset(null)}
         />
       )}
       {!atBottom && (

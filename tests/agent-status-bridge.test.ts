@@ -7,6 +7,8 @@ import { once } from 'node:events';
 import { join } from 'node:path';
 import { AgentStatusBridge } from '../src/main/agent-status-bridge';
 import type { AgentStateEvent } from '../src/shared/agent-state';
+import { builtinAgentProfile } from '../src/shared/agent-profiles';
+import { agentPhase } from '../src/shared/agent-presentation';
 
 describe('agent status bridge', () => {
   let dir: string;
@@ -28,7 +30,7 @@ describe('agent status bridge', () => {
     return { result, hook, post };
   }
   it('runs Codex command hooks, protects turns without claiming ambiguous approvals need user input', async () => {
-    const result = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'codex');
+    const result = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), builtinAgentProfile('codex'));
     const post = async (event: string, turn = 't1', extra = {}) => {
       const child = spawn(process.execPath, [result.settingsPath], {
         env: { ...process.env, DMWS_AGENT_NONCE: 'a'.repeat(64) }, stdio: ['pipe', 'pipe', 'pipe']
@@ -41,8 +43,8 @@ describe('agent status bridge', () => {
       expect(output.trim()).toBe('{}');
     };
     await post('UserPromptSubmit');
-    expect(bridge.snapshot('p1')).toMatchObject({ provider: 'codex', status: 'working' });
-    await expect(bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude')).rejects.toThrow();
+    expect(bridge.snapshot('p1')).toMatchObject({ adapter: 'codex', status: 'working' });
+    await expect(bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), builtinAgentProfile('claude'))).rejects.toThrow();
     await post('PermissionRequest');
     expect(bridge.snapshot('p1')?.status).toBe('unknown');
     await post('PostToolUse', 't1', { tool_use_id: 'unrelated' });
@@ -62,28 +64,26 @@ describe('agent status bridge', () => {
   });
   it('routes shared-daemon hook events without inheriting the terminal environment', async () => {
     await bridge.close();
-    bridge = new AgentStatusBridge(dir, e => events.push(e), () => ({ codex: true, claude: true }));
-    const result = await bridge.prepare('remote', '/bin/zsh', 'b'.repeat(64), 'codex');
+    bridge = new AgentStatusBridge(dir, e => events.push(e));
+    const result = await bridge.prepare('remote', '/bin/zsh', 'b'.repeat(64), { ...builtinAgentProfile('codex'), remoteControl: true });
     expect(result.command).toContain('--remote unix://');
     const child = spawn(process.execPath, [result.settingsPath], {
       env: { ...process.env, DMWS_AGENT_NONCE: 'wrong-daemon-environment' }, stdio: ['pipe', 'pipe', 'pipe']
     });
     child.stdin.end(JSON.stringify({ session_id: 'remote-session', turn_id: 'remote-turn', hook_event_name: 'UserPromptSubmit' }));
     await once(child, 'close');
-    expect(bridge.snapshot('remote')).toMatchObject({ provider: 'codex', status: 'working', sessionId: 'remote-session' });
-    const claude = await bridge.prepare('claude', '/bin/zsh', 'c'.repeat(64), 'claude');
+    expect(bridge.snapshot('remote')).toMatchObject({ adapter: 'codex', status: 'working', sessionId: 'remote-session' });
+    const claude = await bridge.prepare('claude', '/bin/zsh', 'c'.repeat(64), { ...builtinAgentProfile('claude'), remoteControl: true });
     expect(claude.command).toContain('--remote-control');
     expect(claude.command).toContain('--settings');
   });
   it('uses changed remote preferences on a new session after returning to the shell', async () => {
     await bridge.close();
-    let enabled = false;
-    bridge = new AgentStatusBridge(dir, e => events.push(e), () => ({ claude: enabled }));
-    const first = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude');
+    bridge = new AgentStatusBridge(dir, e => events.push(e));
+    const first = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), builtinAgentProfile('claude'));
     expect(first.command).not.toContain('--remote-control');
     bridge.shellReturned('p1');
-    enabled = true;
-    const second = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), 'claude');
+    const second = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), { ...builtinAgentProfile('claude'), remoteControl: true });
     expect(second.command).toContain('--remote-control');
     expect(second.settingsPath).not.toBe(first.settingsPath);
   });
@@ -121,13 +121,21 @@ describe('agent status bridge', () => {
     expect(bridge.snapshot('p1')!.generation).not.toBe(previous.generation);
   });
   it('starts OpenCode without claiming hook status or needing a loopback server', async () => {
-    const result = await bridge.prepare('open', '/bin/sh', 'a'.repeat(64), 'opencode');
+    const result = await bridge.prepare('open', '/bin/sh', 'a'.repeat(64), builtinAgentProfile('opencode'));
     expect(result.command).toBe('opencode');
-    expect(bridge.snapshot('open')).toMatchObject({ provider: 'opencode', status: 'unknown', sessionId: null });
+    expect(bridge.snapshot('open')).toMatchObject({ adapter: 'opencode', status: 'unknown', sessionId: null });
     bridge.shellReturned('open');
     expect(bridge.snapshot('open')?.status).toBe('unknown');
     bridge.release('open');
     expect(existsSync(`${result.settingsPath}.start`)).toBe(false);
+  });
+  it('quotes typographic single quotes of the start file path for PowerShell', async () => {
+    await bridge.close();
+    bridge = new AgentStatusBridge(join(dir, 'it\u2019s \u2018x\u2019'), e => events.push(e));
+    const result = await bridge.prepare('ps', 'pwsh', 'a'.repeat(64), builtinAgentProfile('opencode'));
+    const quoted = `${result.settingsPath}.start`.replace(/[\u2018\u2019]/g, '$&$&');
+    expect(result.launchCommand).toBe(`& ([scriptblock]::Create([IO.File]::ReadAllText('${quoted}')))`);
+    bridge.release('ps');
   });
   it('receives authenticated lifecycle events without storing prompt or transcript data', async () => {
     const { post } = await setup();
@@ -220,7 +228,7 @@ describe('agent status bridge', () => {
     expect(events.at(-1)?.state).toBeNull();
   });
   it.skipIf(process.platform === 'win32')('uses POSIX editing keys for PowerShell hosted on a POSIX PTY', async () => {
-    const result = await bridge.prepare('pwsh', '/usr/local/bin/pwsh', 'a'.repeat(64), 'opencode');
+    const result = await bridge.prepare('pwsh', '/usr/local/bin/pwsh', 'a'.repeat(64), builtinAgentProfile('opencode'));
     expect(result.inputPrefix).toBe('\x05\x15');
   });
   it('prepares idempotently without replacing an active session and rejects unsupported shells', async () => {
@@ -230,6 +238,33 @@ describe('agent status bridge', () => {
     expect((await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64))).command).toBe(result.command);
     expect(bridge.snapshot('p1')?.status).toBe('working');
     await expect(bridge.prepare('p2', 'cmd.exe', 'b'.repeat(64))).rejects.toThrow('shell');
-    expect((await bridge.prepare('p3', 'powershell.exe', 'c'.repeat(64))).command).toMatch(/^claude --settings '/);
+    const ps = (await bridge.prepare('p3', 'powershell.exe', 'c'.repeat(64))).command;
+    expect(ps).toMatch(/^& \(Get-Command claude -CommandType Application -ErrorAction Stop \| Select-Object -First 1\)\.Source --settings '/);
+  });
+
+  it('writes profile args and environment into the private start file', async () => {
+    const profile = { ...builtinAgentProfile('claude'), id: 'custom-ollama', name: 'Claude (Ollama)', args: ['--model', 'qwen3'], env: { ANTHROPIC_BASE_URL: 'http://localhost:11434' } };
+    const result = await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), profile);
+    expect(readFileSync(`${result.settingsPath}.start`, 'utf8')).toBe(
+      `( export ANTHROPIC_BASE_URL='http://localhost:11434'; claude --settings '${result.settingsPath}' '--model' 'qwen3' )\n`);
+    expect(bridge.snapshot('p1')).toMatchObject({ adapter: 'claude', profileId: 'custom-ollama', profileName: 'Claude (Ollama)' });
+  });
+
+  it('starts a generic CLI without a loopback listener and reports it as unsupported', async () => {
+    const generic = { ...builtinAgentProfile('opencode'), id: 'custom-aider', adapter: 'generic' as const, name: 'Aider', command: 'aider' };
+    const result = await bridge.prepare('g', '/bin/sh', 'a'.repeat(64), generic);
+    expect(result.command).toBe('aider');
+    expect(agentPhase(bridge.snapshot('g')!, 'running')).toBe('unsupported');
+  });
+
+  it('reuses a registration only for the identical profile and refuses a switch during a live session', async () => {
+    const { post } = await setup('p1');
+    await post({ session_id: 's1', hook_event_name: 'UserPromptSubmit' });
+    const renamed = { ...builtinAgentProfile('claude'), name: 'Anders' };
+    await expect(bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), renamed)).rejects.toThrow('End the active agent session');
+    expect(bridge.snapshot('p1')).toMatchObject({ profileName: 'Claude Code', sessionId: 's1' });
+    bridge.shellReturned('p1');
+    await bridge.prepare('p1', '/bin/zsh', 'a'.repeat(64), renamed);
+    expect(bridge.snapshot('p1')).toMatchObject({ profileName: 'Anders', event: 'setup' });
   });
 });

@@ -13,6 +13,7 @@ import {
 import { getTheme, DEFAULT_THEME_ID } from '../shared/themes';
 import { normalizeGroups } from '../shared/workspace-groups';
 import { SHORTCUT_ACTIONS, type ShortcutAction } from '../shared/shortcuts';
+import { deriveAgentRemoteControl, normalizeAgentProfiles } from '../shared/agent-profiles';
 
 // Keep only entries whose value is a non-empty string; returns undefined when the
 // result would be empty so the field can be omitted entirely.
@@ -115,6 +116,10 @@ export function migrateSettings(raw: unknown): Settings {
     for (const provider of ['codex', 'claude'] as const) {
       if (typeof remote[provider] === 'boolean') out.agentRemoteControl[provider] = remote[provider];
     }
+  }
+  if (Array.isArray(r.agentProfiles)) {
+    out.agentProfiles = normalizeAgentProfiles(r.agentProfiles, out.agentRemoteControl ?? {});
+    out.agentRemoteControl = deriveAgentRemoteControl(out.agentProfiles);
   }
   if (typeof r.notificationsEnabled === 'boolean') out.notificationsEnabled = r.notificationsEnabled;
   if (typeof r.restoreTerminalHistory === 'boolean') out.restoreTerminalHistory = r.restoreTerminalHistory;

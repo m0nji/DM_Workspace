@@ -250,3 +250,16 @@ describe('pane title helpers', () => {
       .toBe('Behebe den Fehler in …/store.ts');
   });
 });
+
+it('detects opencode and reports the running agent until the next prompt', () => {
+  expect(detectAgentCommand('opencode --model ollama/qwen3')).toBe('opencode');
+  const titles: string[] = [];
+  const agents: Array<string | null> = [];
+  const tracker = createPaneAutoTitleTracker({ onTitle: t => titles.push(t), onAgent: a => agents.push(a) });
+  tracker.onShellPrompt();
+  tracker.onInput('opencode\r');
+  tracker.onInput('Fix the flaky login test\r');
+  tracker.onShellPrompt();
+  expect(titles).toContain('OpenCode · Fix the flaky login test');
+  expect(agents).toEqual([null, 'opencode', null]);
+});

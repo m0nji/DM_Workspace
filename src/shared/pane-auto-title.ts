@@ -31,7 +31,8 @@ export function isPromptPayload(data: string, nonce: string): boolean {
   return nonce.length > 0 && data === promptPayload(nonce);
 }
 
-type AgentKind = 'claude' | 'codex';
+type AgentKind = 'claude' | 'codex' | 'opencode';
+const AGENT_TITLES: Record<AgentKind, string> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode' };
 
 export interface PaneAutoTitleTracker {
   /** Called only for a prompt marker emitted by DM Workspace's local shell hook. */
@@ -43,6 +44,7 @@ export interface PaneAutoTitleTracker {
 
 interface TrackerOptions {
   onTitle: (title: string) => void;
+  onAgent?: (agent: AgentKind | null) => void;
   commandMaxLength?: number;
   promptMaxLength?: number;
 }
@@ -311,16 +313,18 @@ export function detectAgentCommand(command: string): AgentKind | null {
       while (i < tokens.length && /^-/.test(tokens[i])) i++;
     }
     const executable = executableName(tokens[i] ?? '');
-    if (executable === 'claude' || executable === 'codex') return executable;
+    if (executable === 'claude' || executable === 'codex' || executable === 'opencode') return executable;
     if (executable === 'npx' || executable === 'bunx') {
       const packageName = tokens.slice(i + 1).find((token) => !token.startsWith('-'))?.toLowerCase() ?? '';
       if (packageName.includes('claude')) return 'claude';
       if (packageName.includes('codex')) return 'codex';
+      if (packageName.includes('opencode')) return 'opencode';
     }
     if ((executable === 'pnpm' || executable === 'yarn') && tokens[i + 1] === 'dlx') {
       const packageName = (tokens[i + 2] ?? '').toLowerCase();
       if (packageName.includes('claude')) return 'claude';
       if (packageName.includes('codex')) return 'codex';
+      if (packageName.includes('opencode')) return 'opencode';
     }
   }
   return null;
@@ -342,7 +346,7 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
     if (!agent || raw === null) return;
     if (isAgentSessionReset(agent, raw)) {
       agentPromptCaptured = false;
-      opts.onTitle(agent === 'claude' ? 'Claude' : 'Codex');
+      opts.onTitle(AGENT_TITLES[agent]);
       return;
     }
     if (agentPromptCaptured) return;
@@ -350,8 +354,7 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
     // Ignore empty enters and single-key onboarding confirmations. The first
     // substantive submission remains eligible as the actual agent prompt.
     if (summary.length < 3 || /^(?:y|n|yes|no|ja|nein|\d+)$/i.test(summary)) return;
-    const agentName = agent === 'claude' ? 'Claude' : 'Codex';
-    opts.onTitle(`${agentName} · ${summary}`);
+    opts.onTitle(`${AGENT_TITLES[agent]} · ${summary}`);
     agentPromptCaptured = true;
   };
 
@@ -370,6 +373,7 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
     if (!title) return;
     opts.onTitle(title);
     agent = detectAgentCommand(raw);
+    opts.onAgent?.(agent);
   };
 
   const onInput = (data: string): void => {
@@ -395,6 +399,7 @@ export function createPaneAutoTitleTracker(opts: TrackerOptions): PaneAutoTitleT
       prePromptInput = '';
       shellReady = true;
       agent = null;
+      opts.onAgent?.(null);
       agentPromptCaptured = false;
       shellLine.reset();
       agentLine.reset();

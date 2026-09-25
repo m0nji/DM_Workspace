@@ -119,10 +119,15 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
           activeWorkspaceId: 'launch', paneCwd: { original: project }
         });
       }, project);
-      await win.evaluate(remote => window.__store.getState().updateSettings({ agentRemoteControl: { codex: remote, claude: remote } }), remote);
+      await win.evaluate(remote => {
+        window.__store.getState().setAgentProfiles([]);
+        const profiles = window.__store.getState().settings.agentProfiles!
+          .map(p => p.id === 'claude' || p.id === 'codex' ? { ...p, remoteControl: remote } : p);
+        window.__store.getState().setAgentProfiles(profiles);
+      }, remote);
       const original = win.locator('.pane').first();
       await expect(original.locator('.xterm')).toBeVisible();
-      await expect.poll(() => win.evaluate(provider => window.api.checkAgentStart('original', provider), provider)).toBe('ready');
+      await expect.poll(() => win.evaluate(provider => window.api.checkAgentStart('original', { id: provider, adapter: provider, name: provider, icon: { kind: 'logo', logo: provider === 'codex' ? 'openai' : provider }, command: provider, args: [], env: {}, showInMenu: true }), provider)).toBe('ready');
       await expect.poll(() => win.evaluate(() => (window as unknown as {
         __store: { getState(): { paneShell: Record<string, string> } }
       }).__store.getState().paneShell.original)).toBe('atPrompt');
@@ -146,7 +151,8 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
       writeFileSync(join(dir, 'allow-report'), '');
       const buffers = () => win.evaluate(() => Object.fromEntries([...((window as unknown as { __bufferText: Map<string, () => string> }).__bufferText)].map(([id, read]) => [id, read()])));
       await expect.poll(async () => (await buffers()).original.replace(/\r?\n/g, '')).toContain(`AGENT_STARTED_IN=${realpathSync.native(project)}`);
-      await expect(win.locator('.pane-agent-status').filter({ hasText: `${provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode'} · ${provider === 'opencode' ? 'No live status' : 'Working'}` })).toHaveCount(1);
+      await expect(win.locator('.pane-agent-status').filter({ hasText: provider === 'opencode' ? 'No live status' : 'Working' })).toHaveCount(1);
+      await expect(original.getByRole('img', { name: provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'OpenCode' })).toBeVisible();
       expect((await buffers()).original).not.toContain('unfinished-input: command not found');
       await expect(original.locator('.pane-label.automatic')).toHaveText(provider);
       await expect(original.getByRole('textbox', { name: 'Terminal input' })).toBeFocused();
@@ -237,7 +243,7 @@ test('missing CLI stays in the dialog without opening a pane', async () => {
     await win.evaluate(() => (window as unknown as { __store: { setState(s: unknown): void } }).__store.setState({
       workspaces: [{ id: 'w', name: 'Missing CLI', cwd: '/tmp', layout: { type: 'pane', id: 'source' } }], activeWorkspaceId: 'w'
     }));
-    await expect.poll(() => win.evaluate(() => window.api.checkAgentStart('source', 'claude'))).toBe('missing-cli');
+    await expect.poll(() => win.evaluate(() => window.api.checkAgentStart('source', { id: 'claude', adapter: 'claude', name: 'claude', icon: { kind: 'logo', logo: 'claude' }, command: 'claude', args: [], env: {}, showInMenu: true }))).toBe('missing-cli');
     await win.getByRole('button', { name: 'Agent status', exact: true }).click();
     const dialog = win.getByRole('alertdialog');
     await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
@@ -264,7 +270,7 @@ exec /bin/bash --noprofile --norc "$@"
     await win.evaluate(() => (window as unknown as { __store: { setState(s: unknown): void } }).__store.setState({
       workspaces: [{ id: 'w', name: 'Cancel start', cwd: '/tmp', layout: { type: 'pane', id: 'source' } }], activeWorkspaceId: 'w'
     }));
-    await expect.poll(() => win.evaluate(() => window.api.checkAgentStart('source', 'opencode'))).toBe('ready');
+    await expect.poll(() => win.evaluate(() => window.api.checkAgentStart('source', { id: 'opencode', adapter: 'opencode', name: 'opencode', icon: { kind: 'logo', logo: 'opencode' }, command: 'opencode', args: [], env: {}, showInMenu: true }))).toBe('ready');
     await win.getByRole('button', { name: 'Agent status', exact: true }).click();
     const dialog = win.getByRole('alertdialog');
     await dialog.getByRole('combobox').selectOption('opencode');

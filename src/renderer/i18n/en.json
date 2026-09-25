@@ -17,6 +17,8 @@
       "error": "Error"
     },
     "provider": "Agent",
+    "chooseProfile": "Choose an agent",
+    "profileMissing": "The agent “{{name}}” no longer exists. Choose an agent to start.",
     "codexHint": "Starts Codex in this pane. Requires Codex and Node.js. On first start, review and trust the DM Workspace hooks in Codex with /hooks.",
     "codexLimits": "Codex approval events do not confirm that user input is needed. They show Unknown until another event arrives. General errors and some question tools are not covered by its hooks.",
     "overview": {
@@ -34,16 +36,18 @@
     "showCommand": "Show start command (manual)",
     "startFolder": "Current pane in folder: {{cwd}}",
     "startErrors": {
-      "missing-cli": "The selected agent was not found in your shell. Install Claude Code, Codex or OpenCode, or add it to PATH, then try again.",
+      "missing-cli": "“{{command}}” was not found in your shell. Install it or add it to PATH, then try again.",
       "missing-node": "Codex needs Node.js for status reporting. Install Node.js or add it to PATH, then try again.",
       "unsupported-shell": "Direct start supports zsh, bash, sh and PowerShell. Open a terminal using one of these shells.",
+      "unsupported-argument": "An argument cannot be passed reliably in this shell. Windows PowerShell 5.1 and .cmd launchers do not reliably pass quotes, % signs or a trailing backslash after a space; .cmd launchers also break on & | < > ^ ( ). Use PowerShell 7.3 or newer, or change the argument.",
       "check-failed": "Could not check the installation. Wait for the terminal to start and try again. If this persists, check your shell startup profile."
     },
     "stop": "Pause status reporting",
     "stopHint": "Pauses the status display and hides this session from the overview. The CLI and receipt of its status reports continue. You can reconnect this same session afterwards.",
     "runningWithoutStatus": "A program without reconnectable status reporting is running in this pane. Exit it in the terminal first. Once the normal shell prompt returns, you can start a new agent session here.",
     "stopError": "Could not disconnect status reporting. Please try again.",
-    "opencodeHint": "Starts OpenCode in this pane. OpenCode must be installed in your shell. Live status reporting is not available yet; the overview shows Unknown.",
+    "opencodeHint": "Starts OpenCode in this pane. OpenCode must be installed in your shell. Live status reporting is not available yet; the overview shows “No live status”.",
+    "genericHint": "Starts this program in the pane. Live status reporting is only available for Claude Code and Codex profiles; the overview shows “No live status”.",
     "details": "About status reporting",
     "phase": {
       "ready": "Start prepared",
@@ -61,7 +65,7 @@
       "paused": "The CLI keeps running. Its status reports are still received in the background, while this session is hidden from the overview. Reconnect restores the display for this same session.",
       "ended": "The agent session has ended and is no longer in the active overview. You can start a new session in this same pane.",
       "ending": "The agent reported that its session is ending. Wait for the shell to become ready.",
-      "unsupported": "OpenCode has no live status adapter. DM Workspace can start and end the process, but cannot report work, questions or response completion.",
+      "unsupported": "This agent has no live status adapter. DM Workspace can start and end the process, but cannot report work, questions or response completion.",
       "interrupted": "The session was interrupted. A new status report is needed to tell whether the agent is working again."
     },
     "reconnect": "Reconnect",
@@ -289,6 +293,87 @@
       "openClaude": "Open Claude in browser",
       "opencodeHint": "OpenCode supports shared terminal and browser access through a separate web server. Integrated phone pairing is not available here yet. Network access requires a protected server; OpenCode recommends WSL on Windows.",
       "openGuide": "Set up web access – guide",
+      "showInMenu": "In menu",
+      "found": "Found",
+      "notFound": "Not found",
+      "checking": "Checking …",
+      "checkProblem": "Check failed",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "edit": "Edit",
+      "actionsFor": "Actions for {{name}}",
+      "showInMenuFor": "Show in menu: {{name}}",
+      "add": "Add agent",
+      "addCustom": "+ Custom agent",
+      "customDefaultName": "Custom agent",
+      "copySuffix": " (copy)",
+      "duplicate": "Duplicate",
+      "reset": "Reset",
+      "delete": "Delete",
+      "deleteMenu": "Delete…",
+      "deleteTitle": "Delete agent?",
+      "deleteMessage": "“{{name}}” will be removed from the menu and the agent dialog. Running sessions continue.",
+      "checkProfile": "Check",
+      "codexService": "Codex phone service",
+      "commandHint": "Program name or full path. ~ is not expanded.",
+      "secretsWarning": "Do not enter API keys: values are stored unencrypted in state.json.",
+      "envAdd": "+ Variable",
+      "envRemove": "Remove variable",
+      "previewHooks": "+ status hooks",
+      "fields": {
+        "name": "Name",
+        "adapter": "Base",
+        "command": "Program",
+        "args": "Arguments",
+        "env": "Environment",
+        "envName": "Variable name",
+        "envValue": "Value",
+        "icon": "Icon",
+        "letter": "Letter",
+        "color": "Colour",
+        "preview": "Preview"
+      },
+      "adapter": {
+        "claude": "Claude Code",
+        "codex": "Codex",
+        "opencode": "OpenCode",
+        "generic": "Other CLI"
+      },
+      "adapterHint": {
+        "claude": "Status reporting available.",
+        "codex": "Status reporting available. Requires Node.js.",
+        "opencode": "No live status reporting.",
+        "generic": "Any terminal program. No live status reporting."
+      },
+      "logo": {
+        "claude": "Claude",
+        "openai": "OpenAI",
+        "opencode": "OpenCode",
+        "ollama": "Ollama",
+        "letter": "Letter"
+      },
+      "errors": {
+        "name": {
+          "required": "Enter a name."
+        },
+        "command": {
+          "required": "Enter a program."
+        },
+        "args": {
+          "unclosed": "A quote is not closed.",
+          "empty": "Empty arguments are not allowed."
+        },
+        "env": {
+          "name": "Variable names use letters, digits and _, must not start with a digit or DMWS_.",
+          "duplicate": "Each variable may appear only once."
+        },
+        "icon": {
+          "letter": "Enter exactly one letter."
+        },
+        "form": {
+          "invalid": "This profile is not valid."
+        }
+      },
       "error": {
         "unavailable": "Could not reach Codex. Check installation and sign-in, and update Codex. On Windows, run the app normally, not as administrator.",
         "connection": "The service could not establish the remote connection yet. Check your network and, if necessary, quit ChatGPT Desktop, then try again.",
@@ -310,6 +395,8 @@
     },
     "cmd": {
       "newWorkspace": "New workspace",
+      "newPaneRight": "New pane to the right: {{name}}",
+      "newPaneBelow": "New pane below: {{name}}",
       "newRemoteTerminalRight": "New terminal in this project, to the right",
       "newRemoteTerminalBelow": "New terminal in this project, below",
       "splitHorizontal": "Split focused pane left and right",
@@ -471,8 +558,16 @@
     "overrideLabel": "Override automatic label",
     "automaticLabel": "Automatic from command or first prompt",
     "labelPlaceholder": "What is this pane used for?",
-    "splitHorizontal": "Split into left & right",
-    "splitVertical": "Split into top & bottom",
+    "newPane": "New pane",
+    "newPaneMenu": {
+      "title": "New pane",
+      "terminal": "Terminal",
+      "right": "Open {{name}} to the right",
+      "below": "Open {{name}} below",
+      "manage": "Manage agents …",
+      "localOnly": "Agents are only available in local workspaces"
+    },
+    "launchIssue": { "edit": "Edit profile", "retry": "Try again", "dismiss": "Dismiss" },
     "maximize": "Maximize",
     "restore": "Restore",
     "swapWith": "Swap with “{{name}}”",
@@ -480,8 +575,6 @@
     "closeTitle": "Close window?",
     "closeMessage": "This window and its running terminal process will be closed.",
     "closeConfirm": "Close window",
-    "newRemoteTerminalRight": "New terminal in this project (to the right)",
-    "newRemoteTerminalBelow": "New terminal in this project (below)",
     "remoteBlocked": {
       "offline": "Not connected",
       "viewer": "Read-only access",
@@ -669,7 +762,14 @@
     "scrollToBottom": "Scroll to bottom",
     "clearAllTitle": "Clear all windows?",
     "clearAllMessage": "All panes in this workspace will be cleared and their scrollback history lost.",
+    "clearAllResetCount_one": "{{count}} agent will start a new conversation.",
+    "clearAllResetCount_other": "{{count}} agents will start a new conversation.",
+    "clearAllBusyCount_one": "{{count}} agent is currently working and stays unchanged.",
+    "clearAllBusyCount_other": "{{count}} agents are currently working and stay unchanged.",
     "clearAllConfirm": "Clear all",
+    "clearWindowResetTitle": "Start new conversation for {{name}} and clear window?",
+    "clearWindowResetMessage": "The window and the agent's conversation will be cleared; this can't be undone.",
+    "clearWindowResetConfirm": "Start new conversation",
     "startFailed": "Terminal could not start",
     "startFailedHint": "Check that your shell is installed and the working folder is accessible, then try again.",
     "startFailedRemoteHint": "Check the server connection above, then try again.",

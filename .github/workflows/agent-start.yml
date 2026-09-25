@@ -39,10 +39,30 @@ jobs:
       - name: Verify Windows agent startup
         if: runner.os == 'Windows'
         shell: bash
-        run: npx playwright test e2e/agent-start.spec.ts e2e/agent-remote.spec.ts --workers=1 --repeat-each=3
+        run: npx playwright test e2e/agent-start.spec.ts e2e/agent-remote.spec.ts e2e/agent-profiles.spec.ts --workers=1 --repeat-each=3
+      - name: Verify Windows agent startup on Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # resolveWindowsShell (src/main/pty-manager.ts) takes the first
+          # pwsh.exe found on the app's PATH and otherwise falls back to
+          # powershell.exe (5.1). The e2e specs hand this PATH to the app, so
+          # dropping every directory that holds a pwsh.exe makes all panes
+          # Windows PowerShell 5.1.
+          clean=
+          IFS=: read -ra dirs <<< "$PATH"
+          for d in "${dirs[@]}"; do
+            if [ -n "$d" ] && [ ! -e "$d/pwsh.exe" ]; then clean="${clean:+$clean:}$d"; fi
+          done
+          export PATH="$clean"
+          if command -v pwsh.exe >/dev/null 2>&1; then echo "pwsh.exe is still on PATH" >&2; exit 1; fi
+          powershell.exe -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -ne 5) { exit 1 }'
+          # The Codex argv test calls powershell.exe and pwsh.exe explicitly
+          # (not through the app); the step above already runs it with both.
+          npx playwright test e2e/agent-profiles.spec.ts e2e/agent-start.spec.ts --workers=1 --grep-invert "Codex arguments survive Windows PowerShell and pwsh"
       - name: Verify Linux agent startup
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts e2e/agent-remote.spec.ts --workers=1
+        run: xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts e2e/agent-remote.spec.ts e2e/agent-profiles.spec.ts --workers=1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

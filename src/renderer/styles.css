@@ -874,6 +874,12 @@ input[type="checkbox"]:checked::after {
 .pane-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
   background: var(--dm-pane-header); border-bottom: 1px solid var(--border);
   container: pane-header / inline-size; }
+.agent-logo { flex: none; display: inline-block; vertical-align: middle; }
+.agent-logo-letter {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 3px; font-weight: 700; line-height: 1;
+}
+.pane-header .agent-logo { margin-right: 6px; }
 .pane-heading { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .pane-title { min-width: 36px; color: var(--muted); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
@@ -898,6 +904,14 @@ input[type="checkbox"]:checked::after {
   .pane-title-short { display: inline; }
   .pane-heading.has-label .pane-title { max-width: 30%; }
 }
+.pane-launch-issue {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  font-size: 12px; color: var(--dm-text-primary);
+  background: var(--dm-accent-orange-soft); border-bottom: 1px solid var(--dm-border-default);
+}
+.pane-launch-issue > span { flex: 1; min-width: 0; }
+.btn-link { background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.btn-link:disabled { cursor: default; opacity: 0.55; }
 .pane-body { flex: 1; min-height: 0; }
 .pane-body .xterm { height: 100%; padding: 0 4px; }
 /* height:100% lets the wrapper hold a sub-cell themed strip below the pinned
@@ -1118,6 +1132,24 @@ input[type="checkbox"]:checked::after {
 }
 .context-menu-item:hover:not(:disabled) { background: var(--chrome-action-hover-bg); }
 .context-menu-item:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
+.new-pane-menu {
+  position: fixed; z-index: 201; min-width: 240px; padding: 4px;
+  background: var(--panel-elevated); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: var(--shadow-popover); display: flex; flex-direction: column;
+}
+.new-pane-row { display: flex; align-items: center; gap: 2px; border-radius: 4px; }
+.new-pane-row:hover:not(.disabled), .new-pane-row:focus-within { background: var(--chrome-action-hover-bg); }
+.new-pane-row.disabled { opacity: 0.55; }
+.new-pane-main, .new-pane-manage {
+  flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
+  background: none; border: none; color: var(--text); font-size: 13px; text-align: left;
+  padding: 6px 8px; border-radius: 4px; cursor: pointer;
+}
+.new-pane-main[aria-disabled="true"] { cursor: default; }
+.new-pane-main:focus-visible, .new-pane-manage:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.new-pane-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.new-pane-terminal-icon { width: 14px; font: 600 10px/14px var(--font-mono, monospace); text-align: center; color: var(--muted); }
+.new-pane-manage { color: var(--muted); }
 .context-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 
 /* Per-pane find overlay */
@@ -1616,6 +1648,10 @@ body.drag-active webview { pointer-events: none; }
 .agent-overview-name, .agent-overview-state { color: var(--text); }
 .agent-overview-row.agent-needs-input, .agent-overview-row.agent-error { border-left: 3px solid var(--accent); }
 .agent-overview-row.agent-needs-input .agent-overview-state, .agent-overview-row.agent-error .agent-overview-state { font-weight: 700; }
+.agent-overview-state .agent-logo { margin-right: 4px; }
+
+.tasks-agent-select { display: flex; align-items: center; gap: 6px; }
+.tasks-agent-select .wizard-input { flex: 1; }
 
 .agent-folder { overflow-wrap: anywhere; }
 .agent-secondary-action { margin: 0 8px 8px 0; }
@@ -1623,3 +1659,108 @@ body.drag-active webview { pointer-events: none; }
 .agent-remote-help { margin-top: 12px; color: var(--text-muted); font-size: 13px; }
 .agent-remote-help summary { cursor: pointer; }
 .agent-pairing-code { display: inline-block; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 6px; letter-spacing: 0.12em; user-select: all; }
+
+/* Section header: "KI-Agenten" label + scope hint on the left, "+ Eigener
+   Agent" at the top right of the same row (brief 2026-09-24 redesign). */
+.agent-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+/* min-width:0 lets this column actually shrink in the flex row so the scope
+   hint wraps instead of pushing the button into a multi-line label. */
+.agent-settings-header > div:first-child { min-width: 0; }
+.agent-settings-header .modal-section-label { margin-bottom: 4px; }
+.agent-settings-header .modal-hint { margin-top: 0; }
+.agent-settings-header .btn-secondary { flex: none; white-space: nowrap; }
+
+/* Plain rows inside the ALREADY-framed .settings-content — no border/frame of
+   its own and no per-row separators (a group surface is marked once, per the
+   DM brand "Gruppenflächen" rule; a border here plus row dividers would draw
+   the same edge twice). Hover/selected states use the row itself. */
+.agent-profile-list { list-style: none; margin: 4px 0 8px; padding: 0; }
+.agent-profile-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px;
+  cursor: pointer; background: none; border: none; width: 100%; box-sizing: border-box;
+}
+.agent-profile-row:hover { background: rgba(255, 255, 255, 0.07); }
+.agent-profile-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.agent-profile-row[aria-expanded="true"] { background: var(--accent-soft); }
+.agent-profile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.agent-profile-menu-toggle { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.agent-profile-menu-text { font-size: 12px; color: var(--dm-text-muted); }
+.agent-profile-menu-btn { flex-shrink: 0; }
+
+/* Status: a single accent-family dot (never a stoplight green/orange/red) plus
+   muted text — the brand avoids semantic colour-coding, so "found" and
+   "problem" share the same dot colour and are told apart by the label. */
+.agent-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dm-text-muted); white-space: nowrap; flex-shrink: 0; }
+/* Same accent-family colour for every state (never a stoplight) — states are
+   told apart by SHAPE, not hue: found = filled dot, not-found/problem =
+   hollow ring, checking = a small filled grey dot. Text stays the primary
+   signal either way. */
+.agent-check-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
+.agent-check-dot.ok { background: var(--accent); }
+.agent-check-dot.warn, .agent-check-dot.missing { background: transparent; border: 1.5px solid var(--accent); }
+.agent-check-dot.pending { width: 6px; height: 6px; background: var(--dm-text-muted); }
+
+/* A dark pill switch replacing native checkboxes for "im Menü" and the
+   phone-access option — track fills with the brand accent when on and carries
+   a dark knob, per the DM_CICD switch-track rule ("Akzent-Füllflächen"). */
+.switch {
+  appearance: none; -webkit-appearance: none; flex: none; width: 34px; height: 20px; padding: 2px;
+  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--input); cursor: pointer;
+  display: inline-flex; align-items: center; transition: background .12s, border-color .12s;
+}
+.switch:hover { border-color: var(--border-hover); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch.on { background: var(--accent); border-color: var(--accent); }
+.switch-knob { width: 14px; height: 14px; border-radius: 50%; background: var(--dm-text-muted); transition: transform .12s, background .12s; }
+.switch.on .switch-knob { transform: translateX(14px); background: var(--on-accent); }
+
+/* Editor: an indented outline block (no fill) rather than the row's own frame,
+   so it reads as detail of that row without drawing a second grouped surface. */
+.agent-profile-editor {
+  margin: 6px 0 10px 30px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;
+  border: 1px solid var(--dm-border-default); border-radius: 12px; background: none;
+}
+.agent-editor-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.agent-field { display: flex; flex-direction: column; }
+.agent-field .wizard-input { margin-bottom: 0; }
+.agent-field .modal-hint, .agent-field .setting-error { margin-top: 6px; }
+/* Custom chevron for a dark <select>: appearance:none strips the native
+   (white-on-white in some GTK/Windows themes) arrow, this rotated-border
+   triangle replaces it using the same muted text colour in every brand family. */
+.wizard-select-wrap { position: relative; }
+.wizard-select-wrap::after {
+  content: ''; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; margin-top: -5px;
+  pointer-events: none; border-right: 1px solid var(--dm-text-muted); border-bottom: 1px solid var(--dm-text-muted);
+  transform: rotate(45deg);
+}
+select.wizard-input { appearance: none; -webkit-appearance: none; padding-right: 30px; cursor: pointer; }
+select.wizard-input:disabled { cursor: default; opacity: 0.6; }
+
+.agent-env { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.agent-env-row { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 6px; }
+.agent-env-row .wizard-input { margin-bottom: 0; }
+.agent-env-actions { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.agent-env-actions .modal-hint { margin-top: 0; }
+.agent-letter-input { width: 3.5em; text-align: center; flex: none; }
+.agent-icon-extra { margin-top: 10px; }
+
+/* Icon chip group (role="radiogroup") replacing the plain <select>. */
+.icon-chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.icon-chip {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+  border: 1px solid var(--dm-border-default); border-radius: 8px; background: none; color: var(--dm-text-muted); cursor: pointer;
+}
+.icon-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.icon-chip.selected { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.icon-chip-letter { width: auto; padding: 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+.agent-command-preview {
+  display: flex; flex-direction: column; gap: 6px; background: var(--input); border: 1px solid var(--dm-border-default);
+  border-radius: 8px; padding: 10px 12px;
+}
+.agent-command-preview code { display: block; white-space: pre-wrap; word-break: break-all; font-size: 12px; color: var(--text); }
+
+.agent-editor-actions { display: flex; align-items: center; gap: 8px; }
+.agent-editor-actions-spacer { flex: 1; }
+.btn-secondary.btn-danger { color: var(--danger); }
+.btn-secondary.btn-danger:hover { color: var(--danger-hover); border-color: var(--danger); }

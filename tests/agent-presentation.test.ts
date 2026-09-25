@@ -2,12 +2,14 @@ import { expect, it } from 'vitest';
 import { agentPhase, agentLabelKey, agentNeedsAttention } from '../src/shared/agent-presentation';
 import { agentOverview } from '../src/renderer/agent-overview';
 import type { AgentState } from '../src/shared/agent-state';
-const state: AgentState = { provider: 'codex', event: 'setup', status: 'unknown', sessionId: null, updatedAt: 1 };
+import { agentState } from './helpers/agent-state';
+const state: AgentState = agentState();
 it('does not claim a running CLI has confirmed status reporting', () => {
   expect(agentPhase(state, 'atPrompt')).toBe('ready');
   expect(agentPhase(state, 'running')).toBe('waiting');
   expect(agentPhase({ ...state, sessionId: 's', event: 'UserPromptSubmit', status: 'working' })).toBe('live');
-  expect(agentLabelKey({ ...state, provider: 'opencode' }, 'running')).toBe('agent.phase.unsupported');
+  expect(agentLabelKey({ ...state, adapter: 'opencode' }, 'running')).toBe('agent.phase.unsupported');
+  expect(agentLabelKey({ ...state, adapter: 'generic' }, 'running')).toBe('agent.phase.unsupported');
 });
 it('distinguishes interrupt, paused display, session shutdown and returned shell', () => {
   expect(agentPhase({ ...state, event: 'interrupted' })).toBe('interrupted');
