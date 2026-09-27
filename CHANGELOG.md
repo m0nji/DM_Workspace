@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.4 – 2026-09-27
+- fix: Remote terminals reconnect after you sign in to the server again. A pane that was already connected kept sending the expired session cookie on every reconnect attempt, so it stayed disconnected until the app was restarted. Each attempt now uses the current login.
+- fix: Updated all dependencies flagged by `npm audit` — 33 advisories across 20 packages, 23 of them high severity. Reaching the shipped app: Electron 41.10.7 (a sandboxed iframe could open popups despite a missing `allow-popups`, and protocol responses could reuse the default session's cache), DOMPurify 3.4.16 (a hook removed during `IN_PLACE` sanitizing could leave a detached subtree executable) and js-yaml 4.3.2 (CPU exhaustion from crafted YAML, used by the auto-updater). The rest (electron-builder 26.15.3, vitest, xmldom, undici, sharp, brace-expansion, nanoid, browserslist and others) affect the build and test toolchain only
+
 ## 0.19.3 – 2026-09-27
 - fix: On Windows, quitting OpenCode returns to the shell instead of ending the whole pane with "Process exited". OpenCode's exit brought down the console layer that Windows ships (ConPTY), and with it every process in the pane, the shell included. Terminals now use the newer ConPTY bundled with the terminal library, which survives it. That ConPTY asks the terminal for its identity at startup, and the answer no longer keeps the first command from becoming the pane title.
 

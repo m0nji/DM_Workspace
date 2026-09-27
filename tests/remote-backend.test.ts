@@ -219,6 +219,24 @@ describe('RemotePtyBackend (gegen echten ws-Server)', () => {
     expect(server.ofType('hello')[1]).toMatchObject({ resumeClientId: 'c1' });
   }, 15000);
 
+  it('Reconnect nach erneutem Login verwendet das aktuelle Cookie und erhält das Pane-Abo', async () => {
+    backend.killAll();
+    let cookie = 'dmw_session=old';
+    backend = new RemotePtyBackend({
+      resolveServer: () => ({ baseUrl: `http://127.0.0.1:${server.port}`, cookie, name: 'Karl' })
+    });
+    backend.spawn('r:srv1:p-1:rp1', spawnOpts());
+    await waitFor(() => server.ofType('subscribe').length === 1);
+    expect(server.lastUpgradeHeaders.cookie).toBe('dmw_session=old');
+
+    cookie = 'dmw_session=new';
+    server.sockets[0].terminate();
+    await waitFor(() => server.ofType('subscribe').length === 2, 8000);
+    expect(server.lastUpgradeHeaders.cookie).toBe('dmw_session=new');
+    expect(server.lastUpgradeHeaders.origin).toBe(DESKTOP_ORIGIN);
+    expect(server.ofType('subscribe')[1]).toMatchObject({ paneId: 'rp1', sinceSeq: 3 });
+  }, 15000);
+
   it('Close-Code 4205 (Runtime schläft) stoppt den Auto-Reconnect und meldet runtime-stopped', async () => {
     const statuses: string[] = [];
     backend.onStatus((_s, _p, status) => statuses.push(status));

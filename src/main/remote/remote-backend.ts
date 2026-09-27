@@ -355,10 +355,15 @@ export class RemotePtyBackend implements TerminalBackend {
     const wsUrl = resolved.baseUrl.replace(/^http/i, 'ws');
     const client = new WorkspaceClient({
       url: wsUrl,
-      webSocketFactory: this.deps.webSocketFactory ?? wsFactory,
-      // Cookie authentifiziert den Upgrade; der definierte Desktop-Origin ist
-      // serverseitig erlaubt (Plan 4.1).
-      headers: { Cookie: resolved.cookie, Origin: DESKTOP_ORIGIN }
+      // Bei JEDEM Versuch neu auflösen: Nach erneutem Login darf ein
+      // bestehender Client nicht endlos das abgelaufene Cookie verwenden.
+      webSocketFactory: (url) => {
+        const current = this.deps.resolveServer(serverId);
+        return (this.deps.webSocketFactory ?? wsFactory)(url, {
+          ...(current?.cookie ? { Cookie: current.cookie } : {}),
+          Origin: DESKTOP_ORIGIN
+        });
+      }
     });
 
     const conn: Connection = {

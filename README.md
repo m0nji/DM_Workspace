@@ -9,10 +9,6 @@
   organized into named workspaces.
 </p>
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Opening a 2×2 workspace and running commands in each pane" width="820" />
-</p>
-
 ---
 
 > **Just want to install it?** Grab the ready-made app package for your operating system from the [Releases page](https://github.com/m0nji/DM_Workspace/releases) — no build step required.
