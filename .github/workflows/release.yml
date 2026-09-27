@@ -140,6 +140,18 @@ jobs:
         run: |
           npm run build
           bash ./scripts/retry.sh npx electron-builder --win --publish never
+      # Panes spawn with node-pty's useConptyDll, which loads conpty\conpty.dll
+      # next to conpty.node. build/after-pack.cjs puts it there; without it no
+      # terminal starts, so never upload such an installer.
+      - name: Verify bundled ConPTY (Windows)
+        shell: bash
+        run: |
+          release=dist/win-unpacked/resources/app.asar.unpacked/node_modules/node-pty/build/Release
+          if [ -f "$release/conpty.node" ]; then
+            for f in conpty.dll OpenConsole.exe; do
+              [ -f "$release/conpty/$f" ] || { echo "::error::$release/conpty/$f is missing"; exit 1; }
+            done
+          fi
       - name: Publish to GitHub release (Windows)
         shell: bash
         env:

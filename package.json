@@ -58,6 +58,7 @@
     "asarUnpack": [
       "**/node_modules/node-pty/**"
     ],
+    "afterPack": "build/after-pack.cjs",
     "extraResources": [
       {
         "from": "build/icon.ico",
