@@ -42,12 +42,12 @@ echo "→ Version $VERSION: ${#DMGS[@]} .dmg zu verarbeiten"
 : "${APPLE_API_KEY_ID:?APPLE_API_KEY_ID fehlt}"
 : "${APPLE_API_ISSUER:?APPLE_API_ISSUER fehlt}"
 
-# app-builder liegt je Architektur getrennt bei; es erzeugt die Blockmap und
-# liefert Größe und sha512 gleich mit zurück.
-case "$(uname -m)" in
-  arm64) APP_BUILDER="$ROOT/node_modules/app-builder-bin/mac/app-builder_arm64" ;;
-  *)     APP_BUILDER="$ROOT/node_modules/app-builder-bin/mac/app-builder_amd64" ;;
-esac
+# Blockmap mit derselben Funktion erzeugen, die electron-builder selbst nutzt;
+# sie liefert Größe und sha512 gleich mit zurück. Bis electron-builder 26.8 lag
+# dafür das Go-Binary app-builder-bin bei, seit 26.15 ist es entfallen (0.19.4:
+# der Release-Lauf brach hier mit "No such file or directory" ab).
+BLOCKMAP_JS="$ROOT/node_modules/app-builder-lib/out/targets/blockmap/blockmap.js"
+[ -f "$BLOCKMAP_JS" ] || { echo "::error::$BLOCKMAP_JS fehlt — hat electron-builder die Blockmap verlegt?"; exit 1; }
 
 for DMG in "${DMGS[@]}"; do
   echo "→ $DMG: signieren, notarisieren, stapeln"
@@ -57,7 +57,12 @@ for DMG in "${DMGS[@]}"; do
   xcrun stapler staple "$DMG"
 
   echo "→ $DMG: Blockmap und Prüfsumme nachziehen"
-  JSON="$("$APP_BUILDER" blockmap --input "$DMG" --output "$DMG.blockmap")"
+  JSON="$(node -e '
+    const [js, input] = process.argv.slice(1);
+    require(js).buildBlockMap(input, "gzip", input + ".blockmap")
+      .then((r) => console.log(JSON.stringify(r)))
+      .catch((e) => { console.error(e); process.exit(1); });
+  ' "$BLOCKMAP_JS" "$DMG")"
   SHA="$(printf '%s' "$JSON" | sed -n 's/.*"sha512":"\([^"]*\)".*/\1/p')"
   SIZE="$(printf '%s' "$JSON" | sed -n 's/.*"size":\([0-9]*\).*/\1/p')"
   [ -n "$SHA" ] && [ -n "$SIZE" ] || { echo "::error::app-builder lieferte keine Prüfsumme"; exit 1; }
