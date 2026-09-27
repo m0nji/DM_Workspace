@@ -170,6 +170,17 @@ describe('pane automatic title tracker', () => {
     h.tracker.onInput('\r');
     expect(h.current()).toBe('ssh root@10.0.0.8');
   });
+
+  it('ignores device attributes replies queued before the first prompt', () => {
+    const h = harness();
+    // The bundled ConPTY asks for primary device attributes at startup; xterm
+    // answers before the shell prompts, so the reply is replayed on arming.
+    h.tracker.onInput('\x1b[?1;2c');
+    h.tracker.onShellPrompt();
+    h.tracker.onInput('\x1b[>0;276;0c');
+    h.tracker.onInput('opencode\r');
+    expect(h.current()).toBe('opencode');
+  });
 });
 
 describe('pane title helpers', () => {

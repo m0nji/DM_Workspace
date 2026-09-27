@@ -106,6 +106,9 @@ class InputLine {
     // and the pane never gets an automatic title (SSH session, agent prompt).
     // POSIX shells on macOS leave 1004 off, which is why this only bit Windows.
     if (seq === '[I' || seq === '[O') return;
+    // Device attributes replies (DA1 ESC[?…c, DA2 ESC[>…c) are the same kind of
+    // report. The bundled ConPTY queries DA1 at startup, before the first prompt.
+    if (/^\[[?>][\d;]*c$/.test(seq)) return;
     if (/\[(?:\d+;)*\d*D$/.test(seq)) this.cursor = Math.max(0, this.cursor - 1);
     else if (/\[(?:\d+;)*\d*C$/.test(seq)) this.cursor = Math.min(this.chars.length, this.cursor + 1);
     else if (/\[(?:1~|H)$/.test(seq)) this.cursor = 0;

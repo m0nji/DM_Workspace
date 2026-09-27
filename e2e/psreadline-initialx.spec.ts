@@ -59,14 +59,15 @@ function deepWorkFolder(targetLength: number): string {
 // The prompt exactly as PowerShell printed it, read back from the buffer rather
 // than rebuilt from the JS path: PowerShell reports the filesystem's canonical
 // casing, which need not match what os.tmpdir() returned. translateToString
-// trims the line, so the prompt's own trailing blank is added back here.
+// trims the line only where ConPTY left cells empty (the bundled ConPTY writes
+// the prompt's trailing blank), so the blank is normalized and added back here.
 // Matching at all also proves the prompt fits on ONE line at the starting width.
 async function readPrompt(win: Page): Promise<string> {
   let prompt = '';
   await expect
     .poll(async () => {
-      const line = (await paneBufferText(win)).split('\n').find((l) => /^PS .+>$/.test(l));
-      if (line) prompt = `${line} `;
+      const line = (await paneBufferText(win)).split('\n').find((l) => /^PS .+> ?$/.test(l));
+      if (line) prompt = `${line.trimEnd()} `;
       return prompt;
     }, { timeout: 20000, message: 'no single-line "PS …>" prompt in the pane buffer' })
     .not.toBe('');

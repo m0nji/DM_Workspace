@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.3 – 2026-09-27
+- fix: On Windows, quitting OpenCode returns to the shell instead of ending the whole pane with "Process exited". OpenCode's exit brought down the console layer that Windows ships (ConPTY), and with it every process in the pane, the shell included. Terminals now use the newer ConPTY bundled with the terminal library, which survives it. That ConPTY asks the terminal for its identity at startup, and the answer no longer keeps the first command from becoming the pane title.
+
 ## 0.19.2 – 2026-09-25
 - fix: A selection in a program that tracks the mouse (Codex does) now survives the right-click, so the menu's Copy works. The terminal reported every mouse move and the right-button press to the program as input, and input clears the selection. The right button now belongs to the context menu only, and mouse moves are held back while text is selected.
 - fix: On Windows, Codex no longer flashes several terminal windows for each prompt. Since Codex 0.157 its interface hands the work to a shared background server that has no console, so every `git` and command it started opened a window of its own. Agent panes now start Codex with `--no-daemon` when the installed version supports it; with phone access, which needs that server, Codex keeps using it.

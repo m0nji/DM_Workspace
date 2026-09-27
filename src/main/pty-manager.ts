@@ -180,7 +180,10 @@ export class PtyManager implements TerminalBackend {
       cols: opts.cols,
       rows: opts.rows,
       cwd,
-      env: { ...cwdHookEnv(shell), DMWS_AGENT_NONCE: nonce }
+      env: { ...cwdHookEnv(shell), DMWS_AGENT_NONCE: nonce },
+      // The inbox ConPTY host dies when OpenCode exits and takes the shell with
+      // it ("process exited" with no code). node-pty's bundled ConPTY survives.
+      ...(process.platform === 'win32' ? { useConptyDll: true } : {})
     });
     const sendData = (data: string): void => {
       if (this.procs.get(paneId) === proc) this.dataListeners.forEach((l) => l(paneId, data));
