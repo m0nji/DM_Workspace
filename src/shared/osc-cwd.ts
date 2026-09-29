@@ -14,8 +14,18 @@
 // separator; Node accepts forward slashes on Windows. Only drive-letter paths are
 // rewritten — a POSIX filename may legally contain a backslash.
 
+import { isUncPath } from './link-detect';
+
 function normalizeDrivePath(path: string): string {
   return /^[A-Za-z]:[\\/]/.test(path) ? path.replace(/\\/g, '/') : path;
+}
+
+// Das Arbeitsverzeichnis kommt aus beliebiger Terminalausgabe. Ein UNC-Pfad
+// ("\\host\share", "//host/share", auch aus "file:////host/share") würde später
+// vom Datei-Panel und von der Link-Auflösung geöffnet — unter Windows per SMB,
+// mit NTLM-Hash an den Host. Kein Programm meldet legitim ein UNC-Verzeichnis.
+function dropUnc(path: string): string | null {
+  return isUncPath(path) ? null : path;
 }
 
 /**
@@ -35,10 +45,11 @@ export function parseOsc7(payload: string): string | null {
     }
     // file:///C:/Users -> C:/Users (drop the slash that precedes a drive letter)
     if (/^\/[A-Za-z]:/.test(path)) path = path.slice(1);
-    return path;
+    return dropUnc(path);
   }
   // Bare absolute path fallback (POSIX "/..." or Windows "C:\...").
-  return p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p) ? normalizeDrivePath(p) : null;
+  if (!(p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p))) return null;
+  return dropUnc(normalizeDrivePath(p));
 }
 
 /**
@@ -50,5 +61,5 @@ export function parseOsc9(payload: string): string | null {
   const m = /^9;(.*)$/s.exec(payload);
   if (!m) return null;
   const path = m[1].trim();
-  return path ? normalizeDrivePath(path) : null;
+  return path ? dropUnc(normalizeDrivePath(path)) : null;
 }

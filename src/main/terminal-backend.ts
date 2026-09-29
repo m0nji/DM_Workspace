@@ -39,22 +39,24 @@ export class BackendRouter implements TerminalBackend {
 
   // Hängt ein weiteres Backend in die Aggregation von onData/onExit und in den
   // Shutdown-Pfad (killAll/killAllAndWait). B2 ruft das pro Remote-Server auf.
-  registerBackend(backend: TerminalBackend): void {
+  registerBackend(backend: TerminalBackend, opts: { keepRouteOnExit?: boolean } = {}): void {
     this.backends.push(backend);
     backend.onData((paneId, data) => this.dataListeners.forEach((l) => l(paneId, data)));
     backend.onExit((paneId, exitCode) => {
-      // Der Prozess ist weg — Routing-Eintrag aufräumen, damit die Map über eine
-      // lange Session nicht mit toten Panes wächst (spiegelt procs.delete im
-      // PtyManager).
-      this.byPane.delete(paneId);
+      // Lokal: der Prozess ist weg — Routing-Eintrag aufräumen, damit die Map
+      // über eine lange Session nicht mit toten Panes wächst (spiegelt
+      // procs.delete im PtyManager). Remote bleibt der Eintrag: die Pane gehört
+      // dem Server und kann unter derselben Id wieder anlaufen; aufgeräumt wird
+      // erst über kill()/killAll().
+      if (!opts.keepRouteOnExit) this.byPane.delete(paneId);
       this.exitListeners.forEach((l) => l(paneId, exitCode));
     });
   }
 
   // Das Backend, an das Spawns mit target.kind === 'remote' gehen (B2:
-  // RemotePtyBackend). Zusätzlich zu registerBackend aufzurufen.
+  // RemotePtyBackend). Ersetzt registerBackend für dieses Backend.
   registerRemoteBackend(backend: TerminalBackend): void {
-    this.registerBackend(backend);
+    this.registerBackend(backend, { keepRouteOnExit: true });
     this.remoteBackend = backend;
   }
 

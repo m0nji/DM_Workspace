@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, chmodSync, statSync, lstatSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir, homedir } from 'os';
 import {
@@ -103,6 +103,91 @@ describe('createFile', () => {
       try { createFile(dir, bad); throw new Error(`should have thrown for ${bad}`); }
       catch (e) { expect((e as FsBrowserError).code).toBe('invalid-name'); }
     }
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+const posixIt = it.skipIf(process.platform === 'win32');
+
+describe('writeTextFile leaves the file the way the user had it', () => {
+  posixIt('keeps the permission bits of an executable script', () => {
+    const dir = tmp();
+    const file = join(dir, 'run.sh');
+    writeFileSync(file, '#!/bin/sh\n');
+    chmodSync(file, 0o755);
+    writeTextFile(file, '#!/bin/sh\necho hi\n');
+    expect(statSync(file).mode & 0o777).toBe(0o755);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  posixIt('keeps a private file private', () => {
+    const dir = tmp();
+    const file = join(dir, '.env');
+    writeFileSync(file, 'A=1\n');
+    chmodSync(file, 0o600);
+    writeTextFile(file, 'A=2\n');
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  posixIt('writes through a symlink instead of replacing the link', () => {
+    const dir = tmp();
+    const real = join(dir, 'real.txt');
+    const link = join(dir, 'link.txt');
+    writeFileSync(real, 'old');
+    symlinkSync(real, link);
+    writeTextFile(link, 'new');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, 'utf8')).toBe('new');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('still creates a file that does not exist yet', () => {
+    const dir = tmp();
+    const file = join(dir, 'neu.txt');
+    writeTextFile(file, 'hallo');
+    expect(readFileSync(file, 'utf8')).toBe('hallo');
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('readTextFile refuses what it cannot round-trip', () => {
+  it('rejects a Latin-1 file instead of decoding it lossily', () => {
+    const dir = tmp();
+    const file = join(dir, 'alt.csv');
+    writeFileSync(file, Buffer.from([0x63, 0x61, 0x66, 0xe9])); // "café" in Latin-1
+    let err: unknown;
+    try { readTextFile(file); } catch (e) { err = e; }
+    expect(err).toBeInstanceOf(FsBrowserError);
+    // Eigener Code: eine CP1252-Textdatei ist keine Binärdatei, und die UI soll
+    // das nicht behaupten.
+    expect((err as FsBrowserError).code).toBe('not-utf8');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('still calls a file with NUL bytes binary', () => {
+    const dir = tmp();
+    const file = join(dir, 'data.bin');
+    writeFileSync(file, Buffer.from([0x50, 0x4b, 0x00, 0x03]));
+    let err: unknown;
+    try { readTextFile(file); } catch (e) { err = e; }
+    expect((err as FsBrowserError).code).toBe('binary');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads valid UTF-8 with umlauts unchanged', () => {
+    const dir = tmp();
+    const file = join(dir, 'ok.txt');
+    writeFileSync(file, 'Grüße, Öl & Äpfel', 'utf8');
+    expect(readTextFile(file)).toBe('Grüße, Öl & Äpfel');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('keeps a UTF-8 byte order mark so that a save does not drop it', () => {
+    const dir = tmp();
+    const file = join(dir, 'bom.txt');
+    writeFileSync(file, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('x')]));
+    expect(readTextFile(file).startsWith('\uFEFF')).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
 });

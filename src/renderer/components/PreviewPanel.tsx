@@ -22,6 +22,9 @@ export function PreviewPanel(): React.JSX.Element | null {
   const openInEditor = useStore((s) => s.openInEditor);
   const clearEditor = useStore((s) => s.clearEditor);
   const openPreview = useStore((s) => s.openPreview);
+  const pendingEditorLeave = useStore((s) => s.pendingEditorLeave);
+  const confirmEditorLeave = useStore((s) => s.confirmEditorLeave);
+  const cancelEditorLeave = useStore((s) => s.cancelEditorLeave);
   const activeCwd = useStore((s) => {
     const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
     return ws?.cwd ?? '~';
@@ -227,6 +230,18 @@ export function PreviewPanel(): React.JSX.Element | null {
       <div className="preview-region" style={{ display: tab === 'preview' ? 'flex' : 'none' }}>
         {panel.editPath ? <FileEditor path={panel.editPath} /> : <PreviewBody />}
       </div>
+
+      {pendingEditorLeave && (
+        <ConfirmDialog
+          tone="danger"
+          title={t('files.leaveTitle')}
+          message={t('files.leaveMessage')}
+          confirmLabel={t('files.leaveDiscard')}
+          cancelLabel={t('files.leaveKeep')}
+          onConfirm={confirmEditorLeave}
+          onCancel={cancelEditorLeave}
+        />
+      )}
 
       {pendingDelete && (
         <ConfirmDialog

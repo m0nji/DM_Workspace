@@ -16,6 +16,8 @@ import { isAllowedPreviewUrl } from '../shared/link-detect';
 import { installPermissionGuards } from './permissions';
 import { promptNonce } from './prompt-nonce';
 import { PROMPT_NONCE_FLAG } from '../shared/prompt-nonce';
+import { enforceSingleInstance } from './single-instance';
+import { createReloadLimiter } from './reload-limiter';
 
 // Required so Windows shows the app name/icon on notification toasts.
 app.setAppUserModelId('de.dmworkspace.app');
@@ -96,6 +98,10 @@ if (process.env.DMWS_USERDATA) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+
+// Nach dem userData-Block: der Lock hängt am userData-Pfad, die E2E-Läufe mit
+// eigenem Profil bleiben damit unabhängig voneinander.
+const gotInstanceLock = enforceSingleInstance(app, () => mainWindow);
 
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
@@ -183,6 +189,21 @@ function createWindow(): void {
   const load = devServerUrl ? mainWindow.loadURL(devServerUrl) : mainWindow.loadFile(rendererFile);
   load.catch((err: unknown) => console.error('[main] renderer failed to load:', err));
 
+  // Ein abgestürzter Renderer (Speicher, GPU-Prozess) hinterließe ein leeres
+  // Fenster, während jede Shell im Main weiterläuft — beenden hieße alle Shells
+  // und Agents töten. pty:spawn hängt sich an laufende Sessions an und der
+  // Scrollback liegt im Main, also reicht ein Reload. Höchstens dreimal pro
+  // Minute, sonst wird aus einem Absturz-beim-Start eine Endlosschleife.
+  const allowReload = createReloadLimiter(3, 60_000);
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[main] renderer process gone:', details.reason, details.exitCode);
+    if (details.reason === 'clean-exit') return;
+    if (allowReload()) mainWindow?.webContents.reload();
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    if (isMainFrame) console.error('[main] renderer did-fail-load:', code, description, url);
+  });
+
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   mainWindow.on('closed', () => {
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
@@ -219,7 +240,7 @@ function createWindow(): void {
 
 let ipc: ReturnType<typeof registerIpc> | undefined;
 
-void app.whenReady().then(async () => {
+if (gotInstanceLock) void app.whenReady().then(async () => {
   try {
     // Before IPC, scrollback stores, window events or renderer autosaves exist.
     // Never launch an empty replacement session after a failed load.
@@ -229,7 +250,14 @@ void app.whenReady().then(async () => {
     installAppMenu();
     createWindow();
   } catch (err) {
-    if (!(err instanceof StateLoadError)) throw err;
+    if (!(err instanceof StateLoadError)) {
+      // Nicht neu werfen: der Crash-Guard schluckt es, und übrig bliebe ein
+      // Prozess ohne Fenster und ohne Meldung.
+      console.error('[main] startup failed:', err);
+      dialog.showErrorBox('DM Workspace', err instanceof Error ? err.message : String(err));
+      app.exit(1);
+      return;
+    }
     const message = stateLoadErrorMessage(err, app.getLocale());
     await dialog.showMessageBox({ type: 'error', ...message, buttons: ['OK'], noLink: true });
     app.quit();

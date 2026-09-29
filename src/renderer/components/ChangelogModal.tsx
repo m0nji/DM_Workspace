@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ChangelogVersion, ChangelogKind } from '../../shared/changelog';
 import { Icon } from './Icon';
+import { isDialogEnter } from '../dialog-keys';
 
 interface ConfirmAction {
   label: string;
@@ -39,15 +40,23 @@ export function ChangelogModal({ title, versions, highlightVersion, fallbackText
   };
   const primaryRef = useRef<HTMLButtonElement>(null);
 
+  // onClose/confirm sind bei den Aufrufern Inline-Objekte mit neuer Identität pro
+  // Render. Über eine Ref gelesen bleibt der Effect stabil und holt den Fokus
+  // genau einmal auf den Primärbutton, statt ihn bei jedem Re-Render (Download-
+  // Fortschritt, Notes geladen) vom "Später"-Button zurückzuholen.
+  const latest = useRef({ onClose, confirm });
+  useEffect(() => { latest.current = { onClose, confirm }; });
+
   useEffect(() => {
     primaryRef.current?.focus();
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-      else if (e.key === 'Enter' && confirm) { e.preventDefault(); confirm.onConfirm(); }
+      const { onClose: close, confirm: action } = latest.current;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (action && isDialogEnter(e)) { e.preventDefault(); action.onConfirm(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, confirm]);
+  }, []);
 
   const hasContent = versions.length > 0;
 

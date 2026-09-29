@@ -31,7 +31,10 @@ cd "$ROOT"
 # .dmg, das erst die Nachkontrolle auffliegen ließ.
 VERSION="$(node -p 'require("./package.json").version')"
 shopt -s nullglob
-DMGS=( dist/*-"$VERSION"-*.dmg )
+# Beide Architekturen: arm64 heißt "…-$VERSION-arm64.dmg", x64 schlicht
+# "…-$VERSION.dmg". Nur das erste Muster zu suchen ließ das x64-.dmg seit
+# 0.14.1 unsigniert und unnotarisiert (bei 0.19.4 per spctl nachgeprüft).
+DMGS=( dist/*-"$VERSION".dmg dist/*-"$VERSION"-*.dmg )
 if [ ${#DMGS[@]} -eq 0 ]; then
   echo "::error::kein .dmg für Version $VERSION unter dist/ — wurde der Build ausgeführt?"
   exit 1

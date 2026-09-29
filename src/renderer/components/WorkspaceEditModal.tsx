@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { collectPaneIds } from '../../shared/layout-tree';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
+import { isDialogEnter } from '../dialog-keys';
 
 // Shared palette for workspace dots. Kept here next to the editor since this is
 // the only place a workspace's colour is chosen.
@@ -61,7 +62,7 @@ export function WorkspaceEditModal({ workspaceId, onClose }: WorkspaceEditModalP
       // window, so without this guard one keystroke would drive both).
       if (pendingDir) return;
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-      else if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (isDialogEnter(e)) { e.preventDefault(); commit(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

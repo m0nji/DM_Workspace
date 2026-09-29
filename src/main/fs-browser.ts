@@ -1,4 +1,4 @@
-import { readdirSync, statSync, readFileSync, openSync, closeSync } from 'node:fs';
+import { readdirSync, statSync, readFileSync, openSync, closeSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { expandTilde } from './resolve-cwd';
 import { writeFileAtomic } from './atomic-write';
@@ -7,7 +7,7 @@ import type { DirEntry } from '../shared/types';
 // 2 MB cap for inline editing — past this we refuse to load into a <textarea>.
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 
-export type FsBrowserCode = 'binary' | 'too-large' | 'exists' | 'invalid-name';
+export type FsBrowserCode = 'binary' | 'not-utf8' | 'too-large' | 'exists' | 'invalid-name';
 
 export class FsBrowserError extends Error {
   constructor(public code: FsBrowserCode, message: string) {
@@ -57,11 +57,31 @@ export function readTextFile(path: string): string {
   }
   const buf = readFileSync(full);
   if (isBinary(buf)) throw new FsBrowserError('binary', 'File appears to be binary');
-  return buf.toString('utf8');
+  // Strikt dekodieren: toString('utf8') macht aus jedem ungültigen Byte ein
+  // U+FFFD, und Speichern schriebe das Ersatzzeichen über das Original. Eine
+  // Latin-1/CP1252-Datei wird stattdessen schreibgeschützt geöffnet. ignoreBOM:
+  // ein vorhandenes BOM bleibt im Text und überlebt damit das Speichern.
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buf);
+  } catch {
+    throw new FsBrowserError('not-utf8', 'File is not valid UTF-8');
+  }
 }
 
 export function writeTextFile(path: string, content: string): void {
-  writeFileAtomic(expandTilde(path), content);
+  let target = expandTilde(path);
+  let mode: number | undefined;
+  try {
+    // Über den Symlink hinweg schreiben und die Rechte des Originals
+    // übernehmen: writeFileAtomic ersetzt die Datei per rename und würde sonst
+    // Link und Modus (0755, 0600) verlieren. Unter Windows ist der Modus nur
+    // das Schreibschutz-Bit, dort bleibt der bisherige Weg.
+    target = realpathSync(target);
+    if (process.platform !== 'win32') mode = statSync(target).mode & 0o7777;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  writeFileAtomic(target, content, mode === undefined ? {} : { mode });
 }
 
 export function createFile(dirPath: string, name: string): string {

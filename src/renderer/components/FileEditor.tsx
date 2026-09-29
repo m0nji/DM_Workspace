@@ -6,7 +6,7 @@ import { renderMarkdown, isMarkdownFile, handleMarkdownLinkClick } from '../mark
 import { basename } from '../../shared/fs-path';
 import { Icon } from './Icon';
 
-type LoadState = 'loading' | 'ok' | 'binary' | 'too-large' | 'error';
+type LoadState = 'loading' | 'ok' | 'binary' | 'not-utf8' | 'too-large' | 'error';
 
 // Fehlercodes der Datei-Schicht -> i18n-Schlüssel. 'server' bleibt bewusst auf
 // den generischen Meldungen der jeweiligen Stelle (Laden/Speichern). Das
@@ -56,6 +56,14 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
   const isMd = isMarkdownFile(path);
   const dirty = content !== saved;
 
+  // Der Store braucht das Signal, um Schließen/Wechseln zu bremsen. Beim Unmount
+  // zurücksetzen, damit ein Editor, den es nicht mehr gibt, nichts blockiert.
+  const setEditorDirty = useStore((s) => s.setEditorDirty);
+  useEffect(() => {
+    setEditorDirty(dirty);
+    return () => setEditorDirty(false);
+  }, [dirty, setEditorDirty]);
+
   const load = useCallback((): (() => void) => {
     pathRef.current = path;
     let cancelled = false;
@@ -74,7 +82,7 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
       if (res.ok) {
         mtimeRef.current = res.mtime;
         setContent(res.content); setSaved(res.content); setState('ok');
-      } else if (res.code === 'binary' || res.code === 'too-large') {
+      } else if (res.code === 'binary' || res.code === 'not-utf8' || res.code === 'too-large') {
         setState(res.code);
       } else {
         setLoadErrorKey(ERROR_KEYS[res.code] ?? null);
@@ -160,6 +168,7 @@ export function FileEditor({ path }: { path: string }): React.JSX.Element {
       <div className="feditor-body">
         {state === 'loading' && <div className="feditor-notice">{t('files.loading')}</div>}
         {state === 'binary' && <div className="feditor-notice">{t('files.binary')}</div>}
+        {state === 'not-utf8' && <div className="feditor-notice">{t('files.notUtf8')}</div>}
         {state === 'too-large' && <div className="feditor-notice">{t(editRemote ? 'files.tooLargeLimit' : 'files.tooLarge')}</div>}
         {state === 'error' && <div className="feditor-notice">{t(loadErrorKey ?? 'files.editorLoadError')}</div>}
         {state === 'ok' && (

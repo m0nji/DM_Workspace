@@ -79,6 +79,29 @@ describe('BackendRouter', () => {
     ]);
   });
 
+  // Der Server kann eine Pane nach einem exit wiederbeleben (Umgebung wecken,
+  // Server-Neustart) — dieselbe pane-Id, neue Shell. Ohne Routing-Eintrag
+  // landet jede Eingabe stumm beim lokalen Backend.
+  it('keeps routing a remote pane after its exit, because the server can revive it', () => {
+    const local = new FakeBackend();
+    const remote = new FakeBackend();
+    const router = new BackendRouter(local);
+    router.registerRemoteBackend(remote);
+    router.spawn('p1', spawnOpts({ target: remoteTarget }));
+
+    remote.emitExit('p1', 0);
+    router.write('p1', 'ls\r');
+    router.resize('p1', 100, 30);
+    router.kill('p1');
+
+    expect(remote.calls.slice(1)).toEqual([
+      ['write', 'p1', 'ls\r'],
+      ['resize', 'p1', 100, 30],
+      ['kill', 'p1']
+    ]);
+    expect(local.calls).toEqual([]);
+  });
+
   // Heutiges Verhalten: eine unbekannte paneId landet beim lokalen PtyManager,
   // wo write/resize/kill für unbekannte Panes No-ops sind.
   it('falls back to the default backend for an unknown paneId', () => {

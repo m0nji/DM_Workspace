@@ -2,6 +2,18 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.5 – 2026-09-29
+- fix: A program can no longer point a pane's working directory at a network share on Windows. A terminal could announce `\\host\share` as its folder (via OSC 7 or OSC 9;9), and opening the file panel or clicking a relative link would then make Windows connect to that host and hand over the login hash. Such folders are now ignored, and the file panel's read, write and delete calls refuse network paths, empty paths, your home folder and the filesystem root.
+- fix: Saving a file in the built-in editor keeps its permissions and its symlink. A script that was executable, or a private `.env`, used to come back as a plain 0644 file, and a symlink was replaced by a copy. Files that are not UTF-8 (Latin-1, Windows-1252, for example an Excel CSV) are no longer opened lossily: they were shown with replacement characters and saving destroyed every umlaut. They now say so instead of claiming to be binary.
+- fix: The editor no longer throws away unsaved changes silently. Closing the preview, switching to another file, changing folder, or clicking a link in the terminal now asks first.
+- fix: Remote terminals stay usable after the server restarts a shell or wakes the environment. Output kept arriving, but typing and resizing were dropped because the pane had lost its route to the server.
+- fix: On Windows and Linux, starting DM Workspace a second time brings the running window to the front instead of opening a second instance that overwrote the first one's saved layout and history.
+- fix: If the window's renderer process crashes, the window reloads itself and your shells keep running, instead of leaving an empty window with no way out but quitting. A failure during startup now shows an error instead of leaving an invisible process behind.
+- fix: Clicking a pane divider without dragging no longer resets it to 50/50.
+- fix: In the update dialog, Enter on "Later" no longer starts the update and restarts the app, and the focus no longer jumps back to "Update now" while it downloads. In the workspace editor, Enter on "Cancel" no longer applies your changes.
+- fix: zsh panes read and write `~/.zsh_history` again. They kept a separate history inside the app's data folder, so arrow-up did not show what you had typed in other terminals. History from earlier panes stays in `shell-integration/zsh/.zsh_history` there.
+- fix: The Intel (x64) macOS installer is now signed, notarized and stapled like the Apple silicon one.
+
 ## 0.19.4 – 2026-09-27
 - fix: Remote terminals reconnect after you sign in to the server again. A pane that was already connected kept sending the expired session cookie on every reconnect attempt, so it stayed disconnected until the app was restarted. Each attempt now uses the current login.
 - fix: Updated all dependencies flagged by `npm audit` — 33 advisories across 20 packages, 23 of them high severity. Reaching the shipped app: Electron 41.10.7 (a sandboxed iframe could open popups despite a missing `allow-popups`, and protocol responses could reuse the default session's cache), DOMPurify 3.4.16 (a hook removed during `IN_PLACE` sanitizing could leave a detached subtree executable) and js-yaml 4.3.2 (CPU exhaustion from crafted YAML, used by the auto-updater). The rest (electron-builder 26.15.3, vitest, xmldom, undici, sharp, brace-expansion, nanoid, browserslist and others) affect the build and test toolchain only

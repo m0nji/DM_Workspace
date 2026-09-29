@@ -17,11 +17,12 @@ export interface RemoteFilesContext {
   projectId: string;
 }
 
-// Fehlercodes, die die Panels gezielt anzeigen. 'binary'/'too-large' decken
-// sich mit den lokalen ReadTextResult-Codes, der Rest kommt aus der Remote-
-// Fehlerabbildung (shared/types.ts, RemoteFsErrorCode).
+// Fehlercodes, die die Panels gezielt anzeigen. 'binary'/'not-utf8'/'too-large'
+// decken sich mit den lokalen ReadTextResult-Codes ('not-utf8' gibt es nur
+// lokal), der Rest kommt aus der Remote-Fehlerabbildung (shared/types.ts,
+// RemoteFsErrorCode).
 export type FilesErrorCode =
-  | 'binary' | 'too-large'
+  | 'binary' | 'not-utf8' | 'too-large'
   | 'not-logged-in' | 'forbidden' | 'not-found' | 'network' | 'server';
 
 export type FilesReadResult =

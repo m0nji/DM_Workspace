@@ -58,3 +58,23 @@ describe('parseOsc9', () => {
     expect(parseOsc9('9;')).toBeNull();
   });
 });
+
+describe('UNC paths from the terminal', () => {
+  // Das Arbeitsverzeichnis kommt aus Programmausgabe. Ein UNC-Pfad hier würde
+  // später vom Datei-Panel und von der Link-Auflösung per SMB geöffnet (NTLM-Leak).
+  it('drops a UNC cwd from OSC 9;9', () => {
+    expect(parseOsc9('9;\\\\evil\\share')).toBeNull();
+    expect(parseOsc9('9;//evil/share')).toBeNull();
+  });
+
+  it('drops a UNC cwd from OSC 7, including the file://// spelling', () => {
+    expect(parseOsc7('file:////evil/share')).toBeNull();
+    expect(parseOsc7('//evil/share')).toBeNull();
+  });
+
+  it('still accepts ordinary paths', () => {
+    expect(parseOsc9('9;C:\\Users\\me')).toBe('C:/Users/me');
+    expect(parseOsc7('file://host/home/me/proj')).toBe('/home/me/proj');
+    expect(parseOsc7('file:///C:/Users/me')).toBe('C:/Users/me');
+  });
+});

@@ -404,6 +404,11 @@ export interface StoreState extends AppState {
   setBrowseRoot: (path: string) => void;
   openInEditor: (path: string, remote?: RemoteFilesContext | null) => void;
   clearEditor: () => void; // drop the inline editor (e.g. its file was deleted)
+  editorDirty: boolean;                       // der Inline-Editor hat ungespeicherte Änderungen
+  pendingEditorLeave: (() => void) | null;    // Aktion, die auf die Rückfrage wartet
+  setEditorDirty: (dirty: boolean) => void;
+  confirmEditorLeave: () => void;
+  cancelEditorLeave: () => void;
   // lifecycle
   hydrate: () => Promise<void>;
   // workspaces
@@ -671,6 +676,14 @@ function withoutGroup(w: Workspace): Workspace {
   return next;
 }
 
+// Jede Aktion, die den Inline-Editor verlässt, läuft hier durch. Mit
+// ungespeicherten Änderungen wartet sie auf die Rückfrage in PreviewPanel, sonst
+// läuft sie sofort — bestehende Aufrufer bleiben synchron.
+function guardEditorLeave(get: () => StoreState, set: (partial: Partial<StoreState>) => void, run: () => void): void {
+  if (get().editorDirty) set({ pendingEditorLeave: run });
+  else run();
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
@@ -710,6 +723,8 @@ export const useStore = create<StoreState>((set, get) => ({
   taskLogs: {},
   tasksPanelOpen: false,
   previewPanel: { open: false, widthPx: 480, source: null, tab: 'files', browseRoot: null, editPath: null, editRemote: null },
+  editorDirty: false,
+  pendingEditorLeave: null,
 
   hydrate: async () => {
     const loaded = await window.api.loadState();
@@ -1284,29 +1299,47 @@ export const useStore = create<StoreState>((set, get) => ({
     return { paneDetectedAgents };
   }),
 
-  openPreview: (source) => set((s) => ({
+  openPreview: (source) => guardEditorLeave(get, set, () => set((s) => ({
     previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: null, editRemote: null, source }
-  })),
-  closePreview: () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } })),
+  }))),
+  closePreview: () => guardEditorLeave(get, set, () => set((s) => ({ previewPanel: { ...s.previewPanel, open: false } }))),
   // Opening (closed → open) re-syncs the browse root to where the user is
   // working; closing leaves it untouched so nothing shifts on the way out.
-  togglePreview: () => set((s) => {
-    const open = !s.previewPanel.open;
-    if (!open) return { previewPanel: { ...s.previewPanel, open } };
-    return { previewPanel: { ...s.previewPanel, open, browseRoot: activeBrowseRoot(s) } };
-  }),
+  togglePreview: () => {
+    const run = (): void => set((s) => {
+      const open = !s.previewPanel.open;
+      if (!open) return { previewPanel: { ...s.previewPanel, open } };
+      return { previewPanel: { ...s.previewPanel, open, browseRoot: activeBrowseRoot(s) } };
+    });
+    if (get().previewPanel.open) guardEditorLeave(get, set, run);
+    else run();
+  },
   setPreviewWidth: (px) => set((s) => ({
     previewPanel: { ...s.previewPanel, widthPx: Math.min(1200, Math.max(240, px)) }
   })),
-  openFiles: () => set((s) => ({
+  openFiles: () => guardEditorLeave(get, set, () => set((s) => ({
     previewPanel: { ...s.previewPanel, open: true, tab: 'files', browseRoot: activeBrowseRoot(s), editPath: null, editRemote: null }
-  })),
+  }))),
   setPanelTab: (tab) => set((s) => ({ previewPanel: { ...s.previewPanel, tab } })),
-  setBrowseRoot: (path) => set((s) => ({ previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null, editRemote: null } })),
-  openInEditor: (path, remote = null) => set((s) => ({
-    previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, editRemote: remote, source: null }
-  })),
+  setBrowseRoot: (path) => guardEditorLeave(get, set, () => set((s) => ({
+    previewPanel: { ...s.previewPanel, browseRoot: path, editPath: null, editRemote: null }
+  }))),
+  openInEditor: (path, remote = null) => {
+    const run = (): void => set((s) => ({
+      previewPanel: { ...s.previewPanel, open: true, tab: 'preview', editPath: path, editRemote: remote, source: null }
+    }));
+    if (path === get().previewPanel.editPath) run();
+    else guardEditorLeave(get, set, run);
+  },
+  // Bewusst ungeschützt: läuft, nachdem die Datei in den Papierkorb ging.
   clearEditor: () => set((s) => ({ previewPanel: { ...s.previewPanel, editPath: null, editRemote: null, tab: 'files' } })),
+  setEditorDirty: (dirty) => set((s) => (s.editorDirty === dirty ? s : { editorDirty: dirty })),
+  confirmEditorLeave: () => {
+    const run = get().pendingEditorLeave;
+    set({ pendingEditorLeave: null, editorDirty: false });
+    run?.();
+  },
+  cancelEditorLeave: () => set({ pendingEditorLeave: null }),
 
   setWorkspaceColor: (id, color) => set((s) => {
     const next = { ...s, workspaces: s.workspaces.map((w) => w.id === id ? { ...w, color } : w) };

@@ -18,6 +18,7 @@ import { pathEndsWith } from '../shared/link-detect';
 import { readPreviewFile } from './preview-file';
 import { readDir, readTextFile, writeTextFile, createFile, FsBrowserError } from './fs-browser';
 import { expandTilde } from './resolve-cwd';
+import { assertFsPath, assertDeletablePath, FsGuardError } from './fs-guard';
 import { isTrustedSender } from './ipc-sender';
 import {
   isNonEmptyString, parseAgentDone, parseLoginLocal, parsePtyInput, parsePtyResize, parsePtySpawn,
@@ -640,12 +641,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   // a rejected promise (shown as an inline error row). read/create surface their
   // expected FsBrowserError codes as a discriminated result so the UI can react
   // (binary/too-large => read-only; exists/invalid-name => inline message).
-  handle('fs:readdir', (_e, path: string) => readDir(path));
+  handle('fs:readdir', (_e, path: string) => readDir(assertFsPath(path)));
 
   handle('fs:readText', (_e, path: string) => {
-    try { return { ok: true as const, content: readTextFile(path) }; }
+    try { return { ok: true as const, content: readTextFile(assertFsPath(path)) }; }
     catch (err) {
-      if (err instanceof FsBrowserError && (err.code === 'binary' || err.code === 'too-large')) {
+      if (err instanceof FsBrowserError && (err.code === 'binary' || err.code === 'not-utf8' || err.code === 'too-large')) {
         return { ok: false as const, code: err.code };
       }
       throw err;
@@ -653,11 +654,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   });
 
   handle('fs:writeText', (_e, req: { path: string; content: string }) => {
-    writeTextFile(req.path, req.content);
+    if (typeof req?.content !== 'string') throw new FsGuardError('content must be a string');
+    writeTextFile(assertFsPath(req.path), req.content);
   });
 
   handle('fs:createFile', (_e, req: { dir: string; name: string }) => {
-    try { return { ok: true as const, path: createFile(req.dir, req.name) }; }
+    try { return { ok: true as const, path: createFile(assertFsPath(req?.dir), req.name) }; }
     catch (err) {
       if (err instanceof FsBrowserError && (err.code === 'exists' || err.code === 'invalid-name')) {
         return { ok: false as const, code: err.code };
@@ -668,7 +670,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   // Move a file or folder (recursively) to the OS trash, so a delete is always
   // recoverable. Errors (missing path / permission) reject and surface inline.
-  handle('fs:delete', (_e, path: string) => shell.trashItem(expandTilde(path)));
+  handle('fs:delete', (_e, path: string) => shell.trashItem(assertDeletablePath(path)));
 
   // Open a link from the markdown preview in the system browser. http(s) only —
   // never file:/smb:/etc., which could be abused by untrusted markdown.

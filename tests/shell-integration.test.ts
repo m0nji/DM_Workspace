@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { bashPromptCommand, zshIntegrationFiles, screenrcContent, shellArgs, psCwdBootstrap } from '../src/main/shell-integration';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  bashPromptCommand, zshIntegrationFiles, writeZshIntegrationDir, screenrcContent, shellArgs, psCwdBootstrap
+} from '../src/main/shell-integration';
 import { DMWS_PROMPT_OSC, promptPayload } from '../src/shared/pane-auto-title';
 import {
   PSREADLINE_CLEAR_SCREEN_CHORD, PSREADLINE_HEAL_CHORD, PSREADLINE_HEAL_SEQUENCE
@@ -184,3 +190,34 @@ describe('screenrcContent', () => {
   });
 });
 
+
+const hasZsh = process.platform !== 'win32' && spawnSync('zsh', ['--version']).status === 0;
+
+// Echte zsh: die Integration pinnt ZDOTDIR auf ihr eigenes Verzeichnis. Was eine
+// Config daraus ableitet, darf den Verlauf nicht dorthin verlegen.
+describe.skipIf(!hasZsh)('zsh history location (real zsh)', () => {
+  function historyFileFor(userZshrc: string): { home: string; histfile: string } {
+    const home = mkdtempSync(join(tmpdir(), 'dmws-zsh-'));
+    const dir = join(home, 'integration');
+    writeZshIntegrationDir(dir, NONCE);
+    writeFileSync(join(home, '.zshrc'), userZshrc);
+    const out = execFileSync('zsh', ['-i', '-c', 'print -r -- "$HISTFILE"'], {
+      env: { HOME: home, ZDOTDIR: dir, _DMWS_USER_ZDOTDIR: home, PATH: process.env.PATH ?? '', TERM: 'xterm-256color' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+    return { home, histfile: out.trim().split('\n').pop() ?? '' };
+  }
+
+  it('moves a HISTFILE derived from $ZDOTDIR back to the user home', () => {
+    const { home, histfile } = historyFileFor('HISTFILE="$ZDOTDIR/.zsh_history"\n');
+    expect(histfile).toBe(join(home, '.zsh_history'));
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('leaves a HISTFILE the user chose elsewhere alone', () => {
+    const { home, histfile } = historyFileFor('HISTFILE="$HOME/eigener-verlauf"\n');
+    expect(histfile).toBe(join(home, 'eigener-verlauf'));
+    rmSync(home, { recursive: true, force: true });
+  });
+});

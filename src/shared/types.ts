@@ -183,7 +183,7 @@ export interface DirEntry {
   size: number;
   mtimeMs: number;
 }
-export type ReadTextResult = { ok: true; content: string } | { ok: false; code: 'binary' | 'too-large' };
+export type ReadTextResult = { ok: true; content: string } | { ok: false; code: 'binary' | 'not-utf8' | 'too-large' };
 export type CreateFileResult = { ok: true; path: string } | { ok: false; code: 'exists' | 'invalid-name' };
 
 export interface AgentDonePayload {

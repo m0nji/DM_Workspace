@@ -90,6 +90,12 @@ export function zshIntegrationFiles(dir: string, nonce: string): Record<string, 
     '.zprofile': source('.zprofile'),
     '.zshrc':
       source('.zshrc') +
+      // ZDOTDIR zeigt auf unser Verzeichnis. Was /etc/zshrc (macOS) oder die
+      // Nutzer-Config daraus ableitet — allen voran HISTFILE — landete sonst
+      // dort statt in ~. Erst nach dem Einlesen der Nutzer-.zshrc korrigieren,
+      // damit ein bewusst gesetzter HISTFILE außerhalb unseres Verzeichnisses
+      // gewinnt.
+      `case "$HISTFILE" in "$ZDOTDIR"/*) HISTFILE="\${_DMWS_USER_ZDOTDIR:-$HOME}/\${HISTFILE#"$ZDOTDIR"/}" ;; esac\n` +
       `__dmws_cwd(){ printf '${ESC}]7;file://%s%s${BEL}${promptSequence(nonce)}' "$HOST" "$PWD"; }\n` +
       `precmd_functions+=(__dmws_cwd)\n`,
     '.zlogin': source('.zlogin')
