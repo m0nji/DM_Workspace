@@ -313,9 +313,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     try { rmSync(IMAGE_TMP_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   });
 
-  // Coalesce PTY chunks into one IPC message per pane per ~5ms window — see
-  // pty-data-batcher.ts for why (IPC saturation under high-throughput output).
+  // Visible terminals need at most one IPC batch per frame. Hidden/minimized
+  // windows can parse larger batches without affecting interactive echo.
   const dataBatcher = createPtyDataBatcher({
+    getWindowMs: () => {
+      const win = getWindow();
+      return win?.isVisible() && !win.isMinimized() ? 16 : 100;
+    },
     send: (paneId, data) => {
       const payload: PtyDataEvent = { paneId, data };
       getWindow()?.webContents.send('pty:data', payload);

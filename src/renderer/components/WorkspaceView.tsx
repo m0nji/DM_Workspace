@@ -4,6 +4,7 @@ import { collectPaneIds } from '../../shared/layout-tree';
 import { WelcomeScreen } from './WelcomeScreen';
 import { LayoutRenderer } from './LayoutRenderer';
 import { PanePortal } from './PanePortal';
+import { useDocumentVisible } from '../use-document-visible';
 
 // Every workspace stays mounted; only the active one is visible. This keeps each
 // terminal's xterm instance (and its scrollback) alive across workspace switches,
@@ -15,6 +16,7 @@ import { PanePortal } from './PanePortal';
 // (xterm buffer stays in memory, DOM renderer covers them) and reacquire it on
 // return — see TerminalView's syncWebgl.
 export function WorkspaceView(): React.JSX.Element {
+  const documentVisible = useDocumentVisible();
   const workspaces = useStore((s) => s.workspaces);
   const activeId = useStore((s) => s.activeWorkspaceId);
   const maximizedPaneId = useStore((s) => s.maximizedPaneId);
@@ -39,7 +41,8 @@ export function WorkspaceView(): React.JSX.Element {
                 maximizedPaneId={active ? maximizedPaneId : null}
               />
               {collectPaneIds(ws.layout).map((paneId) => (
-                <PanePortal key={paneId} paneId={paneId} cwd={ws.cwd} active={active} />
+                <PanePortal key={paneId} paneId={paneId} cwd={ws.cwd}
+                  active={active && documentVisible && (!maximizedPaneId || maximizedPaneId === paneId)} />
               ))}
             </>
           );

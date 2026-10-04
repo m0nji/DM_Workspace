@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { activityContent } from '../src/renderer/terminal/activity-content';
+import { describe, it, expect, vi } from 'vitest';
+import { activityContent, createActivityContentObserver } from '../src/renderer/terminal/activity-content';
 
 describe('terminal activity content', () => {
   const screen = (composer: string, decoration: string) => [
@@ -26,5 +26,41 @@ describe('terminal activity content', () => {
   it('does not suppress punctuation in ordinary terminal output', () => {
     expect(activityContent(['...'])).not.toBe(activityContent(['..']));
     expect(activityContent(['echo file.txt'])).not.toBe(activityContent(['echo filetxt']));
+  });
+});
+
+
+describe('activity observer cadence', () => {
+  it('samples hidden output less often while still reporting changes and cleaning up', () => {
+    vi.useFakeTimers();
+    try {
+      const read = vi.fn(() => 'first');
+      const changed = vi.fn();
+      const term = {
+        rows: 1,
+        buffer: { active: { type: 'normal', baseY: 0, getLine: () => ({ translateToString: read }) } }
+      } as unknown as import('@xterm/xterm').Terminal;
+      let active = false;
+      const observer = createActivityContentObserver(term, changed, () => active);
+      for (let i = 0; i < 100; i++) observer.output();
+      vi.advanceTimersByTime(999);
+      expect(read).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(read).toHaveBeenCalledOnce();
+      expect(changed).toHaveBeenCalledOnce();
+      active = true;
+      read.mockReturnValue('second');
+      observer.output();
+      vi.advanceTimersByTime(100);
+      expect(changed).toHaveBeenCalledTimes(2);
+      // An unchanged repaint is still not new activity.
+      observer.output();
+      vi.advanceTimersByTime(100);
+      expect(changed).toHaveBeenCalledTimes(2);
+      observer.output();
+      observer.dispose();
+      vi.runAllTimers();
+      expect(changed).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
   });
 });

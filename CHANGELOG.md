@@ -3,6 +3,8 @@
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
 ## 0.19.6 – 2026-10-04
+- perf: Release terminal GPU resources while the window is hidden or minimized and for panes hidden behind a maximized pane. Restore the same terminals when visible again; shells and background output keep running.
+- perf: Coalesce terminal output at 16 ms while visible and 100 ms while hidden or minimized, sample background activity less often, and avoid scrollback-save timers when history is disabled.
 - fix: Local Codex agent panes on macOS and Linux now use `--no-daemon` when the installed CLI supports it. This keeps commands in the terminal's launch context and avoids the LAN access failure observed with the detached macOS background service. Older versions keep their existing start, and phone-enabled profiles continue using the shared remote service.
 
 ## 0.19.5 – 2026-09-29

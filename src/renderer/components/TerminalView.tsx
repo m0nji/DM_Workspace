@@ -576,13 +576,13 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
     const contentActivity = createActivityContentObserver(term, () => {
       if (!disposed && !processEnded) activity.onOutput();
-    });
+    }, () => activeRef.current);
     disposers.push(() => contentActivity.dispose());
 
     // Attach listeners BEFORE spawning so the shell's first prompt is never missed.
     const offData = window.api.onData(paneId, (data) => {
       term.write(data, () => { updateAtBottom(); contentActivity.output(); });
-      saveScheduler.schedule();
+      if (historyEnabled()) saveScheduler.schedule();
     });
     let agentExitReceived: (() => void) | null = null;
     const offExit = window.api.onExit(paneId, (exitCode) => {

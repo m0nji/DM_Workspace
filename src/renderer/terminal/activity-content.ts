@@ -20,7 +20,9 @@ export function activityContent(lines: string[]): string {
   }).join('\n');
 }
 
-export function createActivityContentObserver(term: Terminal, onContent: () => void): { output(): void; dispose(): void } {
+export function createActivityContentObserver(
+  term: Terminal, onContent: () => void, isActive: () => boolean = () => true
+): { output(): void; dispose(): void } {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let previous = '';
   let disposed = false;
@@ -38,7 +40,7 @@ export function createActivityContentObserver(term: Terminal, onContent: () => v
         }
         const next = `${buffer.type}:${buffer.baseY}\n${activityContent(lines)}`;
         if (next !== previous) { previous = next; onContent(); }
-      }, 100);
+      }, isActive() ? 100 : 1000);
     },
     dispose() { disposed = true; if (timer !== null) clearTimeout(timer); }
   };

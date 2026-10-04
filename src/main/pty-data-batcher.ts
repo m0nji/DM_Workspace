@@ -10,6 +10,8 @@ export interface PtyDataBatcherOptions {
   send: (paneId: string, data: string) => void;
   /** Flush window in ms; the first push arms it. */
   windowMs?: number;
+  /** Read at the start of each burst, e.g. to batch hidden-window output more slowly. */
+  getWindowMs?: () => number;
   /** Per-pane buffered-length cap; exceeding it flushes that pane immediately. */
   maxBytes?: number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -25,7 +27,7 @@ export interface PtyDataBatcher {
 }
 
 export function createPtyDataBatcher(opts: PtyDataBatcherOptions): PtyDataBatcher {
-  const windowMs = opts.windowMs ?? 5;
+  const windowMs = opts.windowMs ?? 16;
   const maxBytes = opts.maxBytes ?? 256 * 1024;
   const setTimer = opts.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
   const clearTimer = opts.clearTimer ?? ((h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>));
@@ -67,7 +69,7 @@ export function createPtyDataBatcher(opts: PtyDataBatcherOptions): PtyDataBatche
         return;
       }
       if (timer === null) {
-        timer = setTimer(() => { timer = null; flushAll(); }, windowMs);
+        timer = setTimer(() => { timer = null; flushAll(); }, opts.getWindowMs?.() ?? windowMs);
       }
     },
     flushPane,

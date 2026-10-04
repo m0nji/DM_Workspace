@@ -93,3 +93,49 @@ describe('pty-data-batcher', () => {
     expect(h.sent).toEqual([]);
   });
 });
+
+
+describe('PTY batching cadence', () => {
+  it('batches at frame cadence by default and reads visibility on each burst', () => {
+    let hidden = false;
+    let fire: (() => void) | undefined;
+    const delays: number[] = [];
+    const sent: string[] = [];
+    const batcher = createPtyDataBatcher({
+      send: (_id, data) => sent.push(data),
+      getWindowMs: () => hidden ? 100 : 16,
+      setTimer: (fn, ms) => { fire = fn; delays.push(ms); return 1; },
+      clearTimer: () => { fire = undefined; }
+    });
+    batcher.push('p', 'a');
+    batcher.push('p', 'b');
+    expect(delays).toEqual([16]);
+    fire!();
+    hidden = true;
+    batcher.push('p', 'c');
+    batcher.push('p', 'd');
+    expect(delays).toEqual([16, 100]);
+    // Exit flush keeps all bytes ordered even with a long hidden-window delay.
+    batcher.flushPane('p');
+    expect(sent).toEqual(['ab', 'cd']);
+    fire!();
+    hidden = false;
+    batcher.push('p', 'e');
+    expect(delays).toEqual([16, 100, 16]);
+    fire!();
+    expect(sent).toEqual(['ab', 'cd', 'e']);
+    batcher.dispose();
+  });
+
+  it('does not arm periodic work while there is no terminal output', () => {
+    const delays: number[] = [];
+    const batcher = createPtyDataBatcher({
+      send: () => {},
+      setTimer: (_fn, ms) => { delays.push(ms); return 1; }
+    });
+    expect(delays).toEqual([]);
+    batcher.push('p', 'x');
+    expect(delays).toEqual([16]);
+    batcher.dispose();
+  });
+});
