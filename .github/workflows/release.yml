@@ -11,15 +11,29 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to rebuild with the current CI workflow
+        required: true
+        type: string
+      platform:
+        description: Platform to rebuild
+        type: choice
+        options: [all, macos, windows, linux]
+        default: all
+        required: true
 
 permissions:
   contents: write # allow GITHUB_TOKEN to create/upload the release
 
 jobs:
   macos:
+    if: ${{ !inputs.platform || inputs.platform == 'all' || inputs.platform == 'macos' }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
       - uses: actions/setup-node@v5
         with:
           node-version: 20
@@ -103,15 +117,19 @@ jobs:
         run: bash ./scripts/publish-release.sh
 
   windows:
-    # Run after macOS so only one job publishes first: electron-builder creates
+    # Run after macOS even if notarization fails, so Windows remains buildable.
+    # Only one job publishes first: electron-builder creates
     # the GitHub release if it's missing, and parallel jobs would each create a
     # separate draft for the same tag (splitting mac/win assets + the two
     # electron-updater yml files across two releases). Serializing lets Windows
     # find the existing draft and upload into it.
     needs: macos
+    if: ${{ always() && !cancelled() && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'windows') }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
       - uses: actions/setup-node@v5
         with:
           node-version: 20
@@ -159,13 +177,16 @@ jobs:
         run: bash ./scripts/publish-release.sh
 
   linux:
-    # Run after Windows for the same single-draft reason (see the windows job):
+    # Run after Windows even if it fails, for the same single-draft reason (see the windows job):
     # serializing lets this job upload its AppImage + latest-linux.yml into the
     # existing draft instead of racing to create a second one.
     needs: windows
+    if: ${{ always() && !cancelled() && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'linux') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
       - uses: actions/setup-node@v5
         with:
           node-version: 20
