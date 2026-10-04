@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.19.6 – 2026-10-04
+- fix: Local Codex agent panes on macOS and Linux now use `--no-daemon` when the installed CLI supports it. This keeps commands in the terminal's launch context and avoids the LAN access failure observed with the detached macOS background service. Older versions keep their existing start, and phone-enabled profiles continue using the shared remote service.
+
 ## 0.19.5 – 2026-09-29
 - fix: A program can no longer point a pane's working directory at a network share on Windows. A terminal could announce `\\host\share` as its folder (via OSC 7 or OSC 9;9), and opening the file panel or clicking a relative link would then make Windows connect to that host and hand over the login hash. Such folders are now ignored, and the file panel's read, write and delete calls refuse network paths, empty paths, your home folder and the filesystem root.
 - fix: Saving a file in the built-in editor keeps its permissions and its symlink. A script that was executable, or a private `.env`, used to come back as a plain 0644 file, and a symlink was replaced by a copy. Files that are not UTF-8 (Latin-1, Windows-1252, for example an Excel CSV) are no longer opened lossily: they were shown with replacement characters and saving destroyed every umlaut. They now say so instead of claiming to be binary.

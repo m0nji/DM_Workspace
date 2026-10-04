@@ -23,8 +23,8 @@ test('Codex arguments survive Windows PowerShell and pwsh with npm and native in
     const exe = join(nativeDir, 'codex.exe').replace(/'/g, "''");
     execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Add-Type -TypeDefinition '${source}' -OutputAssembly '${exe}' -OutputType ConsoleApplication`]);
     const hookPath = join(dir, "hooks with 'quotes' & %PATH%.cjs");
-    const posix = codexSetup(hookPath, 1234, 'test-token', false).command;
-    const expected = posix.slice("command codex -c '".length, -1).replaceAll("'\\''", "'");
+    const posix = codexSetup(hookPath, 1234, 'test-token', false, true).command;
+    const expected = posix.slice(posix.indexOf(" -c '") + " -c '".length, -1).replaceAll("'\\''", "'");
     for (const shell of ['powershell.exe', 'pwsh.exe']) {
       for (const bin of [npmDir, nativeDir]) {
         for (const remote of [false, true]) {
@@ -62,6 +62,7 @@ for (const [provider, remote] of [['claude', false], ['codex', false], ['opencod
     writeFileSync(fixture, `#!${process.execPath}
 const fs = require('node:fs');
 const cp = require('node:child_process');
+if (${JSON.stringify(provider)} === 'codex' && process.argv[2] === '--help') { console.log('--no-daemon'); process.exit(0); }
 if (process.argv[2] === 'remote-control') { console.log(JSON.stringify({ status: 'connected' })); process.exit(0); }
 if (${JSON.stringify(provider)} === 'claude' && process.argv.includes('--remote-control') !== ${remote}) throw new Error('Wrong remote preference');
 // Interactive CLIs consume Ctrl+C in raw mode. On Windows, a cooked-mode
@@ -83,7 +84,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     if (!res.ok) process.exit(7);
   } else if (${JSON.stringify(provider)} === 'codex') {
     const config = process.argv[process.argv.indexOf('-c') + 1];
-    if (process.argv.length !== (${remote} ? 8 : 4) || process.argv.includes('--remote') !== ${remote} || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
+    if (process.argv.length !== (${remote} ? 8 : 5) || process.argv.includes('--no-daemon') !== ${!remote} || process.argv.includes('--remote') !== ${remote} || !config.includes('type = "command"')) throw new Error('Corrupt Codex argv: ' + JSON.stringify(process.argv.slice(2)));
     const encoded = config.match(/Buffer.from\\('([^']+)'/)[1];
     const path = Buffer.from(encoded, 'base64').toString();
     const child = cp.spawnSync(process.execPath, [path], { env: process.env, input: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'direct-start-' + process.pid, turn_id: 'turn-' + process.pid }) });

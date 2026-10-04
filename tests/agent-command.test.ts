@@ -113,12 +113,16 @@ describe('buildAgentCommand', () => {
 });
 
 describe('codexSetup with profile program and args', () => {
-  it('is unchanged for the default program', () => {
-    expect(codexSetup('/t/h.cjs', 1, 'tok', false).command).toMatch(/^command codex -c '/);
+  it('probes the default executable before choosing the local runtime', () => {
+    expect(codexSetup('/t/h.cjs', 1, 'tok', false).command.split('\n')[0])
+      .toBe('case "$(command codex --help 2>&1)" in');
   });
   it('quotes a custom program and appends args on POSIX and after --% on PowerShell', () => {
-    expect(codexSetup('/t/h.cjs', 1, 'tok', false, false, undefined, { program: '/opt/my codex', args: ['--profile', 'o s'] }).command)
-      .toMatch(/^command '\/opt\/my codex' -c '.*' '--profile' 'o s'$/s);
+    const posix = codexSetup('/t/h.cjs', 1, 'tok', false, false, undefined, { program: '/opt/my codex', args: ['--profile', 'o s'] }).command;
+    expect(posix).toContain(`command '/opt/my codex' --help 2>&1`);
+    for (const line of posix.split('\n').filter(line => line.includes(' -c '))) {
+      expect(line).toMatch(/^ {4}command '\/opt\/my codex' (?:--no-daemon )?-c '.*' '--profile' 'o s' ;;$/);
+    }
     const ps = codexSetup('C:\\t\\h.cjs', 1, 'tok', true, false, undefined, { program: 'codex', args: ['--profile', 'o s'] }).command;
     expect(ps).toContain(' --% -c "');
     expect(ps).toMatch(/ "--profile" "o s"\n\}\n\}$/);
@@ -142,8 +146,10 @@ describe('codexSetup on PowerShell and the shared Codex server', () => {
     expect(command).not.toContain('--no-daemon');
     expect(command).toContain(' --% --remote unix:// ');
   });
-  it('leaves POSIX shells unchanged', () => {
-    expect(codexSetup('/t/h.cjs', 1, 'tok', false).command).not.toContain('--no-daemon');
+  it('keeps the POSIX phone option on the remote server', () => {
+    const command = codexSetup('/t/h.cjs', 1, 'tok', false, true).command;
+    expect(command).not.toContain('--no-daemon');
+    expect(command).toContain('--remote unix://');
   });
 });
 

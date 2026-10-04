@@ -74,5 +74,20 @@ process.stdin.on('end', () => {
   const posixProgram = posixWord(program);
   const start = remote ? `command ${posixProgram} remote-control start --json >/dev/null && ` : '';
   const posixArgs = extraArgs.map(arg => ` ${quotePosix(arg)}`).join('');
-  return { command: `${start}command ${posixProgram} ${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'${posixArgs}`, script };
+  const invocation = (daemonArgs = ''): string =>
+    `${start}command ${posixProgram} ${daemonArgs}${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'${posixArgs}`;
+  // Keep local work in the pane's launch context, as on Windows. In particular,
+  // a detached macOS daemon can lose the terminal's local-network access.
+  // Probe the selected executable so older versions still start normally.
+  // A profile's explicit execution mode takes precedence over this default.
+  const explicitMode = extraArgs.some(arg => arg === '--no-daemon' || arg === '--remote' || arg.startsWith('--remote='));
+  if (remote || explicitMode) return { command: invocation(), script };
+  return { command: [
+    `case "$(command ${posixProgram} --help 2>&1)" in`,
+    '  *--no-daemon*)',
+    `    ${invocation('--no-daemon ')} ;;`,
+    '  *)',
+    `    ${invocation()} ;;`,
+    'esac'
+  ].join('\n'), script };
 }
