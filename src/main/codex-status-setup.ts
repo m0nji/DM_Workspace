@@ -47,7 +47,7 @@ process.stdin.on('end', () => {
       '& {',
       "$PSNativeCommandArgumentPassing = 'Legacy'",
       ...(remote ? [
-        `${nativeCodex} remote-control start --json | Out-Null`,
+        `${nativeCodex} app-server daemon start | Out-Null`,
         "if ($LASTEXITCODE -ne 0) { throw 'Codex Remote Control could not start. Check login and other desktop connections.' }",
         '$dmwsPreviousCwd = $env:DMWS_CODEX_CWD',
         '$env:DMWS_CODEX_CWD = (Get-Location).Path',
@@ -72,7 +72,9 @@ process.stdin.on('end', () => {
     return { command: lines.join('\n'), script };
   }
   const posixProgram = posixWord(program);
-  const start = remote ? `command ${posixProgram} remote-control start --json >/dev/null && ` : '';
+  // Starting an agent must preserve the service's remote-access preference.
+  // remote-control start would silently re-enable access disabled elsewhere.
+  const start = remote ? `command ${posixProgram} app-server daemon start >/dev/null && ` : '';
   const posixArgs = extraArgs.map(arg => ` ${quotePosix(arg)}`).join('');
   const invocation = (daemonArgs = ''): string =>
     `${start}command ${posixProgram} ${daemonArgs}${remoteArgs}${remote ? '--cd "$PWD" ' : ''}-c '${quoted}'${posixArgs}`;

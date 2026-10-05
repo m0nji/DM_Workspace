@@ -7,9 +7,9 @@ import React from 'react';
  *  `label` is optional: pass it only when nothing else names the control
  *  (e.g. no associated <label>) — otherwise both would supply the accessible
  *  name and the aria-label would just shadow the <label> redundantly. */
-export function Switch({ id, checked, label, onChange }: { id?: string; checked: boolean; label?: string; onChange: (checked: boolean) => void }): React.JSX.Element {
+export function Switch({ id, checked, label, disabled, onChange }: { id?: string; checked: boolean; label?: string; disabled?: boolean; onChange: (checked: boolean) => void }): React.JSX.Element {
   return <button type="button" id={id} role="switch" aria-checked={checked} aria-label={label}
-    className={`switch${checked ? ' on' : ''}`} onClick={() => onChange(!checked)}>
+    className={`switch${checked ? ' on' : ''}`} disabled={disabled} onClick={() => onChange(!checked)}>
     <span className="switch-knob" />
   </button>;
 }

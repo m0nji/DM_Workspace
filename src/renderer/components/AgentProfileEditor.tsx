@@ -128,7 +128,8 @@ export function AgentProfileEditor({ profile, mode, onCommit, onCheck, onReset, 
       {error('icon')}
     </div>
 
-    {supportsRemoteControl(draft.adapter) && <div className="setting-row">
+    {draft.adapter === 'codex' && <p className="modal-hint">{t('settings.smartphone.profileHint')}</p>}
+    {supportsRemoteControl(draft.adapter) && (draft.adapter !== 'codex' || profile.id !== 'codex') && <div className="setting-row">
       {/* The visible <label htmlFor> below already names this control; passing
           an aria-label to Switch too would just shadow it with the same text. */}
       <label htmlFor={id('remote')}>{t('settings.agents.autoRemote')}</label>

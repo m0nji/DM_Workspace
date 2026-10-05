@@ -110,6 +110,7 @@ export function migrateSettings(raw: unknown): Settings {
       Math.max(BUSY_INDICATOR_SPEED_MIN_MS, Math.round(r.busyIndicatorSpeedMs))
     );
   }
+  if (typeof r.codexRemoteAccess === 'boolean') out.codexRemoteAccess = r.codexRemoteAccess;
   if (r.agentRemoteControl && typeof r.agentRemoteControl === 'object') {
     const remote = r.agentRemoteControl as Record<string, unknown>;
     out.agentRemoteControl = {};

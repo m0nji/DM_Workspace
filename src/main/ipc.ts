@@ -1,6 +1,6 @@
 import { codexRemoteAction } from './agent-remote';
 import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
-import { parseAgentProfile } from '../shared/agent-profiles';
+import { codexLaunchProfile, parseAgentProfile } from '../shared/agent-profiles';
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -224,13 +224,23 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     event => getWindow()?.webContents.send('agent:state', event));
   const defaultShell = (): string => process.platform === 'win32' ? resolveWindowsShell(process.env.PATH) : process.env.SHELL || '/bin/zsh';
   let remoteActionPending = false;
+  let remoteMutationPending = false;
   handle('agent:codex-remote', async (_e, action: unknown) => {
-    if (action !== 'status' && action !== 'pair') throw new Error('Invalid remote action');
+    if (!['status', 'enable', 'disable', 'pair', 'stop'].includes(action as string)) throw new Error('Invalid remote action');
     if (remoteActionPending) throw new Error('Remote action already in progress');
     remoteActionPending = true;
+    remoteMutationPending = action === 'enable' || action === 'disable' || action === 'stop';
     try {
-      return await codexRemoteAction(defaultShell(), action);
-    } finally { remoteActionPending = false; }
+      const result = await codexRemoteAction(defaultShell(), action as import('../shared/types').CodexRemoteAction);
+      if ((result.status === 'running' || result.status === 'stopped') && result.remoteEnabled !== null) {
+        const state = loadStateFromFile(STATE_FILE());
+        if (state.settings.codexRemoteAccess !== result.remoteEnabled) {
+          state.settings.codexRemoteAccess = result.remoteEnabled;
+          if (!saveStateToFile(STATE_FILE(), state)) throw new Error('Remote preference could not be saved');
+        }
+      }
+      return result;
+    } finally { remoteActionPending = false; remoteMutationPending = false; }
   });
   handle('agent:stop-status', (_e, paneId: unknown) => {
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
@@ -267,8 +277,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     return checkAgentRequirements(defaultShell(), profile, process.env, homedir());
   });
   handle('agent:prepare', async (_e, paneId: unknown, rawProfile: unknown) => {
-    const profile = parseAgentProfile(rawProfile);
-    if (!profile) throw new Error('Invalid agent profile');
+    const parsed = parseAgentProfile(rawProfile);
+    if (!parsed) throw new Error('Invalid agent profile');
+    const profile = codexLaunchProfile(parsed, loadStateFromFile(STATE_FILE()).settings.codexRemoteAccess);
+    if (profile.adapter === 'codex') {
+      if (remoteMutationPending) throw new Error('Remote settings are being updated');
+    }
     if (!isNonEmptyString(paneId)) throw new Error('Invalid pane');
     const session = localPty.sessionInfo(paneId);
     if (!session) throw new Error('No local terminal session');
@@ -338,7 +352,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   handle('pty:spawn', async (_e, raw: unknown): Promise<PtySpawnResult> => {
     const req = parsePtySpawn(raw);
     if (!req) { rejectPayload('pty:spawn', raw); return {}; }
-    const profile = req.agentProfile;
+    const profile = req.agentProfile ? codexLaunchProfile(req.agentProfile, loadStateFromFile(STATE_FILE()).settings.codexRemoteAccess) : undefined;
+    if (profile?.adapter === 'codex') {
+      if (remoteMutationPending) throw new Error('Remote settings are being updated');
+    }
     if (profile && localPty.sessionInfo(req.paneId)) throw new Error('Agent start requires a new terminal');
     pty.spawn(req.paneId, { cwd: req.cwd, cols: req.cols, rows: req.rows, target: req.target });
     if (!profile) return {};

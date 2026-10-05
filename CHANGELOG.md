@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.20.0 – 2026-10-05
+- feat: Manage Codex smartphone access in Settings → AI agents: enable or disable actual remote control, pair a smartphone, check service status and stop the shared service separately with confirmation. Add a titlebar shortcut and German/English labels.
+- fix: New Codex agent sessions preserve the remote-access preference instead of silently re-enabling it. An explicit global off overrides builtin and custom Codex profiles; failed disable operations do not report success.
+
 ## 0.19.7 – 2026-10-04
 - perf: Release terminal GPU resources while the window is hidden or minimized and for panes hidden behind a maximized pane. Restore the same terminals when visible again; shells and background output keep running.
 - perf: Coalesce terminal output at 16 ms while visible and 100 ms while hidden or minimized, sample background activity less often, and avoid scrollback-save timers when history is disabled.

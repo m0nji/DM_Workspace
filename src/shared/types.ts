@@ -4,9 +4,15 @@ import type { AgentProfile } from './agent-profiles';
 
 export type AgentCheck = 'ready' | 'missing-cli' | 'missing-node' | 'unsupported-shell' | 'unsupported-argument' | 'check-failed';
 
-export type CodexRemoteAction = 'status' | 'pair';
+export type CodexRemoteAction = 'status' | 'enable' | 'disable' | 'pair' | 'stop';
+export interface CodexRemoteSnapshot {
+  status: 'running' | 'stopped';
+  remoteEnabled: boolean | null;
+  connected?: boolean;
+  cliVersion?: string;
+}
 export type CodexRemoteResult =
-  | { status: 'running' | 'stopped' }
+  | CodexRemoteSnapshot
   | { status: 'paired-code'; code: string; expiresAt: string }
   | { status: 'error'; reason: 'unavailable' | 'connection' | 'invalid-response' };
 
@@ -121,6 +127,7 @@ export const TERMINAL_FONT_SIZE_MAX = 32;
 
 export interface Settings {
   agentRemoteControl?: { codex?: boolean; claude?: boolean }; // app-launched sessions on this computer only; derived from agentProfiles once saved
+  codexRemoteAccess?: boolean; // global gate; a profile must not override an explicit false
   agentProfiles?: AgentProfile[]; // order = order in the new-pane menu; absent => builtin profiles (resolveAgentProfiles)
 
   terminalFontSize?: number;   // px; absent => 13, changed live without restarting shells
@@ -541,7 +548,7 @@ export interface RendererApi {
   stopAgentStatus(paneId: string): Promise<void>;
   reconnectAgentStatus(paneId: string): Promise<void>;
   endAgentSession(paneId: string, generation: string): Promise<void>;
-  codexRemote(action: 'status' | 'pair'): Promise<CodexRemoteResult>;
+  codexRemote(action: CodexRemoteAction): Promise<CodexRemoteResult>;
   checkAgentStart(paneId: string, profile: AgentProfile, cwd?: string): Promise<AgentCheck>;
   checkAgentProfile(profile: AgentProfile): Promise<AgentCheck>;
   prepareAgentStatus(paneId: string, profile: AgentProfile): Promise<{ command: string; settingsPath: string; launchCommand: string; inputPrefix?: string }>;

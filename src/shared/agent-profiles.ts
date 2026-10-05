@@ -54,6 +54,10 @@ export function supportsRemoteControl(adapter: AgentAdapter): adapter is 'claude
   return adapter === 'claude' || adapter === 'codex';
 }
 
+export function codexLaunchProfile(profile: AgentProfile, access: boolean | undefined): AgentProfile {
+  return profile.adapter === 'codex' && access === false ? { ...profile, remoteControl: false } : profile;
+}
+
 function cleanString(value: unknown, max: number, trim: boolean): string | null {
   if (typeof value !== 'string') return null;
   const s = trim ? value.trim() : value;

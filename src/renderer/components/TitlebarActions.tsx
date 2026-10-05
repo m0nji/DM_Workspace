@@ -4,6 +4,7 @@ import { tasksAvailable, useStore } from '../store';
 import { Icon } from './Icon';
 import { AgentOverview } from './AgentOverview';
 import { UpdateBadge } from './UpdateBadge';
+import { CodexRemoteBadge } from './CodexRemoteBadge';
 
 export function TitlebarActions(): React.JSX.Element {
   const { t } = useTranslation();
@@ -21,6 +22,7 @@ export function TitlebarActions(): React.JSX.Element {
     <div className="titlebar-actions">
       <UpdateBadge />
       <AgentOverview />
+      <CodexRemoteBadge />
       {/* Umschalter, nicht nur „öffnen": aria-pressed und die active-Klasse
           versprechen genau das, und der Nachbar (Vorschau) macht es ebenso —
           ein Klick auf den gedrückten Knopf schließt das Panel wieder. */}

@@ -277,21 +277,21 @@
       "disabled": "Updates sind nur in der installierten App verfügbar."
     },
     "agents": {
-      "scope": "Diese Einstellungen gelten auf diesem Rechner für neue Agentensitzungen, die du über DM Workspace startest. Laufende Sitzungen und manuell eingegebene Terminalbefehle werden nicht umgestellt.",
-      "autoRemote": "Neue Sitzungen für Handy-Zugriff starten",
-      "codexHint": "Terminal und ChatGPT auf dem Handy nutzen einen gemeinsamen lokalen Dienst. Codex muss installiert und angemeldet sein. Der Rechner muss eingeschaltet und erreichbar bleiben.",
-      "pair": "Handy koppeln",
-      "check": "Dienst prüfen",
+      "scope": "Agentenprofile gelten für neue, über DM Workspace gestartete Sitzungen. Der Smartphone-Bereich steuert den Codex-Zugriff auf diesem Rechner.",
+      "autoRemote": "Neue Sitzungen für Smartphone-Zugriff starten",
+      "codexHint": "Terminal und ChatGPT auf dem Smartphone nutzen einen gemeinsamen lokalen Dienst. Codex muss installiert und angemeldet sein. Der Rechner muss eingeschaltet und erreichbar bleiben.",
+      "pair": "Smartphone koppeln",
+      "check": "Status prüfen",
       "working": "Verbindung wird geprüft …",
-      "running": "Der lokale Codex-Dienst läuft. Das bestätigt noch keine Verbindung vom Handy.",
+      "running": "Der lokale Codex-Dienst läuft. Das bestätigt noch keine Verbindung vom Smartphone.",
       "stopped": "Der lokale Codex-Dienst läuft nicht. Er startet beim nächsten Codex-Start mit aktivierter Option oder beim Koppeln.",
-      "pairInstructions": "Öffne in ChatGPT auf dem Handy die Remote-Verbindungen und gib diesen Kopplungscode ein:",
+      "pairInstructions": "Öffne in ChatGPT auf dem Smartphone die Remote-Verbindungen und gib diesen Kopplungscode ein:",
       "expires": "Gültig bis {{time}}. Der Code wird nicht gespeichert.",
-      "expired": "Der Kopplungscode ist abgelaufen. Klicke erneut auf „Handy koppeln“.",
-      "codexTroubleshooting": "„Handy koppeln“ aktiviert den Codex-Remote-Dienst. Falls ChatGPT Desktop dieselbe Verbindung belegt, beende die Desktop-App. Das Ausschalten der Startoption trennt keine bestehenden Verbindungen. Bei älteren CLI-Versionen bitte Codex aktualisieren.",
-      "claudeHint": "Claude startet mit Remote Control. Melde dich in Claude Code und der Handy-App mit deinem berechtigten Claude-Konto an. Eine erstmalige Freigabe und der Verbindungslink erscheinen im Terminal. Bereits laufende Sitzungen kannst du dort mit /rc verbinden.",
+      "expired": "Der Kopplungscode ist abgelaufen. Erzeuge einen neuen Code.",
+      "codexTroubleshooting": "Falls ChatGPT Desktop dieselbe Verbindung belegt, beende die Desktop-App und versuche es erneut. Bei älteren CLI-Versionen bitte Codex aktualisieren. Unter Windows die App ohne Administratorrechte starten.",
+      "claudeHint": "Claude startet mit Remote Control. Melde dich in Claude Code und der Smartphone-App mit deinem berechtigten Claude-Konto an. Eine erstmalige Freigabe und der Verbindungslink erscheinen im Terminal. Bereits laufende Sitzungen kannst du dort mit /rc verbinden.",
       "openClaude": "Claude im Browser öffnen",
-      "opencodeHint": "OpenCode bietet gemeinsamen Terminal- und Browserzugriff über einen eigenen Webserver. Eine integrierte Handy-Kopplung ist hier noch nicht verfügbar. Netzwerkzugriff erfordert einen geschützten Server; unter Windows empfiehlt OpenCode WSL.",
+      "opencodeHint": "OpenCode bietet gemeinsamen Terminal- und Browserzugriff über einen eigenen Webserver. Eine integrierte Smartphone-Kopplung ist hier noch nicht verfügbar. Netzwerkzugriff erfordert einen geschützten Server; unter Windows empfiehlt OpenCode WSL.",
       "openGuide": "Webzugriff einrichten – Anleitung",
       "showInMenu": "im Menü",
       "found": "gefunden",
@@ -314,7 +314,7 @@
       "deleteTitle": "Agent löschen?",
       "deleteMessage": "„{{name}}“ wird aus dem Menü und dem Agent-Dialog entfernt. Laufende Sitzungen laufen weiter.",
       "checkProfile": "Prüfen",
-      "codexService": "Codex-Handy-Dienst",
+      "codexService": "Codex-Smartphone-Dienst",
       "commandHint": "Programmname oder vollständiger Pfad. ~ wird nicht erweitert.",
       "secretsWarning": "Keine API-Keys eintragen: Die Werte liegen unverschlüsselt in state.json.",
       "envAdd": "+ Variable",
@@ -380,6 +380,72 @@
         "invalid-response": "Die installierte Codex-Version hat eine unerwartete Antwort geliefert. Bitte Codex aktualisieren und erneut versuchen."
       },
       "help": "Verbindung und bestehende Sitzungen"
+    },
+    "smartphone": {
+      "section": "Smartphone-Zugriff · dieser Rechner",
+      "title": "Codex vom Smartphone steuern",
+      "subtitle": "Aufgaben starten, verfolgen und freigeben.",
+      "open": "Smartphone-Zugriff verwalten",
+      "badge": "Smartphone · {{status}}",
+      "short": {
+        "unknown": "Ungeprüft",
+        "off": "Aus",
+        "connecting": "Verbindet …",
+        "connected": "Dienst verbunden",
+        "running": "Dienst läuft",
+        "stopped": "Dienst gestoppt",
+        "error": "Fehler"
+      },
+      "status": {
+        "unknown": "Smartphone-Zugriff noch nicht bestätigt",
+        "off": "Smartphone-Zugriff deaktiviert",
+        "connecting": "Verbindung wird aufgebaut …",
+        "connected": "Remote-Dienst verbunden",
+        "running": "Dienst läuft · Remote-Verbindung unbestätigt",
+        "stopped": "Smartphone-Zugriff erlaubt · Dienst gestoppt",
+        "error": "Smartphone-Zugriff konnte nicht bestätigt werden"
+      },
+      "hint": {
+        "unknown": "Prüfe den Status oder aktiviere den Zugriff.",
+        "off": "Der Remote-Zugriff ist ausgeschaltet, auch für spätere Dienststarts.",
+        "connecting": "Warte auf die Bestätigung des Remote-Dienstes.",
+        "connected": "Öffne ChatGPT auf deinem gekoppelten Smartphone und wähle diesen Rechner.",
+        "running": "Ein laufender Dienst bestätigt noch keine Verbindung vom Smartphone. Prüfe sie in der ChatGPT-App.",
+        "stopped": "Starte den Dienst, damit dein Smartphone den Rechner wieder erreichen kann.",
+        "error": "Prüfe Installation, Anmeldung und Internetverbindung; versuche es danach erneut."
+      },
+      "versionUnknown": "Version nicht bestätigt",
+      "service": "Hintergrunddienst",
+      "serviceState": {
+        "unknown": "Ungeprüft",
+        "running": "Läuft",
+        "stopped": "Gestoppt"
+      },
+      "phoneConnection": "Zugriff vom Smartphone",
+      "checkOnPhone": "In der Smartphone-App prüfen",
+      "notEnabled": "Nicht bestätigt / deaktiviert",
+      "retry": "Dienst starten / erneut verbinden",
+      "auto": "Neue Codex-Sitzungen mit dem Smartphone teilen",
+      "autoHint": "Gilt für das Codex-Profil. Laufende Sitzungen bleiben unverändert.",
+      "awake": "Der Rechner muss wach und online bleiben. Eine offene Terminal-Sitzung ist nicht nötig. Bei Standby pausiert der Zugriff. Prüfe die Verbindung am Smartphone, bevor du gehst.",
+      "advanced": "Erweiterte Optionen & Hilfe",
+      "disableHint": "Ausschalten deaktiviert den Remote-Zugriff auch für spätere Dienststarts. Der lokale Codex-Dienst kann weiterlaufen.",
+      "lifecycle": "Der Dienst kann nach dem Schließen von DM Workspace weiterlaufen. Nach einem Rechnerneustart muss er erneut gestartet werden.",
+      "stop": "Gesamten Codex-Dienst stoppen …",
+      "stopTitle": "Codex-Dienst stoppen?",
+      "stopMessage": "Das stoppt den gemeinsamen Hintergrundserver. Verbundene Terminals und laufende Codex-Aufgaben können unterbrochen werden. Wenn du nur den Smartphone-Zugriff ausschalten möchtest, verwende den Hauptschalter.",
+      "stopConfirm": "Dienst stoppen",
+      "pairTitle": "Smartphone mit Codex koppeln",
+      "newCode": "Neuen Code erzeugen",
+      "pairNote": "Das Schließen dieses Dialogs bestätigt keine erfolgreiche Kopplung. Prüfe die Verbindung in ChatGPT auf deinem Smartphone.",
+      "profileHint": "Smartphone-Zugriff wird zentral im Smartphone-Bereich unterhalb der Agentenprofile gesteuert. Ein globales Aus gilt auch für dieses Profil.",
+      "operation": {
+        "status": "Status wird geprüft …",
+        "enable": "Smartphone-Zugriff wird aktiviert …",
+        "disable": "Smartphone-Zugriff wird deaktiviert …",
+        "pair": "Kopplungscode wird erzeugt …",
+        "stop": "Codex-Dienst wird gestoppt …"
+      }
     }
   },
   "palette": {
@@ -572,7 +638,11 @@
       "manage": "Agenten verwalten …",
       "localOnly": "Agenten nur in lokalen Workspaces"
     },
-    "launchIssue": { "edit": "Profil bearbeiten", "retry": "Erneut versuchen", "dismiss": "Ausblenden" },
+    "launchIssue": {
+      "edit": "Profil bearbeiten",
+      "retry": "Erneut versuchen",
+      "dismiss": "Ausblenden"
+    },
     "maximize": "Maximieren",
     "restore": "Wiederherstellen",
     "swapWith": "Tauschen mit „{{name}}“",

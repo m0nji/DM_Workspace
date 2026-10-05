@@ -52,6 +52,8 @@ for (const [provider, remote] of [['claude', false], ['codex', false], ['opencod
     const dir = mkdtempSync(join(tmpdir(), 'dmws-agent-start-'));
     const project = join(dir, "project with 'quotes'");
     mkdirSync(project);
+    mkdirSync(join(dir, 'app-server-daemon'));
+    writeFileSync(join(dir, 'app-server-daemon', 'settings.json'), JSON.stringify({ remoteControlEnabled: remote }));
     const useZsh = process.platform === 'darwin' && provider === 'codex';
     if (useZsh) writeFileSync(join(dir, '.zshrc'), `export PATH='${dir}:/usr/bin:/bin'\n`);
     const testShell = useZsh ? '/bin/zsh' : join(dir, 'sh');
@@ -63,6 +65,7 @@ for (const [provider, remote] of [['claude', false], ['codex', false], ['opencod
 const fs = require('node:fs');
 const cp = require('node:child_process');
 if (${JSON.stringify(provider)} === 'codex' && process.argv[2] === '--help') { console.log('--no-daemon'); process.exit(0); }
+if (process.argv[2] === 'app-server') { console.log(JSON.stringify({ status: process.argv[4] === 'version' ? 'stopped' : 'started', socketPath: ${JSON.stringify(join(dir, 'app-server-control', 'app-server-control.sock'))} })); process.exit(0); }
 if (process.argv[2] === 'remote-control') { console.log(JSON.stringify({ status: 'connected' })); process.exit(0); }
 if (${JSON.stringify(provider)} === 'claude' && process.argv.includes('--remote-control') !== ${remote}) throw new Error('Wrong remote preference');
 // Interactive CLIs consume Ctrl+C in raw mode. On Windows, a cooked-mode
@@ -103,7 +106,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
     if (process.platform === 'win32') writeFileSync(join(dir, `${provider}.cmd`), `@"${process.execPath}" "${fixture}" %*\r\n`);
     if (process.platform === 'win32' && provider === 'codex') writeFileSync(join(dir, 'codex.ps1'), "throw 'The native Codex shim should be selected'\r\n");
     const app = await electron.launch({ args: ['out/main/index.js', '--lang=en-US'], env: { ...process.env,
-      ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin`, ...(useZsh ? { ZDOTDIR: dir } : {}) }), DMWS_E2E: '1' } });
+      ...(process.platform === 'win32' ? { PATH: `${dir};${process.env.PATH ?? ''}` } : { SHELL: testShell, PATH: `${dir}:/usr/bin:/bin`, ...(useZsh ? { ZDOTDIR: dir } : {}) }), CODEX_HOME: dir, DMWS_E2E: '1' } });
     let mainErrors = '';
     app.process().stderr?.on('data', chunk => { mainErrors = (mainErrors + chunk.toString()).slice(-16000); });
     try {

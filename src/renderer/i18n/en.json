@@ -277,21 +277,21 @@
       "disabled": "Updates are available only in the installed app."
     },
     "agents": {
-      "scope": "These settings apply on this computer to new agent sessions launched through DM Workspace. Running sessions and commands typed manually in terminals are not changed.",
-      "autoRemote": "Start new sessions with phone access",
-      "codexHint": "The terminal and ChatGPT on your phone share a local service. Codex must be installed and signed in. Keep this computer awake and connected.",
-      "pair": "Pair phone",
-      "check": "Check service",
+      "scope": "Agent profiles apply to new sessions launched through DM Workspace. The smartphone section controls Codex access on this computer.",
+      "autoRemote": "Start new sessions with smartphone access",
+      "codexHint": "The terminal and ChatGPT on your smartphone share a local service. Codex must be installed and signed in. Keep this computer awake and connected.",
+      "pair": "Pair smartphone",
+      "check": "Check status",
       "working": "Checking connection …",
-      "running": "The local Codex service is running. This does not confirm a connection from your phone.",
-      "stopped": "The local Codex service is stopped. It starts when you launch Codex with this option enabled or pair your phone.",
-      "pairInstructions": "Open Remote connections in ChatGPT on your phone and enter this pairing code:",
+      "running": "The local Codex service is running. This does not confirm a connection from your smartphone.",
+      "stopped": "The local Codex service is stopped. It starts when you launch Codex with this option enabled or pair your smartphone.",
+      "pairInstructions": "Open Remote connections in ChatGPT on your smartphone and enter this pairing code:",
       "expires": "Valid until {{time}}. The code is not saved.",
-      "expired": "The pairing code has expired. Click “Pair phone” again.",
-      "codexTroubleshooting": "“Pair phone” enables the Codex remote service. If ChatGPT Desktop occupies the same connection, quit the desktop app. Turning off the launch option does not disconnect existing clients. Update Codex if your CLI version is too old.",
+      "expired": "The pairing code has expired. Generate a new code.",
+      "codexTroubleshooting": "If ChatGPT Desktop occupies the same connection, quit the desktop app and try again. Update Codex if your CLI is too old. On Windows, run the app without administrator privileges.",
       "claudeHint": "Claude starts with Remote Control. Sign in to Claude Code and the mobile app with your eligible Claude account. First-time consent and the connection link appear in the terminal. For existing sessions, use /rc there.",
       "openClaude": "Open Claude in browser",
-      "opencodeHint": "OpenCode supports shared terminal and browser access through a separate web server. Integrated phone pairing is not available here yet. Network access requires a protected server; OpenCode recommends WSL on Windows.",
+      "opencodeHint": "OpenCode supports shared terminal and browser access through a separate web server. Integrated smartphone pairing is not available here yet. Network access requires a protected server; OpenCode recommends WSL on Windows.",
       "openGuide": "Set up web access – guide",
       "showInMenu": "In menu",
       "found": "Found",
@@ -314,7 +314,7 @@
       "deleteTitle": "Delete agent?",
       "deleteMessage": "“{{name}}” will be removed from the menu and the agent dialog. Running sessions continue.",
       "checkProfile": "Check",
-      "codexService": "Codex phone service",
+      "codexService": "Codex smartphone service",
       "commandHint": "Program name or full path. ~ is not expanded.",
       "secretsWarning": "Do not enter API keys: values are stored unencrypted in state.json.",
       "envAdd": "+ Variable",
@@ -380,6 +380,72 @@
         "invalid-response": "The installed Codex version returned an unexpected response. Update Codex and try again."
       },
       "help": "Connection and existing sessions"
+    },
+    "smartphone": {
+      "section": "Smartphone access · this computer",
+      "title": "Control Codex from your smartphone",
+      "subtitle": "Start tasks, follow progress and approve actions.",
+      "open": "Manage smartphone access",
+      "badge": "Smartphone · {{status}}",
+      "short": {
+        "unknown": "Unchecked",
+        "off": "Off",
+        "connecting": "Connecting …",
+        "connected": "Service connected",
+        "running": "Service running",
+        "stopped": "Service stopped",
+        "error": "Error"
+      },
+      "status": {
+        "unknown": "Smartphone access has not been confirmed",
+        "off": "Smartphone access disabled",
+        "connecting": "Connecting …",
+        "connected": "Remote service connected",
+        "running": "Service running · remote connection unconfirmed",
+        "stopped": "Smartphone access allowed · service stopped",
+        "error": "Smartphone access could not be confirmed"
+      },
+      "hint": {
+        "unknown": "Check the status or enable access.",
+        "off": "Remote access is disabled, including for future service starts.",
+        "connecting": "Waiting for the remote service to confirm its connection.",
+        "connected": "Open ChatGPT on your paired smartphone and select this computer.",
+        "running": "A running service does not confirm a smartphone connection. Check it in the ChatGPT app.",
+        "stopped": "Start the service so your smartphone can reach this computer again.",
+        "error": "Check installation, sign-in and internet access, then try again."
+      },
+      "versionUnknown": "Version unconfirmed",
+      "service": "Background service",
+      "serviceState": {
+        "unknown": "Unchecked",
+        "running": "Running",
+        "stopped": "Stopped"
+      },
+      "phoneConnection": "Smartphone connection",
+      "checkOnPhone": "Check in the smartphone app",
+      "notEnabled": "Unconfirmed / disabled",
+      "retry": "Start service / reconnect",
+      "auto": "Share new Codex sessions with your smartphone",
+      "autoHint": "Applies to the Codex profile. Existing sessions stay unchanged.",
+      "awake": "Keep this computer awake and online. An open terminal session is not required. Sleep pauses access. Check the connection on your smartphone before leaving.",
+      "advanced": "Advanced options & help",
+      "disableHint": "Turning access off disables remote control, including for future service starts. The local Codex service can keep running.",
+      "lifecycle": "The service can keep running after DM Workspace closes. After restarting this computer, start the service again.",
+      "stop": "Stop the entire Codex service …",
+      "stopTitle": "Stop the Codex service?",
+      "stopMessage": "This stops the shared background server. Connected terminals and running Codex tasks may be interrupted. To disable only smartphone access, use the main switch.",
+      "stopConfirm": "Stop service",
+      "pairTitle": "Pair your smartphone with Codex",
+      "newCode": "Generate a new code",
+      "pairNote": "Closing this dialog does not confirm successful pairing. Check the connection in ChatGPT on your smartphone.",
+      "profileHint": "Smartphone access is managed centrally below the agent profiles. Turning global access off also applies to this profile.",
+      "operation": {
+        "status": "Checking status …",
+        "enable": "Enabling smartphone access …",
+        "disable": "Disabling smartphone access …",
+        "pair": "Generating pairing code …",
+        "stop": "Stopping the Codex service …"
+      }
     }
   },
   "palette": {
@@ -572,7 +638,11 @@
       "manage": "Manage agents …",
       "localOnly": "Agents are only available in local workspaces"
     },
-    "launchIssue": { "edit": "Edit profile", "retry": "Try again", "dismiss": "Dismiss" },
+    "launchIssue": {
+      "edit": "Edit profile",
+      "retry": "Try again",
+      "dismiss": "Dismiss"
+    },
     "maximize": "Maximize",
     "restore": "Restore",
     "swapWith": "Swap with “{{name}}”",

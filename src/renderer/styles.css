@@ -168,6 +168,42 @@
 /* Graphite Sand backdrop: settings, confirmations and the welcome screen carry
    the brand gradient (matches the DM-Voice settings window). */
 .root[data-brand-design="graphite"] .modal.settings-modal { background: var(--dm-gradient-bg); }
+
+/* Smartphone access uses the existing brand tokens in every design family. */
+.codex-remote-badge { display: flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--border);
+  border-radius: var(--radius-control, 5px); background: var(--panel); color: var(--muted); cursor: pointer; font: inherit; font-size: 11px; }
+.codex-remote-badge:hover { border-color: var(--border-hover); color: var(--text); }
+.codex-remote-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.codex-remote-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
+.remote-connected .codex-remote-dot { background: #8fc4a4; }
+.remote-connecting .codex-remote-dot, .remote-stopped .codex-remote-dot, .remote-running .codex-remote-dot { background: #d8b37b; }
+.remote-error .codex-remote-dot { background: #e2938c; }
+.codex-smartphone-card { padding: 18px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--panel); }
+.codex-smartphone-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.codex-smartphone-header > .switch { margin-left: auto; flex: none; }
+.codex-smartphone-title { display: block; color: var(--text-strong); font-size: 14px; font-weight: 600; cursor: pointer; }
+.codex-smartphone-header .modal-hint { margin: 4px 0 0; }
+.codex-smartphone-icon { width: 36px; height: 42px; display: grid; place-items: center; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--panel-elevated); color: var(--accent); flex: none; }
+.codex-smartphone-status { padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--input); }
+.codex-smartphone-status strong { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.codex-smartphone-status .modal-hint { margin: 5px 0 0 13px; }
+.codex-smartphone-status.remote-connected strong { color: #8fc4a4; }
+.codex-smartphone-status.remote-error strong { color: #e2938c; }
+.codex-smartphone-facts { margin: 12px 0; font-size: 12px; }
+.codex-smartphone-facts > div { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.codex-smartphone-facts dt { color: var(--muted); }
+.codex-smartphone-facts dd { margin: 0; text-align: right; }
+.codex-smartphone-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
+.codex-smartphone-auto { justify-content: space-between; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
+.codex-smartphone-auto .modal-hint { margin: 4px 0 0; }
+.codex-smartphone-awake { margin-top: 16px; }
+.codex-smartphone-card .agent-remote-help { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
+.codex-pairing-code { display: block; padding: 18px 12px; margin: 16px 0 10px; text-align: center; background: var(--input);
+  border: 1px dashed var(--border-strong); border-radius: 6px; color: var(--accent); font-size: 24px; letter-spacing: 2px; overflow-wrap: anywhere; }
+.codex-pairing-note, .codex-pairing-expired { display: block; margin-top: 16px; }
+.switch:disabled { opacity: .5; cursor: default; }
+@media (max-width: 700px) { .codex-remote-badge > span:last-child { display: none; } }
 .root[data-brand-design="graphite"] .modal.confirm-modal { background: var(--dm-gradient-bg); }
 .root[data-brand-design="graphite"] .welcome { background: var(--dm-gradient-bg); }
 * { box-sizing: border-box; }

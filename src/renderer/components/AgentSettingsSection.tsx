@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { builtinAgentProfile, customProfileFrom, isBuiltinProfileId, type AgentProfile } from '../../shared/agent-profiles';
-import type { AgentCheck, CodexRemoteResult } from '../../shared/types';
+import type { AgentCheck } from '../../shared/types';
 import { useAgentProfiles } from '../use-agent-profiles';
 import { useAgentChecks } from '../use-agent-checks';
 import { AgentLogo } from './AgentLogo';
@@ -11,6 +11,7 @@ import { AgentProfileEditor } from './AgentProfileEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { Switch } from './Switch';
+import { CodexSmartphoneSettings } from './CodexSmartphoneSettings';
 
 interface MenuState { profile: AgentProfile; index: number; x: number; y: number; }
 
@@ -101,7 +102,7 @@ export function AgentSettingsSection(): React.JSX.Element {
     </ul>
     {menu && createPortal(<ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.profile, menu.index)} onClose={() => setMenu(null)} />,
       document.querySelector('.root') ?? document.body)}
-    <CodexServiceGroup />
+    <CodexSmartphoneSettings />
     {confirmDelete && createPortal(<ConfirmDialog tone="danger" title={t('settings.agents.deleteTitle')}
       message={t('settings.agents.deleteMessage', { name: confirmDelete.name })}
       confirmLabel={t('settings.agents.delete')} cancelLabel={t('common.cancel')}
@@ -120,55 +121,4 @@ function CheckBadge({ check, command }: { check: AgentCheck | 'checking' | undef
   return <span className="agent-check" title={t(`agent.startErrors.${check}`, { command })}>
     <span className={`agent-check-dot ${check === 'missing-cli' ? 'missing' : 'warn'}`} aria-hidden="true" />
     {t(check === 'missing-cli' ? 'settings.agents.notFound' : 'settings.agents.checkProblem')}</span>;
-}
-
-function CodexServiceGroup(): React.JSX.Element {
-  const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<CodexRemoteResult | null>(null);
-  const [expired, setExpired] = useState(false);
-  const mounted = useRef(true);
-  const pending = useRef(false);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => {
-    if (result?.status !== 'paired-code') return;
-    const timer = setTimeout(() => setExpired(true), Math.max(0, Date.parse(result.expiresAt) - Date.now()));
-    return () => clearTimeout(timer);
-  }, [result]);
-  async function run(action: 'status' | 'pair'): Promise<void> {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy(true); setResult(null); setExpired(false);
-    try {
-      const response = await window.api.codexRemote(action);
-      if (mounted.current) setResult(response);
-    } catch {
-      if (mounted.current) setResult({ status: 'error', reason: 'unavailable' });
-    } finally {
-      pending.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  }
-  return <div className="settings-group">
-    <div className="modal-section-label">{t('settings.agents.codexService')}</div>
-    <p className="modal-hint">{t('settings.agents.codexHint')}</p>
-    <div className="setting-row">
-      <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run('pair')}>{t('settings.agents.pair')}</button>
-      <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run('status')}>{t('settings.agents.check')}</button>
-    </div>
-    <div aria-live="polite">
-      {busy && <p>{t('settings.agents.working')}</p>}
-      {result?.status === 'running' && <p className="modal-hint">{t('settings.agents.running')}</p>}
-      {result?.status === 'stopped' && <p className="modal-hint">{t('settings.agents.stopped')}</p>}
-      {result?.status === 'error' && <p className="setting-error">{t(`settings.agents.error.${result.reason}`)}</p>}
-      {result?.status === 'paired-code' && (expired ? <p>{t('settings.agents.expired')}</p> : <>
-        <p>{t('settings.agents.pairInstructions')}</p>
-        <p><strong className="agent-pairing-code">{result.code}</strong></p>
-        <p className="modal-hint">{t('settings.agents.expires', { time: new Date(result.expiresAt).toLocaleTimeString() })}</p>
-      </>)}
-    </div>
-    <details className="agent-remote-help"><summary>{t('settings.agents.help')}</summary>
-      <p className="modal-hint">{t('settings.agents.codexTroubleshooting')}</p>
-    </details>
-  </div>;
 }
