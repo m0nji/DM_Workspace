@@ -544,7 +544,10 @@ export type UpdateEvent =
   | { type: 'disabled' }; // updates only work in the packaged app
 
 // Shape exposed on window.api by the preload script
+export type MicrophoneAccess = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown' | 'unsupported';
+
 export interface RendererApi {
+  microphoneAccess(action: 'status' | 'request' | 'settings'): Promise<MicrophoneAccess>;
   stopAgentStatus(paneId: string): Promise<void>;
   reconnectAgentStatus(paneId: string): Promise<void>;
   endAgentSession(paneId: string, generation: string): Promise<void>;

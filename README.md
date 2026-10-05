@@ -140,6 +140,25 @@ not consistently covered by hooks. Interruptions return to **Unknown**; late eve
 from older turns cannot finish a newer turn. End an active agent session before
 switching providers in the same pane.
 
+### Voice and microphone access
+
+For a CLI with voice support, use **Settings → AI agents → Microphone for voice
+input** to check system permission. The check does not record audio.
+
+- **macOS:** click **Allow microphone access** when permission has not yet been
+  requested. If denied, open **System Settings → Privacy & Security → Microphone**
+  and enable **DM Workspace**. The permission given to Terminal does not apply to
+  DM Workspace. Restart DM Workspace after changing access in System Settings,
+  then start Codex `/voice` again.
+- **Windows:** open **Settings → Privacy & security → Microphone**, enable
+  **Microphone access** and **Let desktop apps access your microphone**. Check
+  the default input device under **System → Sound**, then restart `/voice`.
+  Windows desktop apps use the global setting, without a macOS-style consent dialog.
+
+Voice capture runs in the local CLI process, outside the browser preview's
+permission policy. A granted system permission does not verify microphone hardware
+or CLI voice support. Remote terminals cannot capture this computer's microphone.
+
 Open **Agent overview** in the top-right toolbar to see connected agents across
 all workspaces. Waiting agents and errors appear first; the badge counts those
 needing attention. Select a row to reveal and focus its terminal. The list

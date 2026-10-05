@@ -142,6 +142,24 @@
       "updates": "Updates",
       "agents": "AI agents"
     },
+    "microphone": {
+      "title": "Microphone for voice input",
+      "hint": "Terminal apps such as Codex use the local microphone directly. This checks system permission without recording audio. Remote terminals cannot access this computer’s microphone.",
+      "allow": "Allow microphone access",
+      "check": "Check microphone access",
+      "settings": "Open microphone settings",
+      "mac": "Allow DM Workspace in System Settings → Privacy & Security → Microphone. After changing access there, restart DM Workspace and start /voice again.",
+      "windows": "In Settings → Privacy & security → Microphone, enable microphone access and “Let desktop apps access your microphone”. Also check the default input device under System → Sound. Then start /voice again.",
+      "error": "Could not check microphone permission. Open the system microphone settings.",
+      "status": {
+        "not-determined": "Microphone access has not been requested yet.",
+        "granted": "The system allows microphone access. Check the input device and voice function in the terminal app.",
+        "denied": "Microphone access is blocked in system settings.",
+        "restricted": "Microphone access is restricted by a system policy.",
+        "unknown": "Microphone permission is unknown.",
+        "unsupported": "Permission checks are unavailable on this operating system."
+      }
+    },
     "account": {
       "title": "Workspace servers",
       "empty": "No servers configured yet. Add a DM Workspace Web server below to open remote workspaces.",

@@ -12,6 +12,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { Switch } from './Switch';
 import { CodexSmartphoneSettings } from './CodexSmartphoneSettings';
+import { MicrophoneSettings } from './MicrophoneSettings';
 
 interface MenuState { profile: AgentProfile; index: number; x: number; y: number; }
 
@@ -102,6 +103,7 @@ export function AgentSettingsSection(): React.JSX.Element {
     </ul>
     {menu && createPortal(<ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.profile, menu.index)} onClose={() => setMenu(null)} />,
       document.querySelector('.root') ?? document.body)}
+    <MicrophoneSettings />
     <CodexSmartphoneSettings />
     {confirmDelete && createPortal(<ConfirmDialog tone="danger" title={t('settings.agents.deleteTitle')}
       message={t('settings.agents.deleteMessage', { name: confirmDelete.name })}

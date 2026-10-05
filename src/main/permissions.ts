@@ -10,7 +10,10 @@
 //
 // The app itself needs no web permission — clipboard access goes through IPC to
 // the main process, and notifications are raised there as well — so anything
-// asking is embedded content and everything is refused. Typed structurally
+// asking is embedded content and everything is refused. Native PTY children
+// (e.g. Codex voice) use OS audio APIs, not these Chromium permissions; their
+// microphone consent is handled separately by microphone-access.ts.
+// Typed structurally
 // rather than against Electron's Session so this stays unit-testable.
 export interface PermissionSession {
   setPermissionRequestHandler(

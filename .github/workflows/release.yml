@@ -152,7 +152,7 @@ jobs:
         shell: bash
         run: |
           npm run build
-          npx playwright test e2e/agent-start.spec.ts --workers=1
+          npx playwright test e2e/agent-start.spec.ts e2e/microphone-settings.spec.ts --workers=1
       - name: Build (Windows)
         shell: bash
         run: |
@@ -208,7 +208,7 @@ jobs:
         run: |
           npx playwright install-deps chromium
           npm run build
-          xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts --workers=1
+          xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts e2e/microphone-settings.spec.ts --workers=1
       - name: Build (Linux)
         run: |
           npm run build

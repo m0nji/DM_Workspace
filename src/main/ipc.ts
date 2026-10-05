@@ -1,7 +1,8 @@
 import { codexRemoteAction } from './agent-remote';
+import { createMicrophoneAccess } from './microphone-access';
 import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
 import { codexLaunchProfile, parseAgentProfile } from '../shared/agent-profiles';
-import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell } from 'electron';
+import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell, systemPreferences } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -211,6 +212,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
       fn(event, ...(args as never[]));
     });
   };
+
+  const microphoneAccess = createMicrophoneAccess(process.platform, {
+    getMediaAccessStatus: type => systemPreferences.getMediaAccessStatus(type),
+    askForMediaAccess: type => systemPreferences.askForMediaAccess(type),
+    openExternal: url => shell.openExternal(url)
+  });
+  handle('microphone:access', (_e, action: unknown) => microphoneAccess(action));
 
   // BackendRouter mit dem lokalen PtyManager als Default-Backend: Panes ohne
   // target (bzw. kind 'local') verhalten sich exakt wie bisher. Daneben das

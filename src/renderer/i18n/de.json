@@ -142,6 +142,24 @@
       "updates": "Updates",
       "agents": "KI-Agenten"
     },
+    "microphone": {
+      "title": "Mikrofon für Spracheingabe",
+      "hint": "Terminal-Apps wie Codex verwenden das lokale Mikrofon selbst. Diese Prüfung zeigt die Systemberechtigung; sie startet keine Aufnahme. Remote-Terminals haben keinen Zugriff auf das Mikrofon dieses Rechners.",
+      "allow": "Mikrofonzugriff erlauben",
+      "check": "Mikrofonzugriff prüfen",
+      "settings": "Mikrofon-Einstellungen öffnen",
+      "mac": "Erlaube DM Workspace unter Systemeinstellungen → Datenschutz & Sicherheit → Mikrofon. Nach einer Änderung dort DM Workspace neu starten und /voice erneut starten.",
+      "windows": "Aktiviere unter Einstellungen → Datenschutz & Sicherheit → Mikrofon den Mikrofonzugriff und „Desktop-Apps den Zugriff auf das Mikrofon erlauben“. Prüfe außerdem das Standard-Eingabegerät unter System → Sound. Danach /voice erneut starten.",
+      "error": "Die Mikrofonberechtigung konnte nicht geprüft werden. Öffne die Mikrofon-Einstellungen des Systems.",
+      "status": {
+        "not-determined": "Mikrofonzugriff wurde noch nicht angefragt.",
+        "granted": "Mikrofonzugriff ist vom System erlaubt. Das Eingabegerät und die Sprachfunktion müssen in der Terminal-App geprüft werden.",
+        "denied": "Mikrofonzugriff ist in den Systemeinstellungen gesperrt.",
+        "restricted": "Mikrofonzugriff ist durch eine Systemrichtlinie eingeschränkt.",
+        "unknown": "Die Mikrofonberechtigung ist unbekannt.",
+        "unsupported": "Für dieses Betriebssystem ist keine Berechtigungsprüfung verfügbar."
+      }
+    },
     "account": {
       "title": "Workspace-Server",
       "empty": "Noch keine Server konfiguriert. Unten einen DM-Workspace-Web-Server hinzufügen, um Remote-Workspaces zu öffnen.",

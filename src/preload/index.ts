@@ -46,6 +46,7 @@ function subscribe<T>(map: Map<string, Set<T>>, paneId: string, cb: T): () => vo
 }
 
 const api: RendererApi = {
+  microphoneAccess: action => ipcRenderer.invoke('microphone:access', action),
   codexRemote: action => ipcRenderer.invoke('agent:codex-remote', action),
   reconnectAgentStatus: paneId => ipcRenderer.invoke('agent:reconnect', paneId),
   endAgentSession: (paneId, generation) => ipcRenderer.invoke('agent:end-session', paneId, generation),

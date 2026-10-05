@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.20.1 – 2026-10-05
+- fix: Add the macOS audio-input entitlement required for microphone access in local terminal apps such as Codex voice, with an explicit microphone permission description.
+- feat: Check microphone permission in Settings → AI agents on macOS and Windows. Request macOS consent or open the system microphone settings; Windows guidance covers microphone access for desktop apps and the default input device. Permission checks do not record audio.
+
 ## 0.20.0 – 2026-10-05
 - feat: Manage Codex smartphone access in Settings → AI agents: enable or disable actual remote control, pair a smartphone, check service status and stop the shared service separately with confirmation. Add a titlebar shortcut and German/English labels.
 - fix: New Codex agent sessions preserve the remote-access preference instead of silently re-enabling it. An explicit global off overrides builtin and custom Codex profiles; failed disable operations do not report success.
