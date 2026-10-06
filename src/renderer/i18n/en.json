@@ -337,12 +337,18 @@
       "secretsWarning": "Do not enter API keys: values are stored unencrypted in state.json.",
       "envAdd": "+ Variable",
       "envRemove": "Remove variable",
+      "startPromptHint": "Sent to the agent as its first message on every new start. Line breaks become spaces. With .cmd launchers (npm), quotes, %, & | < > ^ and parentheses are not possible.",
+      "startPromptTemplate": "Template: update repo",
+      "startPromptTemplateText": "Fetch the latest changes from the remote with git fetch and git pull --ff-only, without discarding local changes. On conflicts or uncommitted changes, only report and ask. Then briefly summarize what is new.",
+      "pullOnStart": "Update repo before start (git pull --ff-only)",
+      "pullOnStartHint": "Runs in the terminal's folder before the agent starts, and only inside a Git repository. Local changes stay untouched; a failure does not stop the start.",
       "previewHooks": "+ status hooks",
       "fields": {
         "name": "Name",
         "adapter": "Base",
         "command": "Program",
         "args": "Arguments",
+        "startPrompt": "Start prompt",
         "env": "Environment",
         "envName": "Variable name",
         "envValue": "Value",
@@ -384,6 +390,9 @@
         "env": {
           "name": "Variable names use letters, digits and _, must not start with a digit or DMWS_.",
           "duplicate": "Each variable may appear only once."
+        },
+        "prompt": {
+          "long": "The start prompt can be at most 2000 characters long."
         },
         "icon": {
           "letter": "Enter exactly one letter."

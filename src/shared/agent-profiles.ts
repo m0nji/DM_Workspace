@@ -22,6 +22,8 @@ export interface AgentProfile {
   env: Record<string, string>;
   showInMenu: boolean;
   remoteControl?: boolean;
+  startPrompt?: string; // first message of a new session (not for the generic adapter)
+  pullOnStart?: boolean; // run `git pull --ff-only` in the pane's folder before the agent starts
 }
 
 export const BUILTIN_PROFILE_IDS: readonly AgentProvider[] = ['claude', 'codex', 'opencode'];
@@ -30,6 +32,7 @@ const BUILTIN_LOGOS: Record<AgentProvider, AgentLogoId> = { claude: 'claude', co
 const MAX_ARGS = 64;
 const MAX_ENV = 32;
 const MAX_TEXT = 4096;
+export const MAX_START_PROMPT = 2000;
 const CONTROL = /[\u0000-\u001f\u007f]/;
 export const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const CUSTOM_ID = /^custom-[a-z0-9-]{1,64}$/;
@@ -56,6 +59,27 @@ export function supportsRemoteControl(adapter: AgentAdapter): adapter is 'claude
 
 export function codexLaunchProfile(profile: AgentProfile, access: boolean | undefined): AgentProfile {
   return profile.adapter === 'codex' && access === false ? { ...profile, remoteControl: false } : profile;
+}
+
+export function supportsStartPrompt(adapter: AgentAdapter): adapter is AgentProvider {
+  return adapter !== 'generic';
+}
+
+// A prompt travels as one argument; line breaks would break batch launchers and
+// PTY input, so whitespace runs collapse to single spaces.
+export function normalizeStartPrompt(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+// The profile's arguments plus the start prompt. Claude and Codex take the
+// prompt as their positional argument; after `--` it can neither start with a
+// dash nor be swallowed by a variadic option such as --add-dir. OpenCode's
+// positional argument is a project path, so it gets --prompt (in the = form,
+// which keeps a leading dash inside the value).
+export function launchArgs(profile: AgentProfile): string[] {
+  const prompt = profile.startPrompt;
+  if (!prompt || !supportsStartPrompt(profile.adapter)) return profile.args;
+  return profile.adapter === 'opencode' ? [...profile.args, `--prompt=${prompt}`] : [...profile.args, '--', prompt];
 }
 
 function cleanString(value: unknown, max: number, trim: boolean): string | null {
@@ -108,6 +132,13 @@ export function parseAgentProfile(raw: unknown): AgentProfile | null {
   }
   const profile: AgentProfile = { id, adapter, name, icon, command, args, env, showInMenu: raw.showInMenu !== false };
   if (supportsRemoteControl(adapter) && typeof raw.remoteControl === 'boolean') profile.remoteControl = raw.remoteControl;
+  if (raw.startPrompt !== undefined) {
+    if (typeof raw.startPrompt !== 'string') return null;
+    const prompt = normalizeStartPrompt(raw.startPrompt);
+    if (prompt.length > MAX_START_PROMPT || CONTROL.test(prompt)) return null;
+    if (prompt && supportsStartPrompt(adapter)) profile.startPrompt = prompt;
+  }
+  if (raw.pullOnStart === true) profile.pullOnStart = true;
   return profile;
 }
 
@@ -195,7 +226,7 @@ export function joinArgs(args: string[]): string {
 // Human-readable preview for the settings editor. The real launch command adds
 // hooks and resolves the program; see src/main/agent-command.ts.
 export function previewCommand(profile: AgentProfile, windows: boolean): string {
-  const words = [profile.command, ...profile.args];
+  const words = [profile.command, ...launchArgs(profile)];
   if (windows) {
     // Typographic single quotes (U+2018-U+201B) end a PowerShell string too.
     const q = (s: string): string => /^[A-Za-z0-9_\-.,:/=@+~\\]+$/.test(s) ? s : `'${s.replace(/['\u2018-\u201B]/g, '$&$&')}'`;

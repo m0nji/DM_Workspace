@@ -337,12 +337,18 @@
       "secretsWarning": "Keine API-Keys eintragen: Die Werte liegen unverschlüsselt in state.json.",
       "envAdd": "+ Variable",
       "envRemove": "Variable entfernen",
+      "startPromptHint": "Wird bei jedem neuen Start als erste Nachricht an den Agenten gesendet. Zeilenumbrüche werden zu Leerzeichen. Bei .cmd-Startern (npm) sind Anführungszeichen, %, & | < > ^ und Klammern nicht möglich.",
+      "startPromptTemplate": "Vorlage: Repo aktualisieren",
+      "startPromptTemplateText": "Hole die letzten Änderungen aus dem Remote mit git fetch und git pull --ff-only, ohne lokale Änderungen zu verwerfen. Bei Konflikten oder nicht committeten Änderungen nur berichten und nachfragen. Fasse danach kurz zusammen, was neu ist.",
+      "pullOnStart": "Vor dem Start Repo aktualisieren (git pull --ff-only)",
+      "pullOnStartHint": "Läuft im Ordner des Terminals, bevor der Agent startet, und nur in einem Git-Repository. Lokale Änderungen bleiben unberührt, ein Fehlschlag verhindert den Start nicht.",
       "previewHooks": "+ Status-Hooks",
       "fields": {
         "name": "Name",
         "adapter": "Basis",
         "command": "Programm",
         "args": "Argumente",
+        "startPrompt": "Start-Prompt",
         "env": "Umgebung",
         "envName": "Variablenname",
         "envValue": "Wert",
@@ -384,6 +390,9 @@
         "env": {
           "name": "Variablennamen bestehen aus Buchstaben, Ziffern und _, beginnen nicht mit einer Ziffer und nicht mit DMWS_.",
           "duplicate": "Jede Variable darf nur einmal vorkommen."
+        },
+        "prompt": {
+          "long": "Der Start-Prompt darf höchstens 2000 Zeichen lang sein."
         },
         "icon": {
           "letter": "Bitte genau einen Buchstaben eingeben."

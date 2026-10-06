@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AGENT_ADAPTERS, AGENT_LOGO_IDS, isBuiltinProfileId, previewCommand, supportsRemoteControl,
+import { AGENT_ADAPTERS, AGENT_LOGO_IDS, MAX_START_PROMPT, isBuiltinProfileId, previewCommand, supportsRemoteControl, supportsStartPrompt,
   type AgentIcon, type AgentProfile } from '../../shared/agent-profiles';
 import { fromDraft, toDraft, type AgentProfileDraft, type DraftErrors } from '../agent-profile-draft';
 import { AgentLogo } from './AgentLogo';
@@ -83,6 +83,23 @@ export function AgentProfileEditor({ profile, mode, onCommit, onCheck, onReset, 
       <input id={id('args')} className="wizard-input mono" value={draft.argsText} spellCheck={false} onChange={e => change({ argsText: e.target.value })} />
       {error('args')}
     </div>
+
+    {supportsStartPrompt(draft.adapter) && <div className="agent-field">
+      <label className="wizard-label" htmlFor={id('prompt')}>{t('settings.agents.fields.startPrompt')}</label>
+      <textarea id={id('prompt')} className="wizard-input" rows={3} value={draft.startPrompt} maxLength={MAX_START_PROMPT * 2}
+        onChange={e => change({ startPrompt: e.target.value })} />
+      <p className="modal-hint">{t('settings.agents.startPromptHint')}</p>
+      <div className="agent-env-actions">
+        <button type="button" className="btn-link" onClick={() => change({ startPrompt: t('settings.agents.startPromptTemplateText') })}>{t('settings.agents.startPromptTemplate')}</button>
+      </div>
+      {error('prompt')}
+    </div>}
+
+    <div className="setting-row">
+      <label htmlFor={id('pull')}>{t('settings.agents.pullOnStart')}</label>
+      <Switch id={id('pull')} checked={draft.pullOnStart} onChange={checked => change({ pullOnStart: checked })} />
+    </div>
+    <p className="modal-hint">{t('settings.agents.pullOnStartHint')}</p>
 
     <fieldset className="agent-env">
       <legend className="wizard-label">{t('settings.agents.fields.env')}</legend>

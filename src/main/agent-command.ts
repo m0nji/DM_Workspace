@@ -1,4 +1,4 @@
-import type { AgentProfile } from '../shared/agent-profiles';
+import { launchArgs, type AgentProfile } from '../shared/agent-profiles';
 import { posixWord, powerShellApplication, quotePosix, quotePowerShell, type ShellKind } from './shell-quote';
 
 export interface PowerShellHost { version: [number, number]; appExtension: string }
@@ -13,7 +13,7 @@ export function argumentProblem(profile: AgentProfile, host: PowerShellHost | nu
   const [major, minor] = host.version;
   const legacy = major < 7 || (major === 7 && minor < 3);
   const batch = host.appExtension === 'cmd' || host.appExtension === 'bat';
-  for (const arg of profile.args) {
+  for (const arg of launchArgs(profile)) {
     if (profile.adapter !== 'codex' && (legacy || batch) && (arg.includes('"') || (/\s/.test(arg) && arg.endsWith('\\')))) return 'unsupported-argument';
     if ((batch || profile.adapter === 'codex') && arg.includes('%')) return 'unsupported-argument';
     if (batch && /[&|<>^()]/.test(arg)) return 'unsupported-argument';
@@ -33,7 +33,17 @@ export function buildAgentCommand({ profile, shell, settingsPath, remote, codexC
   const inner = profile.adapter === 'codex' && codexCommand ? codexCommand
     : shell === 'posix' ? posixInvocation(profile, settingsPath, remote)
     : powerShellInvocation(profile, settingsPath, remote);
-  return withEnvironment(inner, profile.env, shell);
+  const command = withEnvironment(inner, profile.env, shell);
+  return profile.pullOnStart ? `${pullCommand(shell)}\n${command}` : command;
+}
+
+// Fast-forward only: never merges, rebases or discards anything. A folder that
+// is no repository, a missing git or a failed pull is skipped or shown in the
+// terminal, and the agent starts anyway.
+function pullCommand(shell: ShellKind): string {
+  return shell === 'posix'
+    ? 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git pull --ff-only; fi'
+    : "if ((Get-Command git -CommandType Application -ErrorAction SilentlyContinue) -and ((git rev-parse --is-inside-work-tree 2>$null) -eq 'true')) { git pull --ff-only }";
 }
 
 function claudeWords(profile: AgentProfile, settingsPath: string, remote: boolean, quote: (s: string) => string): string[] {
@@ -41,11 +51,11 @@ function claudeWords(profile: AgentProfile, settingsPath: string, remote: boolea
 }
 
 function posixInvocation(profile: AgentProfile, settingsPath: string, remote: boolean): string {
-  return [posixWord(profile.command), ...claudeWords(profile, settingsPath, remote, quotePosix), ...profile.args.map(quotePosix)].join(' ');
+  return [posixWord(profile.command), ...claudeWords(profile, settingsPath, remote, quotePosix), ...launchArgs(profile).map(quotePosix)].join(' ');
 }
 
 function powerShellInvocation(profile: AgentProfile, settingsPath: string, remote: boolean): string {
-  return [`& ${powerShellApplication(profile.command)}`, ...claudeWords(profile, settingsPath, remote, quotePowerShell), ...profile.args.map(quotePowerShell)].join(' ');
+  return [`& ${powerShellApplication(profile.command)}`, ...claudeWords(profile, settingsPath, remote, quotePowerShell), ...launchArgs(profile).map(quotePowerShell)].join(' ');
 }
 
 function withEnvironment(command: string, env: Record<string, string>, shell: ShellKind): string {

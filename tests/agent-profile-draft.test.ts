@@ -27,3 +27,15 @@ it('reports field errors instead of a profile', () => {
 it('drops the phone option for adapters without remote control', () => {
   expect(fromDraft(base, { ...draft, adapter: 'generic', remoteControl: true }).profile).not.toHaveProperty('remoteControl');
 });
+it('round-trips the start prompt and pull option', () => {
+  const profile = { ...builtinAgentProfile('claude'), remoteControl: false, startPrompt: 'Hole die letzten Änderungen', pullOnStart: true };
+  expect(fromDraft({ id: 'claude', showInMenu: true }, toDraft(profile)).profile).toEqual(profile);
+});
+it('drops the start prompt for the generic adapter but keeps the pull option', () => {
+  const generic = fromDraft(base, { ...draft, adapter: 'generic', startPrompt: 'Hallo', pullOnStart: true }).profile;
+  expect(generic).not.toHaveProperty('startPrompt');
+  expect(generic?.pullOnStart).toBe(true);
+});
+it('reports an oversized start prompt', () => {
+  expect(fromDraft(base, { ...draft, startPrompt: 'x'.repeat(2001) }).errors).toMatchObject({ prompt: 'long' });
+});

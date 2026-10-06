@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { argumentProblem, buildAgentCommand } from '../src/main/agent-command';
 import { codexSetup } from '../src/main/codex-status-setup';
 import { posixWord, powerShellApplication, powerShellWord, quotePosix, quotePowerShell, quoteWindowsNative, shellKind } from '../src/main/shell-quote';
-import { builtinAgentProfile, type AgentProfile } from '../src/shared/agent-profiles';
+import { builtinAgentProfile, launchArgs, type AgentProfile } from '../src/shared/agent-profiles';
 
 const custom = (patch: Partial<AgentProfile>): AgentProfile => ({ ...builtinAgentProfile('opencode'), id: 'custom-1', ...patch });
 
@@ -178,5 +178,38 @@ describe('argumentProblem', () => {
       expect(argumentProblem({ ...builtinAgentProfile('codex'), args: [arg] }, host(7, 4))).toBeNull();
     }
     expect(argumentProblem(custom({ args: ['--model', 'ollama/qwen3-coder'] }), host(7, 4, 'cmd'))).toBeNull();
+  });
+});
+
+describe('start prompt and pull on start', () => {
+  const host = (appExtension: string) => ({ version: [7, 4] as [number, number], appExtension });
+  it('passes the start prompt after -- on POSIX and as --prompt= for OpenCode on PowerShell', () => {
+    const claude = { ...builtinAgentProfile('claude'), startPrompt: "Hole es's" };
+    expect(buildAgentCommand({ profile: claude, shell: 'posix', settingsPath: '/t/s.json', remote: false }))
+      .toBe(`claude --settings '/t/s.json' '--' 'Hole es'\\''s'`);
+    expect(buildAgentCommand({ profile: custom({ startPrompt: 'Hallo Welt' }), shell: 'powershell', settingsPath: 's', remote: false }))
+      .toBe(`& (Get-Command opencode -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source '--prompt=Hallo Welt'`);
+  });
+  it('puts the start prompt after the Codex arguments behind --%', () => {
+    const profile = { ...builtinAgentProfile('codex'), args: ['--profile', 'o'], startPrompt: 'Hallo Welt' };
+    const codex = codexSetup('C:\\t\\h.cjs', 1, 'tok', true, false, undefined, { program: 'codex', args: launchArgs(profile) });
+    expect(codex.command).toMatch(/ "--profile" "o" "--" "Hallo Welt"\n\}\n\}$/);
+  });
+  it('runs git pull --ff-only before the agent, inside a repository only', () => {
+    const profile = { ...builtinAgentProfile('claude'), pullOnStart: true };
+    expect(buildAgentCommand({ profile, shell: 'posix', settingsPath: '/t/s.json', remote: false }).split('\n'))
+      .toEqual(['if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git pull --ff-only; fi', `claude --settings '/t/s.json'`]);
+    const ps = buildAgentCommand({ profile, shell: 'powershell', settingsPath: 's', remote: false }).split('\n');
+    expect(ps[0]).toBe(`if ((Get-Command git -CommandType Application -ErrorAction SilentlyContinue) -and ((git rev-parse --is-inside-work-tree 2>$null) -eq 'true')) { git pull --ff-only }`);
+    expect(ps).toHaveLength(2);
+  });
+  it('keeps the pull outside the environment block and omits it by default', () => {
+    const lines = buildAgentCommand({ profile: custom({ pullOnStart: true, env: { A: 'x' } }), shell: 'posix', settingsPath: 's', remote: false }).split('\n');
+    expect(lines[1]).toBe(`( export A='x'; opencode )`);
+    expect(buildAgentCommand({ profile: custom({}), shell: 'posix', settingsPath: 's', remote: false })).not.toContain('git pull');
+  });
+  it('checks the start prompt like any other argument', () => {
+    expect(argumentProblem(custom({ startPrompt: 'Hole (alles)' }), host('cmd'))).toBe('unsupported-argument');
+    expect(argumentProblem(custom({ startPrompt: 'Hole alles' }), host('cmd'))).toBeNull();
   });
 });

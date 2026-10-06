@@ -149,6 +149,34 @@ test.describe('agent profiles', () => {
     }).toContain('NOTE=[]');
   });
 
+  test('start prompt reaches the agent and the repository is updated before it starts', async () => {
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], { cwd, encoding: 'utf8' });
+    const origin = join(dir, 'origin.git');
+    const seed = join(dir, 'seed');
+    git(dir, 'init', '--bare', '-b', 'main', origin);
+    git(dir, 'clone', origin, seed);
+    writeFileSync(join(seed, 'a.txt'), 'a');
+    git(seed, 'add', '.'); git(seed, 'commit', '-m', 'first'); git(seed, 'push', 'origin', 'HEAD:main');
+    git(dir, 'clone', origin, project);
+    writeFileSync(join(seed, 'b.txt'), 'b');
+    git(seed, 'add', '.'); git(seed, 'commit', '-m', 'second'); git(seed, 'push', 'origin', 'HEAD:main');
+    expect(existsSync(join(project, 'b.txt'))).toBe(false);
+
+    const command = win32 ? join(dir, 'fake agent.cmd') : 'fake agent';
+    const prompt = 'Hole die letzten Änderungen aus dem Repo';
+    await win.evaluate(({ command, prompt }) => {
+      const s = window.__store.getState();
+      s.setAgentProfiles([...(s.settings.agentProfiles ?? []), { id: 'custom-start', adapter: 'opencode', name: 'Fake Start',
+        icon: { kind: 'letter', letter: 'S', color: '#c97b4a' }, command, args: ['--model', 'x'], env: {}, showInMenu: true, startPrompt: prompt, pullOnStart: true }]);
+    }, { command, prompt });
+    await win.locator('.pane[data-pane-id="source"]').getByRole('button', { name: 'New pane', exact: true }).click();
+    await win.getByRole('menu').getByRole('button', { name: 'Open Fake Start to the right' }).click();
+    const recordPath = join(dir, 'record-fake-agent.json');
+    await expect.poll(() => existsSync(recordPath)).toBe(true);
+    expect(JSON.parse(readFileSync(recordPath, 'utf8')).argv).toEqual(['--model', 'x', `--prompt=${prompt}`]);
+    expect(existsSync(join(project, 'b.txt'))).toBe(true);
+  });
+
   test('an agent without status reports opened from the menu shows as running, not as a start to prepare', async () => {
     const command = win32 ? join(dir, 'fake agent.cmd') : 'fake agent';
     await win.evaluate(command => {

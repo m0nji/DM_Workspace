@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.21.0 – 2026-10-06
+- feat: Give each Claude, Codex or OpenCode agent profile a start prompt in Settings → AI agents. It is sent as the agent's first message on every new start; line breaks become spaces, up to 2000 characters, with a ready-made "update repo" template.
+- feat: Optionally run `git pull --ff-only` in the pane's folder before the agent starts. It only runs inside a Git repository, never merges or discards local changes, and a failed pull does not stop the agent from starting.
+
 ## 0.20.1 – 2026-10-05
 - fix: Add the macOS audio-input entitlement required for microphone access in local terminal apps such as Codex voice, with an explicit microphone permission description.
 - feat: Check microphone permission in Settings → AI agents on macOS and Windows. Request macOS consent or open the system microphone settings; Windows guidance covers microphone access for desktop apps and the default input device. Permission checks do not record audio.

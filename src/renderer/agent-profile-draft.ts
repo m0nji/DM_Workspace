@@ -1,9 +1,10 @@
-import { ENV_NAME, joinArgs, parseAgentProfile, splitArgs, supportsRemoteControl,
+import { ENV_NAME, MAX_START_PROMPT, joinArgs, normalizeStartPrompt, parseAgentProfile, splitArgs, supportsRemoteControl,
   type AgentAdapter, type AgentIcon, type AgentProfile } from '../shared/agent-profiles';
 
 export interface AgentProfileDraft {
   name: string; adapter: AgentAdapter; command: string; argsText: string;
   env: Array<{ key: string; value: string }>; icon: AgentIcon; remoteControl: boolean;
+  startPrompt: string; pullOnStart: boolean;
 }
 // Value types are narrowed to each field's actual literals (not `string`) so
 // AgentProfileEditor's `t(\`settings.agents.errors.${field}.${errors[field]}\`)`
@@ -15,12 +16,14 @@ export interface DraftErrors {
   args?: 'unclosed' | 'empty';
   env?: 'name' | 'duplicate';
   icon?: 'letter';
+  prompt?: 'long';
   form?: 'invalid';
 }
 
 export function toDraft(profile: AgentProfile): AgentProfileDraft {
   return { name: profile.name, adapter: profile.adapter, command: profile.command, argsText: joinArgs(profile.args),
-    env: Object.entries(profile.env).map(([key, value]) => ({ key, value })), icon: profile.icon, remoteControl: profile.remoteControl === true };
+    env: Object.entries(profile.env).map(([key, value]) => ({ key, value })), icon: profile.icon, remoteControl: profile.remoteControl === true,
+    startPrompt: profile.startPrompt ?? '', pullOnStart: profile.pullOnStart === true };
 }
 
 export function fromDraft(base: Pick<AgentProfile, 'id' | 'showInMenu'>, draft: AgentProfileDraft): { profile: AgentProfile | null; errors: DraftErrors } {
@@ -38,10 +41,11 @@ export function fromDraft(base: Pick<AgentProfile, 'id' | 'showInMenu'>, draft: 
     env[key] = value;
   }
   if (draft.icon.kind === 'letter' && Array.from(draft.icon.letter.trim()).length !== 1) errors.icon = 'letter';
+  if (normalizeStartPrompt(draft.startPrompt).length > MAX_START_PROMPT) errors.prompt = 'long';
   if (Object.keys(errors).length > 0) return { profile: null, errors };
   const profile = parseAgentProfile({
     id: base.id, adapter: draft.adapter, name: draft.name, icon: draft.icon, command: draft.command,
-    args, env, showInMenu: base.showInMenu,
+    args, env, showInMenu: base.showInMenu, startPrompt: draft.startPrompt, pullOnStart: draft.pullOnStart,
     ...(supportsRemoteControl(draft.adapter) ? { remoteControl: draft.remoteControl } : {})
   });
   return profile ? { profile, errors } : { profile: null, errors: { form: 'invalid' } };

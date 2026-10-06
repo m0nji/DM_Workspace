@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  builtinAgentProfile, builtinAgentProfiles, customProfileFrom, deriveAgentRemoteControl, joinArgs,
+  builtinAgentProfile, builtinAgentProfiles, customProfileFrom, deriveAgentRemoteControl, joinArgs, launchArgs,
   normalizeAgentProfiles, parseAgentProfile, previewCommand, resolveAgentProfiles, splitArgs,
   type AgentProfile
 } from '../src/shared/agent-profiles';
@@ -110,5 +110,33 @@ describe('previewCommand', () => {
   it('doubles typographic single quotes in the PowerShell form', () => {
     expect(previewCommand({ ...ollama, env: { NOTE: 'a\u2018b' }, args: ['it\u2019s', '\u201Ax\u201B'] }, true))
       .toBe(`$env:NOTE='a\u2018\u2018b'; opencode 'it\u2019\u2019s' '\u201A\u201Ax\u201B\u201B'`);
+  });
+});
+
+describe('start prompt and pull on start', () => {
+  const claude = builtinAgentProfile('claude');
+  it('keeps a start prompt on one line and drops it for the generic adapter', () => {
+    expect(parseAgentProfile({ ...claude, startPrompt: '  Hole die\n  Änderungen \t aus dem Remote  ' })?.startPrompt).toBe('Hole die Änderungen aus dem Remote');
+    expect(parseAgentProfile({ ...ollama, startPrompt: 'Hallo' })?.startPrompt).toBe('Hallo');
+    expect(parseAgentProfile({ ...ollama, adapter: 'generic', startPrompt: 'Hallo' })).not.toHaveProperty('startPrompt');
+  });
+  it('treats an empty prompt as none and rejects an oversized or non-string one', () => {
+    expect(parseAgentProfile({ ...claude, startPrompt: '  \n ' })).not.toHaveProperty('startPrompt');
+    expect(parseAgentProfile({ ...claude, startPrompt: 'x'.repeat(2001) })).toBeNull();
+    expect(parseAgentProfile({ ...claude, startPrompt: 5 })).toBeNull();
+  });
+  it('keeps pullOnStart for every adapter, only when true', () => {
+    expect(parseAgentProfile({ ...claude, pullOnStart: true })?.pullOnStart).toBe(true);
+    expect(parseAgentProfile({ ...ollama, adapter: 'generic', pullOnStart: true })?.pullOnStart).toBe(true);
+    expect(parseAgentProfile({ ...claude, pullOnStart: false })).not.toHaveProperty('pullOnStart');
+  });
+  it('appends the prompt after -- for Claude and Codex and as --prompt= for OpenCode', () => {
+    expect(launchArgs({ ...claude, args: ['--model', 'x'] })).toEqual(['--model', 'x']);
+    expect(launchArgs({ ...claude, args: ['--add-dir', 'a'], startPrompt: 'Hallo Welt' })).toEqual(['--add-dir', 'a', '--', 'Hallo Welt']);
+    expect(launchArgs({ ...builtinAgentProfile('codex'), startPrompt: '-x' })).toEqual(['--', '-x']);
+    expect(launchArgs({ ...ollama, startPrompt: '-x y' })).toEqual(['--model', 'ollama/qwen3-coder', '--prompt=-x y']);
+  });
+  it('shows the prompt in the command preview', () => {
+    expect(previewCommand({ ...claude, startPrompt: 'Hallo Welt' }, false)).toBe("claude -- 'Hallo Welt'");
   });
 });

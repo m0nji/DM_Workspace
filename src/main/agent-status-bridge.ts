@@ -5,7 +5,7 @@ import { PSREADLINE_CLEAR_INPUT_SEQUENCE } from '../shared/psreadline-heal';
 import { codexSetup } from './codex-status-setup';
 import { join } from 'node:path';
 import { claudeState, codexState, type AgentState, type AgentStateEvent } from '../shared/agent-state';
-import { builtinAgentProfile, supportsRemoteControl, type AgentProfile } from '../shared/agent-profiles';
+import { builtinAgentProfile, launchArgs, supportsRemoteControl, type AgentProfile } from '../shared/agent-profiles';
 import { buildAgentCommand } from './agent-command';
 import { quotePosix, quotePowerShell, shellKind } from './shell-quote';
 
@@ -84,7 +84,7 @@ export class AgentStatusBridge {
       allowedEnvVars: ['DMWS_AGENT_NONCE'] };
     const hooks = Object.fromEntries(EVENTS.map(event => [event, [{ hooks: [hook] }]]));
     const codex = adapter === 'codex'
-      ? codexSetup(settingsPath, port, token, powershell, remote, nonce, { program: profile.command, args: profile.args })
+      ? codexSetup(settingsPath, port, token, powershell, remote, nonce, { program: profile.command, args: launchArgs(profile) })
       : null;
     writeFileSync(settingsPath, codex?.script ?? JSON.stringify(adapter === 'claude' ? { hooks } : {}), { mode: 0o600, flag: 'wx' });
     const command = buildAgentCommand({ profile, shell: kind, settingsPath, remote, codexCommand: codex?.command });
