@@ -7,7 +7,8 @@ export type IconName =
   | 'back' | 'forward' | 'reload' | 'folder' | 'close'
   | 'folder-open' | 'file-code' | 'file-text' | 'file-config'
   | 'chevron-down' | 'file-plus' | 'save' | 'arrow-up' | 'trash' | 'edit' | 'server' | 'clock'
-  | 'keyboard' | 'undo' | 'play' | 'agents' | 'smartphone';
+  | 'keyboard' | 'undo' | 'play' | 'agents' | 'smartphone' | 'external'
+  | 'palette' | 'bell' | 'history' | 'download';
 
 // Every icon authored on a 24×24 canvas as stroked paths so they share weight,
 // scale and optical size. Values are arrays of SVG path `d` strings.
@@ -107,7 +108,24 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     'M9 14l-4 -4l4 -4',
     'M5 10h11a4 4 0 1 1 0 8h-1'
   ],
-  play: ['M7 4v16l13 -8z']
+  play: ['M7 4v16l13 -8z'],
+  external: [
+    'M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6',
+    'M11 13l9 -9',
+    'M15 4h5v5'
+  ],
+  palette: [
+    'M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25',
+    'M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+    'M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+    'M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0'
+  ],
+  bell: [
+    'M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6',
+    'M9 17v1a3 3 0 0 0 6 0v-1'
+  ],
+  history: ['M12 8l0 4l2 2', 'M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5'],
+  download: ['M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2', 'M7 11l5 5l5 -5', 'M12 4l0 12']
 };
 
 export interface IconProps { name: IconName; size?: number; }

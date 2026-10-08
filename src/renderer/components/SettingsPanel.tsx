@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
 import { AgentSettingsSection } from './AgentSettingsSection';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import type { BusyIndicator, RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
 import {
   TERMINAL_FONT_SIZE_DEFAULT, TERMINAL_FONT_SIZE_MIN, TERMINAL_FONT_SIZE_MAX,
@@ -416,15 +416,15 @@ function AccountSection(): React.JSX.Element {
   );
 }
 
-const SECTIONS: { id: SettingsSection; labelKey: ParseKeys }[] = [
-  { id: 'appearance', labelKey: 'settings.nav.appearance' },
-  { id: 'shortcuts', labelKey: 'settings.nav.shortcuts' },
-  { id: 'templates', labelKey: 'settings.nav.templates' },
-  { id: 'agents', labelKey: 'settings.nav.agents' },
-  { id: 'session', labelKey: 'settings.nav.session' },
-  { id: 'notifications', labelKey: 'settings.nav.notifications' },
-  { id: 'account', labelKey: 'settings.nav.account' },
-  { id: 'updates', labelKey: 'settings.nav.updates' }
+const SECTIONS: { id: SettingsSection; labelKey: ParseKeys; icon: IconName }[] = [
+  { id: 'appearance', labelKey: 'settings.nav.appearance', icon: 'palette' },
+  { id: 'shortcuts', labelKey: 'settings.nav.shortcuts', icon: 'keyboard' },
+  { id: 'templates', labelKey: 'settings.nav.templates', icon: 'file-text' },
+  { id: 'agents', labelKey: 'settings.nav.agents', icon: 'agents' },
+  { id: 'session', labelKey: 'settings.nav.session', icon: 'history' },
+  { id: 'notifications', labelKey: 'settings.nav.notifications', icon: 'bell' },
+  { id: 'account', labelKey: 'settings.nav.account', icon: 'server' },
+  { id: 'updates', labelKey: 'settings.nav.updates', icon: 'download' }
 ];
 
 // Beschriftungen der Indikator-Arten. Als Tabelle statt als switch, damit eine
@@ -468,8 +468,8 @@ export function SettingsPanel(): React.JSX.Element | null {
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <span>{t('settings.title')}</span>
+        <div className="modal-header settings-header">
+          <span className="settings-title">{t('settings.title')}</span>
           <button className="modal-close" title={t('common.close')} onClick={() => setOpen(false)}><Icon name="close" size={16} /></button>
         </div>
 
@@ -483,7 +483,8 @@ export function SettingsPanel(): React.JSX.Element | null {
                 aria-current={section === s.id ? 'page' : undefined}
                 onClick={() => setSection(s.id)}
               >
-                {t(s.labelKey)}
+                <Icon name={s.icon} size={16} />
+                <span>{t(s.labelKey)}</span>
               </button>
             ))}
           </nav>

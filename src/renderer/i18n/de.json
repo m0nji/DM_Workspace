@@ -564,6 +564,7 @@
     }
   },
   "files": {
+    "openInBrowser": "Im Browser öffnen",
     "tabFiles": "Dateien",
     "tabPreview": "Vorschau",
     "upOneFolder": "Eine Ebene höher",
@@ -943,6 +944,9 @@
     "actionUnknownPane": "Dieses Terminal gibt es nicht mehr — jemand anderes hat es geschlossen."
   },
   "menu": {
+    "openInBrowser": "Im Browser öffnen",
+    "openInPreview": "In Seitenleiste öffnen",
+    "copyLink": "Link kopieren",
     "copy": "Kopieren",
     "copyAsCommand": "Als Befehl kopieren",
     "paste": "Einfügen",

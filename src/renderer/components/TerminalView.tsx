@@ -27,7 +27,7 @@ import { builtinAgentProfile } from '../../shared/agent-profiles';
 // und gibt seinen Disposer zurück (siehe die Disposer-Liste im Mount-Effect).
 import { registerE2EHooks } from '../terminal/e2e-hooks';
 import { resizeConptyTerminal } from '../terminal/conpty-resize';
-import { attachLinkHandling } from '../terminal/links';
+import { attachLinkHandling, canOpenInBrowser, type LinkHandling } from '../terminal/links';
 import { attachClipboardShortcuts } from '../terminal/clipboard';
 import { attachFileDrop } from '../terminal/file-drop';
 import { attachClickToMove } from '../terminal/click-to-move';
@@ -139,6 +139,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   // stays in memory either way, so no output is lost and the DOM renderer (xterm's
   // fallback, same path used on context loss) covers the hidden pane.
   const webglRef = useRef<WebglAddon | null>(null);
+  const linksRef = useRef<LinkHandling | null>(null);
   const webglFailedRef = useRef(false); // creation threw (no GL at all) — stop retrying
   // Pending re-acquire timer after a context loss, plus a short-window loss counter
   // so a genuinely dead GPU can't spin re-creating contexts forever (see onContextLoss).
@@ -160,7 +161,8 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const [exited, setExited] = useState<number | null>(null);
   const [historyRestored, setHistoryRestored] = useState(false);
   const retryStartRef = useRef<(() => void) | null>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  // link: the terminal link under the pointer when the menu opened, if any.
+  const [menu, setMenu] = useState<{ x: number; y: number; link: string | null } | null>(null);
   // Snapshot the affected pane ids and the agentResetPlan at the moment the
   // dialog opens: it drives both the counts shown in the message and exactly
   // which panes get a reset command on confirm, so a state change while the
@@ -271,8 +273,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
     // back to the DOM renderer rather than crash.
     syncWebgl(activeRef.current);
 
-    // Clicking a link opens the right-hand preview panel instead of the OS browser.
-    disposers.push(attachLinkHandling(term, { paneId, spawnCwd: cwd }));
+    // Clicking a link opens the right-hand preview panel instead of the OS browser;
+    // right-clicking one offers the browser via the context menu.
+    const links = attachLinkHandling(term, { paneId, spawnCwd: cwd });
+    linksRef.current = links;
+    disposers.push(() => { links.dispose(); if (linksRef.current === links) linksRef.current = null; });
 
     // Track whether the viewport is scrolled to the bottom (controls the
     // floating scroll-to-bottom button). baseY is the topmost scrollback row;
@@ -983,10 +988,25 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
 
   const scrollToBottom = (): void => { termRef.current?.scrollToBottom(); };
 
-  const menuItems = (): MenuItem[] => {
+  // Shown above the regular entries when the menu was opened on a link.
+  const linkMenuItems = (link: string): MenuItem[] => {
+    const term = termRef.current;
+    const links = linksRef.current;
+    return [
+      ...(canOpenInBrowser(link)
+        ? [{ label: t('menu.openInBrowser'), onClick: () => { void links?.openInBrowser(link); term?.focus(); } }]
+        : []),
+      { label: t('menu.openInPreview'), onClick: () => { void links?.openInPreview(link); term?.focus(); } },
+      { label: t('menu.copyLink'), onClick: () => { window.api.clipboardWrite(link); term?.focus(); } },
+      { label: '-' }
+    ];
+  };
+
+  const menuItems = (link: string | null): MenuItem[] => {
     const term = termRef.current;
     const hasSelection = !!term?.hasSelection();
     return [
+      ...(link ? linkMenuItems(link) : []),
       {
         label: t('menu.copy'),
         disabled: !hasSelection,
@@ -1061,7 +1081,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const hostWrap = (
     <div
       className="xterm-host-wrap"
-      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}
+      onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, link: linksRef.current?.hoveredLink() ?? null }); }}
     >
       <div className="xterm-host" ref={hostRef} />
       {/* Drop-zone overlay: shown (via the `.drop-target` class the drag handlers
@@ -1081,7 +1101,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           <div className="drop-overlay-sub">{t('terminal.dropFilesSub')}</div>
         </div>
       </div>
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.link)} onClose={() => setMenu(null)} />}
       {confirmClearAll && (
         <ConfirmDialog
           title={t('terminal.clearAllTitle')}

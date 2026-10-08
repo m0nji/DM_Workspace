@@ -564,6 +564,7 @@
     }
   },
   "files": {
+    "openInBrowser": "Open in browser",
     "tabFiles": "Files",
     "tabPreview": "Preview",
     "upOneFolder": "Up one folder",
@@ -943,6 +944,9 @@
     "actionUnknownPane": "This terminal no longer exists — someone else closed it."
   },
   "menu": {
+    "openInBrowser": "Open in browser",
+    "openInPreview": "Open in side panel",
+    "copyLink": "Copy link",
     "copy": "Copy",
     "copyAsCommand": "Copy as command",
     "paste": "Paste",

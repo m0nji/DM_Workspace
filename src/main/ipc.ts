@@ -1,10 +1,13 @@
 import { codexRemoteAction } from './agent-remote';
 import { createMicrophoneAccess } from './microphone-access';
+import { createOpenInBrowser } from './open-in-browser';
 import { checkAgentRequirements, launchPreparedAgent } from './agent-launch';
 import { codexLaunchProfile, parseAgentProfile } from '../shared/agent-profiles';
 import { ipcMain, BrowserWindow, dialog, app, Notification, clipboard, safeStorage, shell, systemPreferences } from 'electron';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { join, dirname } from 'path';
 import { AgentStatusBridge } from './agent-status-bridge';
@@ -707,6 +710,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (typeof url !== 'string') { rejectPayload('shell:openExternal', url); return; }
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
   });
+
+  const execFileAsync = promisify(execFile);
+  // "Im Browser öffnen" in the terminal link menu: http(s) or a local .html file.
+  const openInBrowser = createOpenInBrowser({
+    platform: process.platform,
+    openExternal: (url) => shell.openExternal(url),
+    isFile: (path) => { try { return statSync(path).isFile(); } catch { return false; } },
+    defaultBrowserApp: async () => {
+      try { return (await app.getApplicationInfoForProtocol('https://')).path || null; } catch { return null; }
+    },
+    openWithApp: async (appPath, path) => { await execFileAsync('open', ['-a', appPath, path]); }
+  });
+  handle('shell:openInBrowser', (_e, url: unknown) => openInBrowser(url));
 
   handle('dialog:pickDirectory', async () => {
     // e2e-only: return a fixed path so tests can drive folder changes without

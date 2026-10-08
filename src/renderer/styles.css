@@ -717,28 +717,48 @@ body {
 /* The settings modal uses a left nav rail to pick a category and a content area
    that renders one section at a time. */
 /* Fixed height so switching sections doesn't resize (and re-center) the modal —
-   the left nav stays put and only the content area scrolls. */
-.modal.settings-modal { width: 640px; max-width: 92vw; height: min(620px, 85vh);
-  display: flex; flex-direction: column; overflow: hidden; }
-.settings-body { display: flex; gap: 8px; align-items: stretch; flex: 1; min-height: 0; }
+   the left nav stays put and only the content area scrolls. Wide enough that
+   agent rows, button rows and hints get room instead of wrapping word by word. */
+.modal.settings-modal { width: min(920px, calc(100vw - 48px)); max-width: none; height: min(740px, 88vh);
+  padding: 22px 24px 24px; display: flex; flex-direction: column; overflow: hidden; }
+.settings-header { margin-bottom: 18px; }
+.settings-title { color: var(--text-strong); font-size: 16px; font-weight: 600; letter-spacing: .01em; }
+.settings-body { display: flex; gap: 16px; align-items: stretch; flex: 1; min-height: 0; }
 /* Grouped surface, like the sidebar: one outline around plain rows. */
 .settings-nav {
   display: flex; flex-direction: column; gap: 2px;
-  min-width: 150px; flex-shrink: 0;
-  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 6px;
+  width: 210px; flex-shrink: 0; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 8px;
 }
 .settings-nav-item {
-  text-align: left; padding: 8px 12px; border-radius: 7px;
+  display: flex; align-items: center; gap: 10px;
+  text-align: left; padding: 9px 12px; border-radius: 8px;
   background: none; border: none; cursor: pointer;
   color: var(--muted); font-size: 13px;
 }
+.settings-nav-item svg { flex: none; opacity: .75; }
+.settings-nav-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-nav-item:hover { color: var(--text); background: var(--chrome-action-hover-bg); }
-.settings-nav-item.active { color: var(--accent); background: var(--accent-soft); }
+.settings-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.settings-nav-item.active { color: var(--accent); background: var(--accent-soft); font-weight: 500; }
+.settings-nav-item.active svg { opacity: 1; }
 /* ONE grouped surface around the whole content area — the frame stays put while the
    sections scroll inside it. A frame per section would stack outline on outline. */
-.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 12px; }
-.settings-group { margin-bottom: 14px; }
+.settings-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable;
+  border: 1px solid var(--border); border-radius: var(--radius-large); padding: 22px 26px; }
+/* Sections inside the frame are told apart by a hairline and air, not boxes. */
+.settings-group { margin-bottom: 22px; }
+.settings-group + .settings-group,
+.settings-group .settings-group { padding-top: 22px; border-top: 1px solid var(--border-subtle); }
+.agent-profile-list + .settings-group { margin-top: 14px; }
+/* A hint closes the control above it — give the next control air. */
+.settings-content .modal-hint + .setting-row { margin-top: 16px; }
+.settings-group:last-child { margin-bottom: 0; }
+.settings-content .modal-section-label { font-weight: 600; letter-spacing: .08em; margin-bottom: 12px; }
+.settings-content .modal-hint { font-size: 12px; line-height: 1.55; max-width: 72ch; }
+/* A row of plain buttons (e.g. microphone): wrap whole buttons, never their labels. */
+.setting-actions { flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.settings-content .btn-secondary { white-space: nowrap; }
 .modal-header { display: flex; justify-content: space-between; align-items: center;
   font-weight: 500; margin-bottom: 14px; }
 .modal-close { background: none; border: none; color: var(--muted); cursor: pointer;

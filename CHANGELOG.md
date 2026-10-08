@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.22.0 – 2026-10-08
+- feat: Right-click a link in a terminal to open it in your default browser instead of the side panel, open it in the side panel, or copy it. Works for web addresses and local `.html`/`.htm` files, including relative paths. A right-click no longer opens the side panel by accident, and the side panel's preview has an "Open in browser" button for the page it shows.
+- feat: The settings dialog is wider and calmer: section icons in the navigation, more spacing, and separated groups, so agent rows, button rows and hints no longer wrap word by word.
+
 ## 0.21.0 – 2026-10-06
 - feat: Give each Claude, Codex or OpenCode agent profile a start prompt in Settings → AI agents. It is sent as the agent's first message on every new start; line breaks become spaces, up to 2000 characters, with a ready-made "update repo" template.
 - feat: Optionally run `git pull --ff-only` in the pane's folder before the agent starts. It only runs inside a Git repository, never merges or discards local changes, and a failed pull does not stop the agent from starting.

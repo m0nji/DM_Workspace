@@ -598,6 +598,9 @@ export interface RendererApi {
   getPathForFile(file: File): string;
   // open an http(s) link in the system browser (markdown preview links)
   openExternal(url: string): void;
+  // open an http(s) URL or a local .html file (file: URL) in the default browser;
+  // resolves false when the target was refused or does not exist
+  openInBrowser(url: string): Promise<boolean>;
   // the host platform (for path-escaping decisions in the renderer)
   platform: NodeJS.Platform;
   windowsBuild?: number;

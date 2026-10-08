@@ -110,6 +110,14 @@ export function PreviewBody(): React.JSX.Element {
           title={addr}
         />
         {notFound && <button type="button" className="icon-btn" aria-label={t('files.chooseFolder')} onClick={() => { void pickAndResolve(); }}><Icon name="folder" /></button>}
+        {/* Hand the current page (incl. in-preview navigation) to the system browser
+            when the side panel is too narrow for it. */}
+        {!isMarkdown && !notFound && source && (
+          <button type="button" className="icon-btn" aria-label={t('files.openInBrowser')} title={t('files.openInBrowser')}
+                  onClick={() => { void window.api.openInBrowser(addr || source.target); }}>
+            <Icon name="external" />
+          </button>
+        )}
       </div>
       <div className="preview-body">
         {!source ? (

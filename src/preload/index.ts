@@ -96,6 +96,7 @@ const api: RendererApi = {
   // File.path; webUtils.getPathForFile is the supported replacement).
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
+  openInBrowser: (url: string) => ipcRenderer.invoke('shell:openInBrowser', url) as Promise<boolean>,
   platform: process.platform,
   windowsBuild: windowsBuildFromArgv(process.argv),
   disableWebgl: process.env.DMWS_DISABLE_WEBGL === '1',

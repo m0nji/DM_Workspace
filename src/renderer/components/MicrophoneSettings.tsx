@@ -41,7 +41,7 @@ export function MicrophoneSettings(): React.JSX.Element {
       {failed && <p className="setting-error">{t('settings.microphone.error')}</p>}
     </div>
     {supported && <>
-      <div className="setting-row">
+      <div className="setting-row setting-actions">
         {window.api.platform === 'darwin' && access === 'not-determined' &&
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run('request')}>
             {t('settings.microphone.allow')}</button>}
