@@ -49,6 +49,21 @@ export function refreshTerminalLayoutAfterCommit(paneId: string): void {
   requestAnimationFrame(() => requestAnimationFrame(() => refreshTerminalLayout(paneId)));
 }
 
+// After the system wakes, GPU textures can be gone without a WebGL context-loss
+// event, leaving panes with backgrounds and cursors but no text. Each
+// TerminalView registers a callback that rebuilds its glyph atlas and repaints
+// (see main/wake-repaint.ts).
+const repaintRegistry = new Map<string, () => void>();
+export function registerTerminalRepaint(paneId: string, repaint: () => void): void {
+  repaintRegistry.set(paneId, repaint);
+}
+export function unregisterTerminalRepaint(paneId: string): void {
+  repaintRegistry.delete(paneId);
+}
+export function repaintTerminals(): void {
+  for (const repaint of repaintRegistry.values()) repaint();
+}
+
 // Programmatic commands (agent starts, startup commands) bypass xterm's onData
 // callback. Route a copy through the pane's automatic-title tracker before the
 // bytes go to the PTY so they behave like commands typed by the user.

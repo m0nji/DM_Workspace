@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- Electron's native fixture runs as CommonJS. */
 // Run without Playwright's debugger: its foreground emulation masks the native
 // Page Visibility API. This exercises the normal application entry point.
 const assert = require('node:assert/strict');

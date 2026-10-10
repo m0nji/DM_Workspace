@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from './store';
+import { repaintTerminals } from './terminal-registry';
 import i18n, { resolveLocale } from './i18n';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { WorkspaceView } from './components/WorkspaceView';
@@ -63,6 +64,19 @@ export function App(): React.JSX.Element {
     const offActivate = window.api.onActivateWorkspace(selectWorkspace);
     return () => { offFocus(); offActivate(); };
   }, [setWindowFocused, selectWorkspace]);
+
+  // System woke from sleep: rebuild the terminals' glyph textures (see
+  // main/wake-repaint.ts). Once right away and once after the GPU has settled —
+  // right after wake the driver may still be restoring, and a repaint then is lost.
+  useEffect(() => {
+    let settle: ReturnType<typeof setTimeout> | null = null;
+    const off = window.api.onSystemWake(() => {
+      repaintTerminals();
+      if (settle) clearTimeout(settle);
+      settle = setTimeout(() => { settle = null; repaintTerminals(); }, 1500);
+    });
+    return () => { off(); if (settle) clearTimeout(settle); };
+  }, []);
 
   // Remote-Workspaces: Verbindungs-, Driver- und Presence-Pushes aus dem
   // Main-Prozess in den Store spiegeln. Die

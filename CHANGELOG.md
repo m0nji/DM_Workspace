@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.22.1 – 2026-10-10
+- fix: Terminal text no longer disappears after the computer wakes from sleep or the screen is unlocked. Panes kept their backgrounds and cursor but showed no text until you switched workspaces; they now rebuild their text rendering on wake. While the graphics process restarts, the window may briefly flash white.
+
 ## 0.22.0 – 2026-10-08
 - feat: Right-click a link in a terminal to open it in your default browser instead of the side panel, open it in the side panel, or copy it. Works for web addresses and local `.html`/`.htm` files, including relative paths. A right-click no longer opens the side panel by accident, and the side panel's preview has an "Open in browser" button for the page it shows.
 - feat: The settings dialog is wider and calmer: section icons in the navigation, more spacing, and separated groups, so agent rows, button rows and hints no longer wrap word by word.

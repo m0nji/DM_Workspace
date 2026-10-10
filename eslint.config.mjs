@@ -139,5 +139,17 @@ export default tseslint.config(
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node }
+  },
+
+  // CommonJS-Skripte: `require` ist dort die einzige Importform, nicht ein
+  // Versäumnis. disableTypeChecked oben nimmt no-require-imports nicht mit —
+  // die Regel braucht keine Typinformation und bleibt deshalb aktiv. Sie
+  // meldete `docs/handbuch-assets/build-manual.cjs` an und liess damit den
+  // verify-Job auf main durchgehend scheitern.
+  {
+    files: ['**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
+    }
   }
 );

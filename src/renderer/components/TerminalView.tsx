@@ -15,7 +15,7 @@ import { registerSearch, unregisterSearch } from '../search-registry';
 import {
   registerAgentEnd, unregisterAgentEnd, registerTerminal, unregisterTerminal, clearTerminal, clearTerminals, refreshTerminalLayoutAfterCommit,
   registerTerminalFocus, unregisterTerminalFocus,
-  registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh,
+  registerTerminalLayoutRefresh, unregisterTerminalLayoutRefresh, registerTerminalRepaint, unregisterTerminalRepaint,
   registerTerminalInputTracking, unregisterTerminalInputTracking, trackTerminalInput
 } from '../terminal-registry';
 import { parseOsc7, parseOsc9 } from '../../shared/osc-cwd';
@@ -895,6 +895,16 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       if (term.rows > 0) term.refresh(0, term.rows - 1);
     });
 
+    // After a system wake the GPU may have dropped the glyph texture silently
+    // (no context-loss event): rebuild the atlas so xterm re-uploads it, then
+    // repaint every row. Only panes holding a WebGL renderer are affected —
+    // hidden panes get a fresh one on their next activation anyway.
+    registerTerminalRepaint(paneId, () => {
+      if (!webglRef.current) return;
+      term.clearTextureAtlas();
+      if (term.rows > 0) term.refresh(0, term.rows - 1);
+    });
+
     // The very first fit can run before the WebGL renderer has measured the cell
     // size, so .xterm-screen still has no height and the host can't be pinned —
     // which leaves the black bottom bar on idle panes (no output → no resize/render
@@ -926,6 +936,7 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       ro.disconnect();
       resizeScheduler.dispose();
       unregisterTerminalLayoutRefresh(paneId);
+      unregisterTerminalRepaint(paneId);
       unregisterTerminalInputTracking(paneId);
       unregisterAgentEnd(paneId);
       autoTitleTracker.dispose();

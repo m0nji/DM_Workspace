@@ -615,6 +615,8 @@ export interface RendererApi {
   // agent-activity notifications
   notifyAgentDone(payload: AgentDonePayload): void;
   onWindowFocus(cb: (focused: boolean) => void): () => void;
+  // System woke from sleep / screen unlocked — repaint the terminals.
+  onSystemWake(cb: () => void): () => void;
   onActivateWorkspace(cb: (workspaceId: string) => void): () => void;
   // ---- Remote-Workspaces (alle Token bleiben im Main-Prozess) ----
   authLoginLocal(serverId: string, username: string, password: string): Promise<RemoteLoginResult>;

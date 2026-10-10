@@ -110,6 +110,11 @@ const api: RendererApi = {
     ipcRenderer.on('window:focus', handler);
     return () => ipcRenderer.removeListener('window:focus', handler);
   },
+  onSystemWake: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on('system:wake', handler);
+    return () => ipcRenderer.removeListener('system:wake', handler);
+  },
   onActivateWorkspace: (cb: (workspaceId: string) => void) => {
     const handler = (_e: unknown, workspaceId: string) => cb(workspaceId);
     ipcRenderer.on('notify:activateWorkspace', handler);

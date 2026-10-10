@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, powerMonitor, screen } from 'electron';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { mkdtempSync, rmSync } from 'fs';
@@ -9,6 +9,7 @@ import { loadStateFromFile, StateLoadError } from './persistence';
 import { stateLoadErrorMessage } from './state-load-error';
 import { isBoundsVisible } from './window-bounds';
 import { wireWindowShow } from './window-show';
+import { wireWakeRepaint } from './wake-repaint';
 import { registerUpdater } from './updater';
 import { installAppMenu } from './menu';
 import { windowIconFile } from './window-icon';
@@ -204,10 +205,14 @@ function createWindow(): void {
     if (isMainFrame) console.error('[main] renderer did-fail-load:', code, description, url);
   });
 
+  // Nach dem Aufwachen fehlt in den Terminals sonst manchmal der Text (siehe wake-repaint.ts).
+  const unwireWake = wireWakeRepaint(powerMonitor, mainWindow);
+
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   mainWindow.on('closed', () => {
     if (boundsTimer) { clearTimeout(boundsTimer); boundsTimer = null; }
     cancelShowFallback();
+    unwireWake();
     mainWindow = null;
   });
   mainWindow.on('focus', () => mainWindow?.webContents.send('window:focus', true));
