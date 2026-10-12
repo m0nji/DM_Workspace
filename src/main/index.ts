@@ -84,6 +84,17 @@ app.on('web-contents-created', (_event, contents) => {
   });
 });
 
+// macOS: Skia Graphite abschalten (Chromium nimmt dann das bewährte Ganesh-Backend).
+// Unter Electron 41 / Chromium 146 bricht der GPU-Prozess sonst alle paar Stunden
+// absichtlich ab — CHECK in GraphiteSharedContext::InsertRecordingImpl, wenn Graphite
+// eine Aufzeichnung als kAsyncShaderCompilesFailed/kOutOfOrderRecording verwirft.
+// Jeder Absturz kostet alle Panes ihren WebGL-Kontext; zwei kurz hintereinander
+// sperren WebGL für ~2 min (ruckeliges Scrollen). WebGL und GPU-Compositing
+// bleiben an. Erneut prüfen, sobald Electron auf ein neueres Chromium springt.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'SkiaGraphite');
+}
+
 // E2E isolation: when DMWS_E2E is set, redirect userData to a fresh temp dir
 // so each test run starts from defaultState (welcome screen) instead of any
 // previously persisted layout. Must run before app.whenReady().

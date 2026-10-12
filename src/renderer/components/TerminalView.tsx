@@ -61,6 +61,13 @@ interface Props { paneId: string; cwd: string; active?: boolean; }
 // would silently drop restorable history). Also caps scrollback.json growth.
 const SCROLLBACK_LINES = 1000;
 
+// Backoff for re-acquiring WebGL after a context loss when creation fails.
+// Chromium blocks new WebGL contexts for ~2 min after repeated GPU-process
+// crashes; the cap keeps the pane at most this long on the DOM renderer once
+// the block lifts.
+const WEBGL_RETRY_MIN_MS = 2000;
+const WEBGL_RETRY_MAX_MS = 15_000;
+
 // Remove the legacy in-buffer notice; new notices live in the translated UI.
 const RESTORE_MARKER_TEXT = 'vorherige Sitzung wiederhergestellt (Prozess neu gestartet)';
 
@@ -140,11 +147,12 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   // fallback, same path used on context loss) covers the hidden pane.
   const webglRef = useRef<WebglAddon | null>(null);
   const linksRef = useRef<LinkHandling | null>(null);
-  const webglFailedRef = useRef(false); // creation threw (no GL at all) — stop retrying
+  const webglFailedRef = useRef(false); // first creation threw (no GL at all) — stop retrying
   // Pending re-acquire timer after a context loss, plus a short-window loss counter
   // so a genuinely dead GPU can't spin re-creating contexts forever (see onContextLoss).
   const webglRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webglLossRef = useRef({ count: 0, last: 0 });
+  const webglRetryDelayRef = useRef(WEBGL_RETRY_MIN_MS);
   const activeRef = useRef(active);
   // The mount effect owns the scheduler; the active effect steers its cadence.
   const saveSchedulerRef = useRef<SaveScheduler | null>(null);
@@ -178,9 +186,18 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
   const syncWebgl = useCallback((shouldHave: boolean): void => {
     const term = termRef.current;
     if (!term || window.api.disableWebgl || webglFailedRef.current) return;
+    const retryLater = (delayMs: number): void => {
+      if (webglRetryRef.current) clearTimeout(webglRetryRef.current);
+      webglRetryRef.current = setTimeout(() => {
+        webglRetryRef.current = null;
+        if (activeRef.current) syncWebgl(true);
+      }, delayMs);
+    };
     if (shouldHave && !webglRef.current) {
+      let created: WebglAddon | null = null;
       try {
         const addon = new WebglAddon();
+        created = addon;
         // Context loss (GPU sleep/reset/switch) frees the context: drop the addon so
         // xterm falls back to the DOM renderer — then re-acquire WebGL automatically
         // after a short settle delay, so the pane doesn't stay stuck on the slow DOM
@@ -195,18 +212,25 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
           loss.count = now - loss.last < 10_000 ? loss.count + 1 : 1;
           loss.last = now;
           if (loss.count > 5) return; // repeated immediate losses → give up
-          if (webglRetryRef.current) clearTimeout(webglRetryRef.current);
-          webglRetryRef.current = setTimeout(() => {
-            webglRetryRef.current = null;
-            if (activeRef.current) syncWebgl(true);
-          }, 1000);
+          retryLater(1000);
         });
         term.loadAddon(addon);
         webglRef.current = addon;
+        webglRetryDelayRef.current = WEBGL_RETRY_MIN_MS;
       } catch {
-        webglRef.current?.dispose();
-        webglRef.current = null;
-        webglFailedRef.current = true; // no GL context available at all — don't retry
+        // loadAddon registers the addon before activate() throws — unregister it.
+        created?.dispose();
+        if (webglLossRef.current.last === 0) {
+          webglFailedRef.current = true; // no GL context available at all — don't retry
+          return;
+        }
+        // Re-acquire after a context loss failed: after repeated GPU-process
+        // crashes Chromium blocks new WebGL contexts for a while. Keep retrying
+        // with backoff so the pane returns to WebGL once the block lifts instead
+        // of scrolling on the DOM renderer until the app restarts.
+        const delay = webglRetryDelayRef.current;
+        webglRetryDelayRef.current = Math.min(delay * 2, WEBGL_RETRY_MAX_MS);
+        retryLater(delay);
       }
     } else if (!shouldHave && webglRef.current) {
       webglRef.current.dispose();

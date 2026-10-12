@@ -44,3 +44,50 @@ test('a lost WebGL context is re-acquired automatically (no permanent DOM-render
 
   await app.close();
 });
+
+// After repeated GPU-process crashes Chromium refuses new WebGL contexts for the
+// page for a while (~2 min; getContext('webgl2') returns null). The first
+// re-acquire attempt then fails — and the pane must not give up for good: once
+// WebGL is available again it has to come back without a restart. Reproduced by
+// killing the GPU process twice within ~25s; here getContext is blocked by hand.
+test('a re-acquire that fails while WebGL is temporarily blocked is retried later', async () => {
+  test.setTimeout(60_000);
+  const app = await electron.launch({
+    args: ['out/main/index.js', '--lang=en-US'],
+    env: { ...process.env, DMWS_E2E: '1' }
+  });
+  const win = await app.firstWindow();
+
+  const canvasCount = () => win.evaluate(() => document.querySelectorAll('.xterm canvas').length);
+
+  await win.getByText('How many terminals do you want to open?').waitFor();
+  await win.getByText('1 Pane').click();
+  await win.locator('.pane .xterm-screen').first().waitFor();
+  await expect.poll(canvasCount).toBeGreaterThan(0);
+
+  await win.evaluate(() => {
+    const contexts = (Array.from(document.querySelectorAll('.xterm canvas')) as HTMLCanvasElement[])
+      .map((c) => c.getContext('webgl2') as WebGL2RenderingContext | null);
+    // Block new WebGL2 contexts like Chromium does after repeated GPU resets.
+    const original = HTMLCanvasElement.prototype.getContext;
+    (window as unknown as Record<string, unknown>).__unblockWebgl = () => {
+      HTMLCanvasElement.prototype.getContext = original;
+    };
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+      if (type === 'webgl2') return null;
+      return (original as (...a: unknown[]) => unknown).call(this, type, ...rest);
+    } as typeof original;
+    for (const gl of contexts) gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  });
+  await expect.poll(canvasCount).toBe(0);
+
+  // Let the first re-acquire (3s xterm restore wait + 1s retry delay) hit the block.
+  await win.waitForTimeout(6000);
+  expect(await canvasCount()).toBe(0);
+
+  // WebGL becomes available again → the pane must return to the WebGL renderer.
+  await win.evaluate(() => (window as unknown as { __unblockWebgl: () => void }).__unblockWebgl());
+  await expect.poll(canvasCount, { timeout: 20_000 }).toBeGreaterThan(0);
+
+  await app.close();
+});
