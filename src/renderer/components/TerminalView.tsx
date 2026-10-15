@@ -265,7 +265,11 @@ export function TerminalView({ paneId, cwd, active = true }: Props): React.JSX.E
       // xterm's native alt-click only ever emits ←/→ and models the prompt as
       // one wrapped logical line, so it can't reach another line of a multi-line
       // editor. Disable it; the custom mouseup handler below handles ↑/↓ too.
-      altClickMovesCursor: false
+      altClickMovesCursor: false,
+      // While a TUI (Codex, Claude Code) tracks the mouse, xterm forces a
+      // selection with Shift on Windows/Linux but only with Option on macOS, and
+      // only with this flag. Without it the Mac had no way to select there.
+      macOptionClickForcesSelection: true
     });
     termRef.current = term;
     // Jeder attach*/register* unten gibt seinen eigenen Disposer zurück und legt

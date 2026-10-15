@@ -65,8 +65,10 @@ test('terminal settles rapid window narrowing and remains editable', async () =>
       const hooks = (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText;
       return [...hooks.values()].map(read => read()).join('\n');
     });
-    // A visible xterm precedes the async PTY spawn and shell integration.
-    await expect.poll(text).toMatch(/[>$#❯]/);
+    const atPrompt = () => win.evaluate(() => Object.values(window.__store.getState().paneShell).includes('atPrompt'));
+    // A visible xterm precedes the async PTY spawn and shell integration. Wait
+    // for its prompt marker, not a prompt character: zsh's default ends in %.
+    await expect.poll(atPrompt).toBe(true);
     await input.focus();
     await win.keyboard.type('RESIZE_INPUT_123', { delay: 30 });
     await expect.poll(text).toContain('RESIZE_INPUT_123');
@@ -82,8 +84,9 @@ test('terminal settles rapid window narrowing and remains editable', async () =>
       return screen.offsetWidth <= wrap.clientWidth && screen.offsetWidth > wrap.clientWidth - 40
         && screen.offsetHeight <= wrap.clientHeight && screen.offsetHeight > wrap.clientHeight - 40;
     })).toBe(true);
+    // The cursor is still at the end of the line. No End key: macOS's
+    // /etc/zshrc binds the application-mode sequence, xterm sends ESC [ F.
     await input.focus();
-    await win.keyboard.press('End');
     await win.keyboard.type('_EDITED');
     await expect.poll(text).toContain('RESIZE_INPUT_123_EDITED');
   } finally {
@@ -104,7 +107,8 @@ test('native terminal history survives repeated width and height changes exactly
       const hooks = (window as unknown as { __bufferText: Map<string, () => string> }).__bufferText;
       return [...hooks.values()].map(read => read()).join('\n');
     });
-    await expect.poll(text).toMatch(/[>$#❯]/);
+    const atPrompt = () => win.evaluate(() => Object.values(window.__store.getState().paneShell).includes('atPrompt'));
+    await expect.poll(atPrompt).toBe(true);
     await input.focus();
     await win.keyboard.type(`node "${resolve('e2e/fixtures/resize-history.cjs')}"`, { delay: 5 });
     await win.keyboard.press('Enter');

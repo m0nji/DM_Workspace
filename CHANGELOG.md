@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.23.2 – 2026-10-15
+- fix: On macOS you can select text with Option+drag while a program such as Codex or Claude Code tracks the mouse. Before, there was no way to select text there with the mouse.
+- fix: On macOS a right-click next to a selection no longer clears it, so "Copy" in the context menu stays available. Without a selection, a right-click still selects the word under the pointer.
+
 ## 0.23.1 – 2026-10-15
 - fix: The agent start dialog lists agents in a drop-down again instead of tiles, so it stays compact with many agent profiles. The chosen agent's logo is shown next to the list.
 

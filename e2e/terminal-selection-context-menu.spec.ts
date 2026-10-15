@@ -3,7 +3,9 @@ import { test, expect, _electron as electron, type Page } from '@playwright/test
 // Regression: TUIs like Codex switch on mouse tracking (DECSET 1003 + SGR 1006).
 // xterm then reports every mouse move and the right-button press to the program
 // as *user input* — and user input clears the selection. A Shift+drag selection
-// vanished on the way to the right-click, so "Copy" in the menu was disabled.
+// (Option+drag on macOS) vanished on the way to the right-click, so "Copy" in
+// the menu was disabled. On macOS a right-click next to the selection also
+// replaced it with the word under the pointer (xterm's rightClickSelectsWord).
 
 async function cellCenter(win: Page, col: number, row: number): Promise<{ x: number; y: number }> {
   const box = await win.locator('.pane .xterm-screen').boundingBox();
@@ -34,6 +36,9 @@ for (const mouseMode of [false, true]) {
     await win.getByText('1 Pane').click();
     await expect(win.locator('.pane .xterm-screen')).toBeVisible();
     await expect.poll(() => win.evaluate(() => !!(window as unknown as { __termWrite?: Map<string, unknown> }).__termWrite?.size)).toBe(true);
+    // Paint only once the shell is up: its startup output can clear the screen
+    // and with it the selection (zsh on macOS starts slowly enough to race).
+    await expect.poll(() => win.evaluate(() => Object.values(window.__store.getState().paneShell).includes('atPrompt'))).toBe(true);
 
     // Paint a known word on row 0 in the alternate screen, where the shell
     // prompt cannot overwrite it, and switch mouse tracking on like Codex does.
@@ -45,13 +50,14 @@ for (const mouseMode of [false, true]) {
     // short of cell 8's middle selects exactly "SELECTME" (cells 0–7).
     const to = await cellCenter(win, 8, 0);
     to.x -= 2;
-    // Shift forces a selection even while the program owns the mouse.
-    if (mouseMode) await win.keyboard.down('Shift');
+    // Shift (macOS: Option) forces a selection while the program owns the mouse.
+    const force = process.platform === 'darwin' ? 'Alt' : 'Shift';
+    if (mouseMode) await win.keyboard.down(force);
     await win.mouse.move(from.x - 2, from.y);
     await win.mouse.down();
     await win.mouse.move(to.x, to.y, { steps: 5 });
     await win.mouse.up();
-    if (mouseMode) await win.keyboard.up('Shift');
+    if (mouseMode) await win.keyboard.up(force);
 
     // Move the pointer away before right-clicking, as a user would.
     const rc = await cellCenter(win, 20, 3);
