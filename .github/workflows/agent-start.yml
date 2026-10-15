@@ -63,7 +63,7 @@ jobs:
       - name: Verify Linux agent startup
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum npx playwright test e2e/agent-start.spec.ts e2e/agent-remote.spec.ts e2e/agent-profiles.spec.ts e2e/microphone-settings.spec.ts --workers=1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: agent-start-${{ runner.os }}

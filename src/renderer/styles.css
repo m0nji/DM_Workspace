@@ -1688,9 +1688,24 @@ body.drag-active webview { pointer-events: none; }
 .agent-command { max-height: 160px; overflow-y: auto; display: block; overflow-wrap: anywhere; user-select: text; padding: 10px;
   margin-bottom: 12px; background: var(--bg); color: var(--text); border-radius: 6px; }
 
-.agent-help select { color: var(--text); background: var(--bg); border: 1px solid var(--border);
-  border-radius: 4px; padding: 4px 8px; font: inherit; }
-.agent-help select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Agent picker in the start dialog: icon tiles instead of a native select,
+   which cannot show the agent logos. Spans, because ConfirmDialog renders the
+   message inside a <p>. */
+.agent-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.agent-choice { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-panel);
+  background: var(--input); color: var(--text); cursor: pointer; line-height: 1.3;
+  transition: border-color .12s ease, background-color .12s ease; }
+.agent-choice:hover { border-color: var(--border-hover); background: var(--panel-elevated); }
+.agent-choice.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--text-strong); }
+.agent-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.agent-choice:has(input:disabled) { cursor: default; opacity: .6; }
+.agent-choice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.agent-choice-icon { flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: var(--radius-control); background: var(--panel-elevated);
+  border: 1px solid var(--border-subtle); color: var(--text); }
+.agent-choice.selected .agent-choice-icon { border-color: var(--accent); }
+.agent-choice-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
 
 .agent-overview-trigger { position: relative; }
 .agent-overview-trigger.has-attention { color: var(--accent); }
@@ -1709,7 +1724,9 @@ body.drag-active webview { pointer-events: none; }
 .tasks-agent-select { display: flex; align-items: center; gap: 6px; }
 .tasks-agent-select .wizard-input { flex: 1; }
 
-.agent-folder { overflow-wrap: anywhere; }
+.agent-folder { overflow-wrap: anywhere; padding: 8px 10px; border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--accent); border-radius: var(--radius-control); background: var(--input);
+  font-size: 12px; line-height: 1.45; }
 .agent-secondary-action { margin: 0 8px 8px 0; }
 
 .agent-remote-help { margin-top: 12px; color: var(--text-muted); font-size: 13px; }

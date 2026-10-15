@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.23.0 – 2026-10-15
+- feat: The agent start dialog shows each agent as a tile with its logo instead of a plain drop-down list, and highlights the chosen one. Arrow keys switch between agents, and the pane's folder is set apart in its own box.
+
 ## 0.22.2 – 2026-10-12
 - fix: Scrolling in terminals no longer turns sluggish after several hours of work on macOS. The graphics process crashed every few hours in Chromium's new Skia Graphite renderer, and every crash dropped all panes to a slow fallback renderer. Graphite is now turned off on macOS; hardware acceleration stays on.
 - fix: After the graphics process crashed twice in quick succession, a pane stayed on the slow fallback renderer until DM Workspace was restarted. It now switches back to fast rendering on its own as soon as the system allows it again, usually within about two minutes.

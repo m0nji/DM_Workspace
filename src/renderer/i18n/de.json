@@ -17,7 +17,6 @@
       "error": "Fehler"
     },
     "provider": "Agent",
-    "chooseProfile": "Agent auswählen",
     "profileMissing": "Den Agenten „{{name}}“ gibt es nicht mehr. Wähle einen Agenten zum Starten.",
     "codexHint": "Startet Codex in dieser Pane. Benötigt Codex und Node.js. Beim ersten Start die DM-Workspace-Hooks in Codex mit /hooks prüfen und ihnen vertrauen.",
     "codexLimits": "Codex-Freigabeereignisse bestätigen keinen Eingabebedarf und werden als „Unbekannt“ angezeigt, bis ein weiteres Ereignis vorliegt. Allgemeine Fehler und nicht alle Rückfragewerkzeuge werden von seinen Hooks erfasst.",

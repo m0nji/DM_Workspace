@@ -144,7 +144,7 @@ process.stdin.on('data', data => { if (data.includes(3)) process.exit(0); });
       await win.evaluate(() => window.api.input({ paneId: 'original', data: 'unfinished-input' }));
       await original.getByRole('button', { name: 'Agent status', exact: true }).click();
       const dialog = win.getByRole('alertdialog');
-      await dialog.getByRole('combobox').selectOption(provider);
+      await dialog.locator(`input[type="radio"][value="${provider}"]`).check();
       // The shell's first cwd report can replace an 8.3 Windows path (and
       // backslashes) while the dialog is open. Compare the actual directory.
       await expect.poll(async () => realpathSync.native((await dialog.locator('.agent-folder').innerText()).replace(/(?:New|Current) pane in folder: /, ''))).toBe(realpathSync.native(project));
@@ -257,7 +257,7 @@ test('the agent dialog hands focus to the terminal even when a frame runs before
     await expect.poll(() => win.evaluate(() => window.__store.getState().paneShell.source)).toBe('atPrompt');
     await win.getByRole('button', { name: 'Agent status', exact: true }).click();
     const dialog = win.getByRole('alertdialog');
-    await dialog.getByRole('combobox').selectOption('opencode');
+    await dialog.getByRole('radio', { name: 'OpenCode', exact: true }).check();
     // A busy renderer can paint a frame before React commits the dialog's
     // removal. Run animation frames as microtasks to force that order.
     await win.evaluate(() => {
@@ -319,7 +319,7 @@ exec /bin/bash --noprofile --norc "$@"
     await expect.poll(() => win.evaluate(() => window.api.checkAgentStart('source', { id: 'opencode', adapter: 'opencode', name: 'opencode', icon: { kind: 'logo', logo: 'opencode' }, command: 'opencode', args: [], env: {}, showInMenu: true }))).toBe('ready');
     await win.getByRole('button', { name: 'Agent status', exact: true }).click();
     const dialog = win.getByRole('alertdialog');
-    await dialog.getByRole('combobox').selectOption('opencode');
+    await dialog.getByRole('radio', { name: 'OpenCode', exact: true }).check();
     await dialog.getByRole('button', { name: 'Start agent', exact: true }).click();
     await expect(dialog.getByRole('button', { name: 'Checking installation …' })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
