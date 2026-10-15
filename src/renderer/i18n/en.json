@@ -17,6 +17,7 @@
       "error": "Error"
     },
     "provider": "Agent",
+    "chooseProfile": "Choose an agent",
     "profileMissing": "The agent “{{name}}” no longer exists. Choose an agent to start.",
     "codexHint": "Starts Codex in this pane. Requires Codex and Node.js. On first start, review and trust the DM Workspace hooks in Codex with /hooks.",
     "codexLimits": "Codex approval events do not confirm that user input is needed. They show Unknown until another event arrives. General errors and some question tools are not covered by its hooks.",

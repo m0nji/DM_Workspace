@@ -267,11 +267,12 @@ test.describe('agent profiles', () => {
     await expect(pane.locator('.pane-agent-status')).toHaveText('Session ended');
     await pane.getByRole('button', { name: 'Agent status', exact: true }).click();
     const dialog = win.getByRole('alertdialog');
-    await expect(dialog.getByRole('radiogroup', { name: 'Agent', exact: true }).getByRole('radio', { checked: true })).toHaveCount(0);
+    const agent = dialog.getByRole('combobox', { name: 'Agent', exact: true });
+    await expect(agent).toHaveValue('');
     await expect(dialog).toContainText('The agent “Gone” no longer exists. Choose an agent to start.');
     await expect(dialog.getByRole('button', { name: 'Restart', exact: true })).toBeDisabled();
     await expect(dialog.getByRole('button', { name: 'Show start command (manual)' })).toHaveCount(0);
-    await dialog.getByRole('radio', { name: 'Claude Code', exact: true }).check();
+    await agent.selectOption('claude');
     await expect(dialog.getByRole('button', { name: 'Restart', exact: true })).toBeEnabled();
     await expect(dialog).not.toContainText('no longer exists');
   });

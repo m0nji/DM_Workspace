@@ -2,6 +2,9 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.23.1 – 2026-10-15
+- fix: The agent start dialog lists agents in a drop-down again instead of tiles, so it stays compact with many agent profiles. The chosen agent's logo is shown next to the list.
+
 ## 0.23.0 – 2026-10-15
 - feat: The agent start dialog shows each agent as a tile with its logo instead of a plain drop-down list, and highlights the chosen one. Arrow keys switch between agents, and the pane's folder is set apart in its own box.
 

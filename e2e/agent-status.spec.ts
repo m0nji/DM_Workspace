@@ -73,9 +73,8 @@ test('Claude setup and explicit events drive only the target pane, with no silen
     await panes.first().getByRole('button', { name: 'Agent status', exact: true }).click();
     await expect(dialog.getByRole('button', { name: 'Restart', exact: true })).toBeFocused();
     await win.keyboard.press('Tab');
-    await expect(dialog.getByRole('radio', { name: 'Claude Code', exact: true })).toBeFocused();
-    await win.keyboard.press('ArrowDown');
-    await expect(dialog.getByRole('radio', { name: 'Codex', exact: true })).toBeChecked();
+    await expect(dialog.getByRole('combobox', { name: 'Agent', exact: true })).toBeFocused();
+    await dialog.getByRole('combobox', { name: 'Agent', exact: true }).selectOption('codex');
     await dialog.getByRole('button', { name: 'Show start command (manual)' }).click();
     await expect(dialog.locator('code')).toContainText('codex -c');
     await expect(dialog).toContainText('/hooks');

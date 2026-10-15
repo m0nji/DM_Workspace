@@ -1,5 +1,5 @@
 import { agentPhase, agentLabelKey } from '../../shared/agent-presentation';
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
@@ -24,7 +24,6 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
   // A deleted profile is not silently replaced by another one: the snapshot
   // only carries name and icon, so a restart needs an explicit choice.
   const profile = profiles.find(p => p.id === profileId);
-  const pickerName = useId();
   const [showDetails, setShowDetails] = useState(false);
   const [pending, setPending] = useState(false);
   const [dialog, setDialog] = useState<{ command?: string; error?: 'endError' | 'reconnectError' | 'stopError' | 'setupError' | 'promptRequired' | `startErrors.${'missing-cli' | 'missing-node' | 'unsupported-shell' | 'unsupported-argument' | 'check-failed'}` } | null>(null);
@@ -132,18 +131,14 @@ export function AgentStatus({ paneId, remote }: { paneId: string; remote: boolea
       tone={confirmEnd ? 'danger' : 'brand'}
       message={confirmEnd ? t('agent.endConfirm') : <>
         {connected && <span className="agent-help">{state.profileName} · {label}<br />{t(`agent.hint.${phase ?? 'waiting'}`)}{phase === 'live' && state.status === 'unknown' && <><br />{t(state.event === 'PermissionRequest' ? 'agent.approvalUnknown' : 'agent.evidenceUnknown')}</>}</span>}
-        {!remote && canShowStart && <span className="agent-picker" role="radiogroup" aria-label={t('agent.provider')}>
-          {profiles.map((p, i) => <label key={p.id} className={`agent-choice${p.id === profile?.id ? ' selected' : ''}`}>
-            {/* The dialog's own Tab trap visits every tabbable control, so only
-                the chosen radio (or the first, with none chosen) is tabbable;
-                arrow keys still move within the group. */}
-            <input type="radio" name={pickerName} value={p.id} checked={p.id === profile?.id} disabled={pending}
-              tabIndex={p.id === profile?.id || (!profile && i === 0) ? 0 : -1}
-              onChange={() => { setProfileId(p.id); setDialog({}); }} />
-            <span className="agent-choice-icon"><AgentLogo icon={p.icon} name={p.name} size={18} decorative /></span>
-            <span className="agent-choice-name">{p.name}</span>
-          </label>)}
-        </span>}
+        {!remote && canShowStart && <label className="agent-picker">
+          <span className="agent-picker-icon">{profile && <AgentLogo icon={profile.icon} name={profile.name} size={18} decorative />}</span>
+          <select aria-label={t('agent.provider')} value={profile?.id ?? ''} disabled={pending}
+            onChange={e => { setProfileId(e.target.value); setDialog({}); }}>
+            {!profile && <option value="" disabled>{t('agent.chooseProfile')}</option>}
+            {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>}
         {!remote && canShowStart && !profile && <span className="agent-help" role="status">{t('agent.profileMissing', { name: state?.profileName ?? profileId })}</span>}
         {canShowStart && (remote || profile) && <span className="agent-help">{t(remote ? 'agent.remoteHint' : profile!.adapter === 'generic' ? 'agent.genericHint' : profile!.adapter === 'opencode' ? 'agent.opencodeHint' : profile!.adapter === 'codex' ? 'agent.codexHint' : 'agent.setupHint')}</span>}
         {!remote && canShowStart && <span className="agent-help agent-folder">{t('agent.startFolder', { cwd })}</span>}

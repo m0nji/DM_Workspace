@@ -1688,24 +1688,18 @@ body.drag-active webview { pointer-events: none; }
 .agent-command { max-height: 160px; overflow-y: auto; display: block; overflow-wrap: anywhere; user-select: text; padding: 10px;
   margin-bottom: 12px; background: var(--bg); color: var(--text); border-radius: 6px; }
 
-/* Agent picker in the start dialog: icon tiles instead of a native select,
-   which cannot show the agent logos. Spans, because ConfirmDialog renders the
-   message inside a <p>. */
-.agent-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
-.agent-choice { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-panel);
-  background: var(--input); color: var(--text); cursor: pointer; line-height: 1.3;
-  transition: border-color .12s ease, background-color .12s ease; }
-.agent-choice:hover { border-color: var(--border-hover); background: var(--panel-elevated); }
-.agent-choice.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--text-strong); }
-.agent-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.agent-choice:has(input:disabled) { cursor: default; opacity: .6; }
-.agent-choice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
-.agent-choice-icon { flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: var(--radius-control); background: var(--panel-elevated);
+/* Agent picker in the start dialog: a native select scales to many profiles;
+   the logo of the chosen agent sits in front of it. Label and spans, because
+   ConfirmDialog renders the message inside a <p>. */
+.agent-picker { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.agent-picker-icon { flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; box-sizing: border-box; border-radius: var(--radius-control); background: var(--panel-elevated);
   border: 1px solid var(--border-subtle); color: var(--text); }
-.agent-choice.selected .agent-choice-icon { border-color: var(--accent); }
-.agent-choice-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.agent-picker select { flex: 1; min-width: 0; height: 32px; color: var(--text); background: var(--input);
+  border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 8px; font: inherit; font-size: 13px; }
+.agent-picker select:hover:not(:disabled) { border-color: var(--border-hover); }
+.agent-picker select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.agent-picker select:disabled { opacity: .6; }
 
 .agent-overview-trigger { position: relative; }
 .agent-overview-trigger.has-attention { color: var(--accent); }
