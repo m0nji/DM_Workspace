@@ -182,7 +182,11 @@ jobs:
     # existing draft instead of racing to create a second one.
     needs: windows
     if: ${{ always() && !cancelled() && (!inputs.platform || inputs.platform == 'all' || inputs.platform == 'linux') }}
-    runs-on: ubuntu-latest
+    # Fest auf 24.04: Das 26.04-Image hinter ubuntu-latest erreichte im
+    # November 2026 die Ubuntu-Paketserver nicht (DNS), install-deps brach ab.
+    # 24.04 ist zudem die Basis bis 0.23.x und hält die glibc-Anforderung
+    # des AppImage niedrig.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
