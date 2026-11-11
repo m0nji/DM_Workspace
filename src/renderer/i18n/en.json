@@ -139,6 +139,7 @@
       "session": "Session",
       "notifications": "Notifications",
       "account": "Account & servers",
+      "transfer": "Backup & transfer",
       "updates": "Updates",
       "agents": "AI agents"
     },
@@ -473,6 +474,31 @@
         "pair": "Generating pairing code …",
         "stop": "Stopping the Codex service …"
       }
+    },
+    "transfer": {
+      "exportTitle": "Export settings",
+      "exportHint": "Saves all settings, AI agents with their launch parameters, templates and workspaces to a JSON file that you can import on another computer. Server sign-ins and terminal history are not exported.",
+      "exportButton": "Export…",
+      "exportSecretsHint": "Environment variables of AI agents (e.g. API keys) are stored in plain text in the file. Keep it somewhere safe.",
+      "exported": "Saved as {{file}}",
+      "errorWrite": "The file could not be written.",
+      "importTitle": "Import settings",
+      "importHint": "Reads an exported file. Before anything is applied you see what it contains and choose what to import.",
+      "importButton": "Choose file…",
+      "fileInfo": "{{file}} · exported on {{date}} with version {{version}}",
+      "unknown": "unknown",
+      "partSettings": "Settings incl. AI agents ({{agents}}) and servers ({{servers}})",
+      "partTemplates": "Templates ({{count}})",
+      "partWorkspaces": "Workspaces ({{count}})",
+      "importRules": "Settings replace the current ones. Templates and workspaces are added; a template with the same name is overwritten, a workspace that already exists (same name and folder) is skipped. Servers need a new sign-in afterwards.",
+      "importTrustHint": "Only import files from a trusted source: AI agents and templates contain commands that run when started.",
+      "cancel": "Cancel",
+      "confirmImport": "Import",
+      "imported": "Import complete.",
+      "errorUnreadable": "The file could not be read.",
+      "errorTooLarge": "The file is too large to be a settings file.",
+      "errorInvalid": "This is not a valid DM Workspace settings file.",
+      "errorNewerVersion": "The file comes from a newer version of DM Workspace. Please update first."
     }
   },
   "palette": {

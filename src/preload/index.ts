@@ -10,7 +10,8 @@ import type {
   RemoteWorkspaceInfo, RemoteConnectionInfo, RemoteStatusEvent, RemoteDriverEvent,
   RemotePresenceEvent, RemoteFsListResult, RemoteFsReadResult, RemoteFsWriteResult,
   RemoteFsOkResult, ServerConfig, RemoteTaskEvent, RemoteTaskListResult, RemoteTaskResult,
-  RemoteTaskOkResult, RemoteTaskRunsResult, RemoteRunResult, RemoteMembersResult
+  RemoteTaskOkResult, RemoteTaskRunsResult, RemoteRunResult, RemoteMembersResult,
+  SettingsExportPayload, SettingsExportResult, SettingsImportResult
 } from '../shared/types';
 
 // Route pty:data / pty:exit to per-pane subscribers through a SINGLE ipcRenderer
@@ -66,6 +67,9 @@ const api: RendererApi = {
   loadState: () => ipcRenderer.invoke('state:load') as Promise<AppState>,
   saveState: (state: AppState) => ipcRenderer.invoke('state:save', state),
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory') as Promise<string | null>,
+  exportSettings: (payload: SettingsExportPayload) =>
+    ipcRenderer.invoke('settings:export', payload) as Promise<SettingsExportResult>,
+  importSettings: () => ipcRenderer.invoke('settings:import') as Promise<SettingsImportResult>,
   resolveLink: (rel: string, cwd: string, roots: string[]) =>
     ipcRenderer.invoke('link:resolve', { rel, cwd, roots }) as Promise<string | null>,
   readFile: (path: string) => ipcRenderer.invoke('file:read', path) as Promise<string>,

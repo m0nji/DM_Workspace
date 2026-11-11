@@ -18,7 +18,7 @@ export type CodexRemoteResult =
 
 export type Direction = 'h' | 'v'; // 'h' = left/right, 'v' = top/bottom
 
-export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'session' | 'notifications' | 'agents' | 'account' | 'updates';
+export type SettingsSection = 'appearance' | 'shortcuts' | 'templates' | 'session' | 'notifications' | 'agents' | 'account' | 'transfer' | 'updates';
 
 export type WorkspaceNavigationPlacement = 'left' | 'top';
 
@@ -180,6 +180,45 @@ export interface AppState {
   activeWorkspaceId: string | null;
   settings: Settings;
   windowBounds?: WindowBounds; // vom Main-Prozess verwaltet; fehlt beim Erststart
+}
+
+// ---- Einstellungen sichern & übertragen ----
+// Datei, die "Einstellungen exportieren" schreibt und "Importieren" liest. Sie
+// enthält alles, was in state.json portabel ist — NIE Session-Tokens (die liegen
+// in remote-auth.json, per safeStorage an diesen Rechner gebunden), nie
+// Fenstergröße oder Terminal-Verlauf. Pfade unter dem Home-Ordner werden als
+// "~/..." geschrieben, damit sie auf einem Rechner mit anderem Benutzernamen
+// passen.
+export const SETTINGS_EXPORT_FORMAT = 'dm-workspace-settings';
+export const SETTINGS_EXPORT_VERSION = 1;
+
+export interface SettingsExportFile {
+  format: typeof SETTINGS_EXPORT_FORMAT;
+  formatVersion: typeof SETTINGS_EXPORT_VERSION;
+  appVersion: string;
+  exportedAt: string; // ISO-8601
+  settings: Settings;
+  workspaceTemplates: WorkspaceTemplate[];
+  workspaces: Workspace[];
+  workspaceGroups: WorkspaceGroup[];
+}
+
+// Was der Renderer zum Export schickt; Kopf (format, Version, Zeit) setzt Main.
+export type SettingsExportPayload = Pick<SettingsExportFile, 'settings' | 'workspaceTemplates' | 'workspaces' | 'workspaceGroups'>;
+
+export type SettingsExportResult =
+  | { ok: true; fileName: string }
+  | { ok: false; code: 'canceled' | 'write-failed' };
+
+export type SettingsImportResult =
+  | { ok: true; fileName: string; file: SettingsExportFile }
+  | { ok: false; code: 'canceled' | 'unreadable' | 'too-large' | 'invalid' | 'unsupported-version' };
+
+// Teile, die beim Import einzeln an- oder abgewählt werden können.
+export interface SettingsImportParts {
+  settings: boolean;   // alle Einstellungen inkl. Agentenprofile und Serverliste
+  templates: boolean;  // Workspace-Vorlagen
+  workspaces: boolean; // Workspaces (Register) und ihre Gruppen
 }
 
 // ---- File browser ----
@@ -567,6 +606,9 @@ export interface RendererApi {
   loadState(): Promise<AppState>;
   saveState(state: AppState): Promise<void>;
   pickDirectory(): Promise<string | null>;
+  // Einstellungen sichern & übertragen: beide öffnen einen nativen Datei-Dialog.
+  exportSettings(payload: SettingsExportPayload): Promise<SettingsExportResult>;
+  importSettings(): Promise<SettingsImportResult>;
   // resolve a relative link target against cwd / its subdirs / workspace roots; null if not found
   resolveLink(rel: string, cwd: string, roots: string[]): Promise<string | null>;
   // read a UTF-8 text file (used by the markdown preview)

@@ -854,6 +854,9 @@ input[type="checkbox"]:checked::after {
 .root[data-brand-design="graphite"] .confirm-btn-danger:hover:not(:disabled) {
   background: #c2634a; border-color: #c2634a; }
 .update-status { flex: 1; color: var(--muted); font-size: 12px; }
+/* Einstellungen sichern & übertragen */
+.transfer-error { color: var(--danger); }
+.transfer-actions { justify-content: flex-end; margin-top: 4px; }
 
 /* Top-right update indicator (TitlebarActions → UpdateBadge). Accent pill so an
    available/staged update is obvious at a glance; opts out of the titlebar drag

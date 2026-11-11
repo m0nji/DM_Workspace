@@ -2,6 +2,10 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.24.0 – 2026-11-11
+- feat: Export and import your settings in Settings → Backup & transfer. One JSON file carries all settings, AI agents with their launch parameters, environment variables and start prompts, keyboard shortcuts, templates and workspaces, so a new computer is set up in one step. Before anything is applied you see what the file contains and choose what to import. Folders under your home directory are adjusted to the new computer, and workspaces that already exist are not added twice. Server sign-ins and terminal history are not exported; environment variables are stored in plain text, so keep the file safe.
+- fix: Updated Electron to 42 together with the latest security fixes for DOMPurify, Vite, undici and Zod.
+
 ## 0.23.2 – 2026-10-15
 - fix: On macOS you can select text with Option+drag while a program such as Codex or Claude Code tracks the mouse. Before, there was no way to select text there with the mouse.
 - fix: On macOS a right-click next to a selection no longer clears it, so "Copy" in the context menu stays available. Without a selection, a right-click still selects the word under the pointer.

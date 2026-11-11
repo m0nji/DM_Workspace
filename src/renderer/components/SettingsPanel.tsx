@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ParseKeys } from 'i18next';
 import { useStore } from '../store';
 import { AgentSettingsSection } from './AgentSettingsSection';
+import { SettingsTransferSection } from './SettingsTransferSection';
 import { Icon, type IconName } from './Icon';
 import type { BusyIndicator, RemoteAuthStatus, ServerConfig, SettingsSection } from '../../shared/types';
 import {
@@ -424,6 +425,7 @@ const SECTIONS: { id: SettingsSection; labelKey: ParseKeys; icon: IconName }[] =
   { id: 'session', labelKey: 'settings.nav.session', icon: 'history' },
   { id: 'notifications', labelKey: 'settings.nav.notifications', icon: 'bell' },
   { id: 'account', labelKey: 'settings.nav.account', icon: 'server' },
+  { id: 'transfer', labelKey: 'settings.nav.transfer', icon: 'save' },
   { id: 'updates', labelKey: 'settings.nav.updates', icon: 'download' }
 ];
 
@@ -794,6 +796,7 @@ export function SettingsPanel(): React.JSX.Element | null {
             )}
             {section === 'agents' && <AgentSettingsSection />}
             {section === 'account' && <AccountSection />}
+            {section === 'transfer' && <SettingsTransferSection />}
             {section === 'updates' && <UpdateSection />}
           </div>
         </div>

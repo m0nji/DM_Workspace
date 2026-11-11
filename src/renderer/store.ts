@@ -2,7 +2,7 @@ import type { AgentProvider, AgentState } from '../shared/agent-state';
 import { create } from 'zustand';
 import type {
   AppState, PresetKind, Direction, Workspace, WorkspaceGroup, WorkspaceTemplate, Settings, UpdateEvent,
-  PaneShellState, PaneStatus, SettingsSection,
+  PaneShellState, PaneStatus, SettingsSection, SettingsExportFile, SettingsImportParts,
   LayoutNode, RemoteConnectionStatus, RemoteDriverEvent, RemotePaneInfo, RemotePresenceEvent,
   RemotePresenceUser, RemoteRole, RemoteStatusEvent, RemoteWorkspaceRef, ServerConfig, SpawnTargetScope,
   RemoteTask, RemoteTaskAccess, RemoteTaskError, RemoteTaskEvent, RemoteProjectMember, AgentCheck
@@ -17,6 +17,7 @@ import {
 import { findPaneInDirection, type NavDirection } from '../shared/layout-navigate';
 import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
 import { createIdGenerator } from '../shared/ids';
+import { applySettingsImport } from './settings-import';
 import { DEFAULT_THEME_ID } from '../shared/themes';
 import { USER_SCOPE_KEY, isRemotePaneKey, parseRemotePaneKey, remotePaneKey, remoteScopeKey } from '../shared/remote-pane-key';
 import type { ShortcutAction } from '../shared/shortcuts';
@@ -443,6 +444,8 @@ export interface StoreState extends AppState {
   // settings
   settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
+  // Übernimmt eine geprüfte Exportdatei (Einstellungen sichern & übertragen).
+  importSettingsFile: (file: SettingsExportFile, parts: SettingsImportParts) => void;
   setAgentProfiles: (profiles: AgentProfile[]) => void;
   agentSettingsFocus: string | null;
   setAgentSettingsFocus: (profileId: string | null) => void;
@@ -1109,6 +1112,34 @@ export const useStore = create<StoreState>((set, get) => ({
 
   updateSettings: (patch) => set((s) => {
     const next = { ...s, settings: { ...s.settings, ...patch } };
+    persist(next);
+    return next;
+  }),
+
+  importSettingsFile: (file, parts) => set((s) => {
+    const merged = applySettingsImport({
+      settings: s.settings,
+      workspaces: s.workspaces,
+      workspaceTemplates: s.workspaceTemplates ?? [],
+      workspaceGroups: s.workspaceGroups ?? [],
+      activeWorkspaceId: s.activeWorkspaceId
+    }, file, parts, {
+      pane: nextPaneId, split: nextSplitId, workspace: nextWsId, template: nextTemplateId, group: nextGroupId,
+      server: nextServerId
+    });
+    const { addedServers, ...imported } = merged;
+    // Neue Server-ids aus der Datei: der Generator muss dahinter weiterzählen,
+    // und die Main-Registry braucht sie wie bei addServer.
+    nextServerId.seed(addedServers.map((srv) => srv.id));
+    for (const server of addedServers) {
+      void window.api.serverAdd(server).catch((err: unknown) => console.error('server:add failed:', err));
+    }
+    const activeChanged = imported.activeWorkspaceId !== s.activeWorkspaceId;
+    const next = {
+      ...s,
+      ...imported,
+      ...(activeChanged ? { maximizedPaneId: null, focusedPaneId: null } : {})
+    };
     persist(next);
     return next;
   }),

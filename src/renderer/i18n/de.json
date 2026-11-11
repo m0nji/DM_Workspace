@@ -139,6 +139,7 @@
       "session": "Sitzung",
       "notifications": "Benachrichtigungen",
       "account": "Konto & Server",
+      "transfer": "Sichern & Übertragen",
       "updates": "Updates",
       "agents": "KI-Agenten"
     },
@@ -473,6 +474,31 @@
         "pair": "Kopplungscode wird erzeugt …",
         "stop": "Codex-Dienst wird gestoppt …"
       }
+    },
+    "transfer": {
+      "exportTitle": "Einstellungen exportieren",
+      "exportHint": "Speichert alle Einstellungen, KI-Agenten mit ihren Startparametern, Vorlagen und Workspaces in eine JSON-Datei, die du auf einem anderen Rechner importieren kannst. Server-Anmeldungen und Terminal-Verlauf werden nicht exportiert.",
+      "exportButton": "Exportieren…",
+      "exportSecretsHint": "Umgebungsvariablen der KI-Agenten (z. B. API-Keys) stehen im Klartext in der Datei. Bewahre sie entsprechend sicher auf.",
+      "exported": "Gespeichert als {{file}}",
+      "errorWrite": "Die Datei konnte nicht geschrieben werden.",
+      "importTitle": "Einstellungen importieren",
+      "importHint": "Liest eine exportierte Datei ein. Vor dem Übernehmen siehst du, was enthalten ist, und wählst aus, was importiert wird.",
+      "importButton": "Datei auswählen…",
+      "fileInfo": "{{file}} · exportiert am {{date}} mit Version {{version}}",
+      "unknown": "unbekannt",
+      "partSettings": "Einstellungen inkl. KI-Agenten ({{agents}}) und Server ({{servers}})",
+      "partTemplates": "Vorlagen ({{count}})",
+      "partWorkspaces": "Workspaces ({{count}})",
+      "importRules": "Einstellungen ersetzen die aktuellen. Vorlagen und Workspaces werden ergänzt; eine gleichnamige Vorlage wird überschrieben, ein bereits vorhandener Workspace (gleicher Name und Ordner) übersprungen. Bei Servern ist danach eine neue Anmeldung nötig.",
+      "importTrustHint": "Importiere nur Dateien aus vertrauenswürdiger Quelle: KI-Agenten und Vorlagen enthalten Befehle, die beim Start ausgeführt werden.",
+      "cancel": "Abbrechen",
+      "confirmImport": "Importieren",
+      "imported": "Import abgeschlossen.",
+      "errorUnreadable": "Die Datei konnte nicht gelesen werden.",
+      "errorTooLarge": "Die Datei ist zu groß für eine Einstellungsdatei.",
+      "errorInvalid": "Das ist keine gültige DM-Workspace-Einstellungsdatei.",
+      "errorNewerVersion": "Die Datei stammt aus einer neueren Version von DM Workspace. Bitte zuerst aktualisieren."
     }
   },
   "palette": {

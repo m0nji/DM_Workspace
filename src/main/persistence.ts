@@ -204,7 +204,7 @@ function migrateLayout(raw: unknown, depth = 0): LayoutNode | null | undefined {
   };
 }
 
-function migrateWorkspace(raw: unknown): Workspace | undefined {
+export function migrateWorkspace(raw: unknown): Workspace | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const r = raw as Record<string, unknown>;
   if (typeof r.id !== 'string' || r.id.length === 0) return undefined;
@@ -248,7 +248,7 @@ function migrateWorkspace(raw: unknown): Workspace | undefined {
 // A template requires a real (non-null) layout. confirmStartupCommands defaults
 // to the safe value (true) when missing. Optional string maps are kept only when
 // non-empty so a template round-trips to an identical object.
-function migrateWorkspaceTemplate(raw: unknown): WorkspaceTemplate | undefined {
+export function migrateWorkspaceTemplate(raw: unknown): WorkspaceTemplate | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const r = raw as Record<string, unknown>;
   if (typeof r.id !== 'string' || r.id.length === 0) return undefined;
@@ -289,7 +289,7 @@ function migrateWorkspaceGroup(raw: unknown): WorkspaceGroup | undefined {
 // losing one group beats losing every workspace. On a duplicate id the first
 // entry wins: a `groupId` names exactly one group, so a second one carrying the
 // same id could never be addressed anyway.
-function migrateWorkspaceGroups(raw: unknown): WorkspaceGroup[] {
+export function migrateWorkspaceGroups(raw: unknown): WorkspaceGroup[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   const out: WorkspaceGroup[] = [];

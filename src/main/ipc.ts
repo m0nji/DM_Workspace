@@ -9,12 +9,17 @@ import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { homedir } from 'node:os';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { AgentStatusBridge } from './agent-status-bridge';
 import { PtyManager, resolveWindowsShell } from './pty-manager';
 import { BackendRouter, type TerminalBackend } from './terminal-backend';
 import { createPtyDataBatcher } from './pty-data-batcher';
 import { loadStateFromFile, saveStateToFile } from './persistence';
+import {
+  buildSettingsExport, defaultExportFileName, MAX_IMPORT_BYTES, parseSettingsExport,
+  serializeSettingsExport, SettingsImportError
+} from './settings-transfer';
+import { writeFileAtomic } from './atomic-write';
 import { ScrollbackStore } from './scrollback';
 import { collectPaneIds } from '../shared/layout-tree';
 import { currentWindowBounds } from './window-bounds';
@@ -34,7 +39,8 @@ import {
 import { AuthManager } from './remote/auth-manager';
 import { RemoteManager } from './remote/remote-manager';
 import type {
-  AppState, PtyDataEvent, PtyExitEvent, PtySpawnResult, WindowBounds
+  AppState, PtyDataEvent, PtyExitEvent, PtySpawnResult, SettingsExportPayload, SettingsExportResult,
+  SettingsImportResult, WindowBounds
 } from '../shared/types';
 
 // Ein Payload, der die Prüfung nicht besteht, ist immer ein Bug im Renderer (die
@@ -732,6 +738,67 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     if (!win) return null;
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
     return res.canceled ? null : res.filePaths[0];
+  });
+
+  // Einstellungen sichern & übertragen (settings-transfer.ts). Der Renderer
+  // liefert seinen aktuellen Stand — der ist maßgeblich, state.json hinkt bei
+  // Layout-Änderungen per Debounce hinterher. Import liefert nur die geprüfte
+  // Datei zurück; übernommen wird erst nach Bestätigung im Renderer.
+  // e2e: feste Pfade statt nativer Dialoge, die Playwright nicht bedienen kann.
+  handle('settings:export', async (_e, raw: unknown): Promise<SettingsExportResult> => {
+    if (typeof raw !== 'object' || raw === null) { rejectPayload('settings:export', raw); throw new Error('settings:export: invalid payload'); }
+    const now = new Date();
+    const file = buildSettingsExport(raw as SettingsExportPayload, { appVersion: __APP_VERSION__, now, home: homedir() });
+    let target: string | undefined;
+    if (process.env.DMWS_E2E && process.env.DMWS_E2E_EXPORT_FILE) {
+      target = process.env.DMWS_E2E_EXPORT_FILE;
+    } else {
+      const win = getWindow();
+      const options: Electron.SaveDialogOptions = {
+        defaultPath: join(app.getPath('documents'), defaultExportFileName(now)),
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      };
+      const res = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+      if (res.canceled || !res.filePath) return { ok: false, code: 'canceled' };
+      target = res.filePath;
+    }
+    try {
+      // Owner-only: Agentenprofile können API-Keys in Umgebungsvariablen tragen.
+      writeFileAtomic(target, serializeSettingsExport(file), { mode: 0o600 });
+    } catch (err) {
+      console.error('[settings:export] write failed:', (err as NodeJS.ErrnoException).code ?? 'unknown');
+      return { ok: false, code: 'write-failed' };
+    }
+    return { ok: true, fileName: basename(target) };
+  });
+
+  handle('settings:import', async (): Promise<SettingsImportResult> => {
+    let source: string | undefined;
+    if (process.env.DMWS_E2E && process.env.DMWS_E2E_IMPORT_FILE) {
+      source = process.env.DMWS_E2E_IMPORT_FILE;
+    } else {
+      const win = getWindow();
+      const options: Electron.OpenDialogOptions = {
+        properties: ['openFile'],
+        defaultPath: app.getPath('documents'),
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+      };
+      const res = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+      if (res.canceled || res.filePaths.length === 0) return { ok: false, code: 'canceled' };
+      source = res.filePaths[0];
+    }
+    let text: string;
+    try {
+      if (statSync(source).size > MAX_IMPORT_BYTES) return { ok: false, code: 'too-large' };
+      text = readFileSync(source, 'utf8');
+    } catch {
+      return { ok: false, code: 'unreadable' };
+    }
+    try {
+      return { ok: true, fileName: basename(source), file: parseSettingsExport(text, homedir()) };
+    } catch (err) {
+      return { ok: false, code: err instanceof SettingsImportError ? err.code : 'invalid' };
+    }
   });
 
   handle('link:resolve', (_e, req: { rel: string; cwd: string; roots: string[] }): string | null =>

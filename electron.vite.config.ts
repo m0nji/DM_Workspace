@@ -16,6 +16,8 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     resolve: { alias: dmwAlias },
+    // app.getVersion() liefert unverpackt (dev, e2e) die Electron-Version.
+    define: { __APP_VERSION__: JSON.stringify(version) },
     build: { rollupOptions: { input: resolve(__dirname, 'src/main/index.ts') } }
   },
   preload: {
