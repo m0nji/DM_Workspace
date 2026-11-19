@@ -206,6 +206,16 @@ describe('Pfeiltasten-Kuerzel fuer den Fokuswechsel', () => {
     expect(pc.focusPaneDown).toBe(mac.focusPaneDown);
   });
 
+  it('legt das Verschieben auf Fokus-Kuerzel plus Alt, ohne Konflikt', () => {
+    for (const mac of [true, false]) {
+      const d = getDefaultShortcuts(mac);
+      expect(d.movePaneLeft).toBe('Mod+Alt+Shift+ArrowLeft');
+      expect(d.movePaneDown).toBe('Mod+Alt+Shift+ArrowDown');
+      const values = Object.values(d);
+      expect(new Set(values).size).toBe(values.length);
+    }
+  });
+
   it('leitet das Token aus dem physischen code ab', () => {
     const ev = { key: 'ArrowLeft', code: 'ArrowLeft', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true };
     expect(shortcutFromEvent(ev, false)).toBe('Mod+Shift+ArrowLeft');

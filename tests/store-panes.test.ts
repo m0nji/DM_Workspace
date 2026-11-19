@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../src/renderer/store';
 import { registerTerminalFocus, unregisterTerminalFocus } from '../src/renderer/terminal-registry';
-import type { LayoutNode } from '../src/shared/types';
+import type { LayoutNode, SplitNode } from '../src/shared/types';
 
 const pane = (id: string): LayoutNode => ({ type: 'pane', id });
 const split = (id: string, direction: 'h' | 'v', a: LayoutNode, b: LayoutNode): LayoutNode =>
@@ -187,6 +187,71 @@ describe('Panes tauschen im Store', () => {
     expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
     useStore.getState().swapPanesInLayout('tl', 'gibtesnicht');
     expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+  });
+
+  describe('movePaneInLayout', () => {
+    it('dockt ein Pane an den Rand eines anderen an', () => {
+      useStore.getState().movePaneInLayout('tr', 'tl', 'bottom');
+      const root = useStore.getState().workspaces[0].layout as SplitNode;
+      expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+      // Oben steht jetzt ein vertikaler Split aus tl/tr statt der alten Zeile.
+      const top = root.children[0] as SplitNode;
+      expect(top.direction).toBe('v');
+      expect(top.children).toEqual([{ type: 'pane', id: 'tl' }, { type: 'pane', id: 'tr' }]);
+    });
+
+    it('laesst den Fokus auf derselben Pane-Id und schreibt weg', async () => {
+      await flushMicrotasks();
+      saveState.mockClear();
+      useStore.getState().movePaneInLayout('tl', 'br', 'right');
+      await flushMicrotasks();
+      expect(useStore.getState().focusedPaneId).toBe('tl');
+      expect(saveState).toHaveBeenCalled();
+    });
+
+    it('dockt am Aussenrand des ganzen Layouts an', () => {
+      useStore.getState().dockPaneAtEdge('tr', 'bottom');
+      const root = useStore.getState().workspaces[0].layout as SplitNode;
+      expect(root.direction).toBe('v');
+      expect(root.children[1]).toEqual({ type: 'pane', id: 'tr' });
+      expect(paneOrder()).toEqual(['tl', 'bl', 'br', 'tr']);
+    });
+
+    it('verschiebt das fokussierte Pane per Richtung (Tausch mit Nachbar)', () => {
+      useStore.setState({ focusedPaneId: 'tl' });
+      useStore.getState().movePaneInDirection('right');
+      expect(paneOrder()).toEqual(['tr', 'tl', 'bl', 'br']);
+      useStore.getState().movePaneInDirection('down');
+      expect(paneOrder()).toEqual(['tr', 'br', 'bl', 'tl']);
+      expect(useStore.getState().focusedPaneId).toBe('tl');
+    });
+
+    it('verschiebt nichts am Rand oder bei maximiertem Pane', () => {
+      useStore.setState({ focusedPaneId: 'tl' });
+      useStore.getState().movePaneInDirection('left');
+      expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+      useStore.setState({ maximizedPaneId: 'tl' });
+      useStore.getState().movePaneInDirection('right');
+      expect(paneOrder()).toEqual(['tl', 'tr', 'bl', 'br']);
+      useStore.setState({ maximizedPaneId: null });
+    });
+
+    it('merkt sich die Aussenrand-Vorschau und raeumt sie mit dem Drag ab', () => {
+      useStore.getState().setDraggingPane('tl');
+      useStore.getState().setEdgeDockHover({ paneId: 'br', side: 'bottom' });
+      const first = useStore.getState().edgeDockHover;
+      useStore.getState().setEdgeDockHover({ paneId: 'br', side: 'bottom' });
+      expect(useStore.getState().edgeDockHover).toBe(first); // kein neues Objekt
+      useStore.getState().setDraggingPane(null);
+      expect(useStore.getState().edgeDockHover).toBeNull();
+    });
+
+    it('ist wirkungslos bei gleicher Id oder schon angedocktem Pane', () => {
+      const before = useStore.getState().workspaces[0].layout;
+      useStore.getState().movePaneInLayout('tl', 'tl', 'left');
+      useStore.getState().movePaneInLayout('tr', 'tl', 'right');
+      expect(useStore.getState().workspaces[0].layout).toBe(before);
+    });
   });
 
   // Waehrend eines Drags braucht JEDES Pane die Id der Quelle: nur damit kann

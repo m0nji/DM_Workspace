@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createIdGenerator } from '../src/shared/ids';
-import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset, swapPanes } from '../src/shared/layout-tree';
+import { makePane, collectPaneIds, splitPane, closePane, setRatio, makePreset, swapPanes, movePane, paneDropZoneAt, dockPaneAtRoot, rootDockSideAt } from '../src/shared/layout-tree';
 import type { SplitNode } from '../src/shared/types';
 
 describe('createIdGenerator', () => {
@@ -228,5 +228,177 @@ describe('swapPanes', () => {
     const result = swapPanes(tree, 'tl', 'tr') as SplitNode;
     // Nur der obere Split aendert sich; der untere bleibt dasselbe Objekt.
     expect(result.children[1]).toBe(tree.children[1]);
+  });
+});
+
+describe('movePane', () => {
+  // Ausgangslage aus dem Fehlerbild: links ein Pane, rechts zwei uebereinander.
+  //   l | rt
+  //     | --
+  //     | rb
+  const threeWay = (): SplitNode => ({
+    type: 'split', id: 's0', direction: 'h', ratio: 0.5,
+    children: [
+      makePane('l'),
+      { type: 'split', id: 's1', direction: 'v', ratio: 0.5, children: [makePane('rt'), makePane('rb')] }
+    ]
+  });
+
+  it('legt ein Pane unter ein anderes (rechts oben -> unter links)', () => {
+    const result = movePane(threeWay(), 'rt', 'l', 'bottom', 'sN');
+    expect(result).toEqual({
+      type: 'split', id: 's0', direction: 'h', ratio: 0.5,
+      children: [
+        { type: 'split', id: 'sN', direction: 'v', ratio: 0.5, children: [makePane('l'), makePane('rt')] },
+        makePane('rb')
+      ]
+    });
+  });
+
+  it('dockt links und oben vor dem Ziel an', () => {
+    const left = movePane(threeWay(), 'rb', 'l', 'left', 'sN') as SplitNode;
+    expect(collectPaneIds(left)).toEqual(['rb', 'l', 'rt']);
+    expect((left.children[0] as SplitNode).direction).toBe('h');
+
+    const top = movePane(threeWay(), 'rb', 'l', 'top', 'sN') as SplitNode;
+    expect(collectPaneIds(top)).toEqual(['rb', 'l', 'rt']);
+    expect((top.children[0] as SplitNode).direction).toBe('v');
+  });
+
+  it('laesst den alten Platz dem Geschwister zufallen', () => {
+    const result = movePane(threeWay(), 'l', 'rb', 'right', 'sN') as SplitNode;
+    // s0 ist weg, der rechte Split rueckt an die Wurzel.
+    expect(result.id).toBe('s1');
+    expect(result.children[0]).toEqual(makePane('rt'));
+    expect(result.children[1]).toEqual({
+      type: 'split', id: 'sN', direction: 'h', ratio: 0.5, children: [makePane('rb'), makePane('l')]
+    });
+  });
+
+  it('dreht zwei Geschwister von nebeneinander auf uebereinander', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(movePane(tree, 'b', 'a', 'bottom', 'sN')).toEqual({
+      type: 'split', id: 'sN', direction: 'v', ratio: 0.5, children: [makePane('a'), makePane('b')]
+    });
+  });
+
+  it('ist wirkungslos, wenn die Quelle schon an dieser Seite liegt', () => {
+    const tree = { ...splitPane(makePane('a'), 'a', 'h', 'b', 's1'), ratio: 0.3 } as SplitNode;
+    expect(movePane(tree, 'b', 'a', 'right', 'sN')).toBe(tree);
+    expect(movePane(tree, 'a', 'b', 'left', 'sN')).toBe(tree);
+  });
+
+  it('ist wirkungslos bei gleicher oder unbekannter Id', () => {
+    const tree = threeWay();
+    expect(movePane(tree, 'l', 'l', 'left', 'sN')).toBe(tree);
+    expect(movePane(tree, 'l', 'gibtesnicht', 'left', 'sN')).toBe(tree);
+    expect(movePane(tree, 'gibtesnicht', 'l', 'left', 'sN')).toBe(tree);
+  });
+
+  it('behaelt alle Panes', () => {
+    const result = movePane(threeWay(), 'rt', 'l', 'top', 'sN');
+    expect(collectPaneIds(result).sort()).toEqual(['l', 'rb', 'rt']);
+  });
+});
+
+describe('paneDropZoneAt', () => {
+  it('liefert die Mitte im inneren Bereich', () => {
+    expect(paneDropZoneAt(0.5, 0.5)).toBe('center');
+    expect(paneDropZoneAt(0.3, 0.7)).toBe('center');
+  });
+
+  it('liefert den naechsten Rand im aeusseren Viertel', () => {
+    expect(paneDropZoneAt(0.1, 0.5)).toBe('left');
+    expect(paneDropZoneAt(0.9, 0.5)).toBe('right');
+    expect(paneDropZoneAt(0.5, 0.1)).toBe('top');
+    expect(paneDropZoneAt(0.5, 0.9)).toBe('bottom');
+  });
+
+  it('entscheidet in der Ecke nach dem naeheren Rand', () => {
+    expect(paneDropZoneAt(0.05, 0.15)).toBe('left');
+    expect(paneDropZoneAt(0.15, 0.95)).toBe('bottom');
+  });
+
+  it('klemmt Werte ausserhalb von 0..1', () => {
+    expect(paneDropZoneAt(-0.2, 0.5)).toBe('left');
+    expect(paneDropZoneAt(0.5, 1.4)).toBe('bottom');
+  });
+});
+
+describe('dockPaneAtRoot', () => {
+  // 2x2-Gitter wie bei swapPanes
+  const grid = (): SplitNode => ({
+    type: 'split', id: 's0', direction: 'v', ratio: 0.4,
+    children: [
+      { type: 'split', id: 's1', direction: 'h', ratio: 0.3, children: [makePane('tl'), makePane('tr')] },
+      { type: 'split', id: 's2', direction: 'h', ratio: 0.6, children: [makePane('bl'), makePane('br')] }
+    ]
+  });
+
+  it('setzt ein Pane ueber die volle Breite unten', () => {
+    const result = dockPaneAtRoot(grid(), 'tr', 'bottom', 'sN') as SplitNode;
+    expect(result.id).toBe('sN');
+    expect(result.direction).toBe('v');
+    expect(result.children[1]).toEqual(makePane('tr'));
+    // Der Rest: oben tl allein (s1 kollabiert), unten weiter bl|br
+    expect(collectPaneIds(result.children[0])).toEqual(['tl', 'bl', 'br']);
+    expect((result.children[0] as SplitNode).ratio).toBe(0.4);
+  });
+
+  it('setzt ein Pane ueber die volle Hoehe links', () => {
+    const result = dockPaneAtRoot(grid(), 'br', 'left', 'sN') as SplitNode;
+    expect(result.direction).toBe('h');
+    expect(result.children[0]).toEqual(makePane('br'));
+    expect(collectPaneIds(result.children[1])).toEqual(['tl', 'tr', 'bl']);
+  });
+
+  it('ist wirkungslos, wenn das Pane schon so an der Wurzel steht', () => {
+    const tree = splitPane(makePane('a'), 'a', 'v', 'b', 's1');
+    expect(dockPaneAtRoot(tree, 'b', 'bottom', 'sN')).toBe(tree);
+    expect(dockPaneAtRoot(tree, 'a', 'top', 'sN')).toBe(tree);
+  });
+
+  it('dreht zwei Panes von nebeneinander auf uebereinander', () => {
+    const tree = splitPane(makePane('a'), 'a', 'h', 'b', 's1');
+    expect(dockPaneAtRoot(tree, 'a', 'bottom', 'sN')).toEqual({
+      type: 'split', id: 'sN', direction: 'v', ratio: 0.5, children: [makePane('b'), makePane('a')]
+    });
+  });
+
+  it('ist wirkungslos bei einzelnem Pane oder unbekannter Id', () => {
+    const lone = makePane('a');
+    expect(dockPaneAtRoot(lone, 'a', 'left', 'sN')).toBe(lone);
+    const tree = grid();
+    expect(dockPaneAtRoot(tree, 'gibtesnicht', 'left', 'sN')).toBe(tree);
+  });
+});
+
+describe('rootDockSideAt', () => {
+  const root = { left: 0, top: 0, right: 1000, bottom: 800 };
+  const topLeft = { left: 0, top: 0, right: 500, bottom: 400 };
+  const inner = { left: 500, top: 0, right: 1000, bottom: 400 }; // rechts oben
+
+  it('erkennt das Band an einer Layout-Kante, die das Pane beruehrt', () => {
+    expect(rootDockSideAt(topLeft, root, 10, 200)).toBe('left');
+    expect(rootDockSideAt(topLeft, root, 250, 10)).toBe('top');
+  });
+
+  it('bietet keine Kante an, die das Pane nicht beruehrt', () => {
+    // untere Kante des Panes liegt mitten im Layout
+    expect(rootDockSideAt(topLeft, root, 250, 395)).toBeNull();
+    expect(rootDockSideAt(inner, root, 505, 200)).toBeNull();
+  });
+
+  it('liefert ausserhalb des Bandes null', () => {
+    expect(rootDockSideAt(topLeft, root, 30, 200)).toBeNull();
+  });
+
+  it('nimmt in der Ecke die naehere Kante', () => {
+    expect(rootDockSideAt(topLeft, root, 5, 15)).toBe('left');
+    expect(rootDockSideAt(topLeft, root, 15, 5)).toBe('top');
+  });
+
+  it('toleriert Rundungsabweichungen von bis zu 2 px', () => {
+    expect(rootDockSideAt({ ...inner, right: 998.5 }, root, 990, 200)).toBe('right');
   });
 });

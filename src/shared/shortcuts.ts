@@ -18,7 +18,11 @@ export const SHORTCUT_ACTIONS = [
   'focusPaneLeft',
   'focusPaneRight',
   'focusPaneUp',
-  'focusPaneDown'
+  'focusPaneDown',
+  'movePaneLeft',
+  'movePaneRight',
+  'movePaneUp',
+  'movePaneDown'
 ] as const;
 
 export type ShortcutAction = typeof SHORTCUT_ACTIONS[number];
@@ -49,7 +53,13 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { action: 'focusPaneLeft', label: 'Focus pane left', macDefault: 'Mod+Shift+ArrowLeft', otherDefault: 'Mod+Shift+ArrowLeft' },
   { action: 'focusPaneRight', label: 'Focus pane right', macDefault: 'Mod+Shift+ArrowRight', otherDefault: 'Mod+Shift+ArrowRight' },
   { action: 'focusPaneUp', label: 'Focus pane up', macDefault: 'Mod+Shift+ArrowUp', otherDefault: 'Mod+Shift+ArrowUp' },
-  { action: 'focusPaneDown', label: 'Focus pane down', macDefault: 'Mod+Shift+ArrowDown', otherDefault: 'Mod+Shift+ArrowDown' }
+  { action: 'focusPaneDown', label: 'Focus pane down', macDefault: 'Mod+Shift+ArrowDown', otherDefault: 'Mod+Shift+ArrowDown' },
+  // Verschieben = Fokus-Kuerzel plus Alt: dieselbe Richtungslogik, eine Taste
+  // mehr. Das fokussierte Pane tauscht mit seinem Nachbarn in Pfeilrichtung.
+  { action: 'movePaneLeft', label: 'Move pane left', macDefault: 'Mod+Alt+Shift+ArrowLeft', otherDefault: 'Mod+Alt+Shift+ArrowLeft' },
+  { action: 'movePaneRight', label: 'Move pane right', macDefault: 'Mod+Alt+Shift+ArrowRight', otherDefault: 'Mod+Alt+Shift+ArrowRight' },
+  { action: 'movePaneUp', label: 'Move pane up', macDefault: 'Mod+Alt+Shift+ArrowUp', otherDefault: 'Mod+Alt+Shift+ArrowUp' },
+  { action: 'movePaneDown', label: 'Move pane down', macDefault: 'Mod+Alt+Shift+ArrowDown', otherDefault: 'Mod+Alt+Shift+ArrowDown' }
 ];
 
 const MODIFIERS = ['Mod', 'Alt', 'Shift'] as const;

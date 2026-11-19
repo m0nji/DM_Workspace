@@ -210,6 +210,14 @@ describe('buildCommandList', () => {
     expect(left?.hint).toBe('Ctrl+Shift+←');
   });
 
+  it('listet auch das Verschieben in alle vier Richtungen', () => {
+    const list = build();
+    expect(list.map((c) => c.id)).toEqual(expect.arrayContaining([
+      'move-pane-left', 'move-pane-right', 'move-pane-up', 'move-pane-down'
+    ]));
+    expect(list.find((c) => c.id === 'move-pane-left')?.hint).toBe('Ctrl+Alt+Shift+←');
+  });
+
   it('listet sie nicht ohne fokussiertes Pane', () => {
     useStore.setState({ focusedPaneId: null });
     expect(ids()).not.toContain('focus-pane-left');

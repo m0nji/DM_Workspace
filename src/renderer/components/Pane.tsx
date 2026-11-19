@@ -17,6 +17,10 @@ import { AgentLogo } from './AgentLogo';
 import { paneAgentIdentity } from '../pane-agent-identity';
 import { useAgentProfiles } from '../use-agent-profiles';
 import { NewPaneMenu } from './NewPaneMenu';
+import {
+  paneDropZoneAt, rootDockSideAt, collectPaneIds, type PaneDropZone, type DockSide
+} from '../../shared/layout-tree';
+import { PANE_DRAG_TYPE, DockIcon } from './pane-drag-ui';
 
 interface Props { paneId: string; cwd: string; active?: boolean; }
 
@@ -88,9 +92,23 @@ function Swap(): React.JSX.Element {
   );
 }
 
-// Eigener MIME-Typ statt text/plain: eine aus dem Terminal gezogene
-// Textauswahl traegt ihn nicht und kann deshalb keinen Tausch ausloesen.
-const PANE_DRAG_TYPE = 'application/x-dm-pane';
+// Was unter dem Zeiger liegt: eine Zone dieses Panes (Mitte/Rand) oder -- im
+// schmalen Band ganz aussen am Workspace -- der Aussenrand des ganzen Layouts.
+type DropHit = PaneDropZone | `root-${DockSide}`;
+
+function hitFromEvent(e: React.DragEvent<HTMLElement>): DropHit {
+  const r = e.currentTarget.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return 'center';
+  const root = e.currentTarget.closest('.ws-host')?.getBoundingClientRect();
+  const rootSide = root ? rootDockSideAt(r, root, e.clientX, e.clientY) : null;
+  if (rootSide) return `root-${rootSide}`;
+  return paneDropZoneAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+}
+
+function rootSideOf(hit: DropHit | null): DockSide | null {
+  return hit?.startsWith('root-') ? (hit.slice(5) as DockSide) : null;
+}
+
 
 export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const { t } = useTranslation();
@@ -125,8 +143,24 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   const [editingLabel, setEditingLabel] = React.useState(false);
   const [labelDraft, setLabelDraft] = React.useState(manualLabel);
   const labelInputRef = React.useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = React.useState(false);
+  // Was unter dem Zeiger liegt, solange ein fremdes Pane hierueber gezogen
+  // wird. Mitte = tauschen, Rand = an dieses Pane andocken, root-* = an den
+  // Aussenrand des ganzen Layouts. null = nicht ueber diesem Pane.
+  const [hit, setHit] = React.useState<DropHit | null>(null);
+  const rootSide = rootSideOf(hit);
+  const dropZone: PaneDropZone | null = hit && !rootSide ? (hit as PaneDropZone) : null;
+  const dragOver = dropZone !== null;
+  const setEdgeDockHover = useStore((s) => s.setEdgeDockHover);
+  // Ziehen ergibt nur Sinn, wenn es ein Ziel gibt: nicht bei einem einzigen
+  // Pane und nicht maximiert (dann ist nur dieses eine sichtbar).
+  const canDrag = useStore((s) => {
+    if (s.maximizedPaneId) return false;
+    const ws = s.workspaces.find((w) => w.layout && collectPaneIds(w.layout).includes(paneId));
+    return collectPaneIds(ws?.layout ?? null).length > 1;
+  });
   const swapPanesInLayout = useStore((s) => s.swapPanesInLayout);
+  const movePaneInLayout = useStore((s) => s.movePaneInLayout);
+  const dockPaneAtEdge = useStore((s) => s.dockPaneAtEdge);
   const setDraggingPane = useStore((s) => s.setDraggingPane);
   const draggingPaneId = useStore((s) => s.draggingPaneId);
   // Der Hinweis auf dem Drop-Ziel nennt die QUELLE beim Namen. Deren
@@ -155,12 +189,22 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
   // dragend feuert dagegen immer auf der Quelle und bubbelt bis window, egal wo
   // der Zeiger steht und ob abgebrochen wurde. Der Listener laeuft nur, solange
   // dieses Pane ueberhaupt hervorgehoben ist -- kein Dauer-Listener pro Pane.
+  const hovered = hit !== null;
   React.useEffect(() => {
-    if (!dragOver) return;
-    const onDragEndAnywhere = (): void => setDragOver(false);
+    if (!hovered) return;
+    const onDragEndAnywhere = (): void => setHit(null);
     window.addEventListener('dragend', onDragEndAnywhere);
     return () => window.removeEventListener('dragend', onDragEndAnywhere);
-  }, [dragOver]);
+  }, [hovered]);
+
+  // Die Vorschau fuers Andocken am Aussenrand liegt ueber dem ganzen Workspace
+  // (EdgeDockPreview), also meldet dieses Pane seinen Treffer an den Store.
+  // Geraeumt wird nur der EIGENE Eintrag: beim Wechsel auf ein Nachbar-Pane
+  // feuert dessen dragover vor dem dragleave hier.
+  React.useEffect(() => {
+    if (rootSide) { setEdgeDockHover({ paneId, side: rootSide }); return; }
+    if (useStore.getState().edgeDockHover?.paneId === paneId) setEdgeDockHover(null);
+  }, [rootSide, paneId, setEdgeDockHover]);
 
   // Zweite Absicherung, diesmal fuer den globalen Zustand: verschwindet die
   // Quelle mitten im Drag (Pane geschlossen, Workspace gewechselt), feuert ihr
@@ -215,6 +259,7 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         `status-${status}`,
         focused ? 'focused' : '',
         dragOver ? 'drop-target' : '',
+        dropZone && dropZone !== 'center' ? 'dock-zone' : '',
         isDragSource ? 'drag-source' : '',
         isBystander ? 'drag-bystander' : ''].filter(Boolean).join(' ')}
       onMouseDownCapture={() => setFocusedPane(paneId)}
@@ -228,32 +273,38 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         // Ohne preventDefault lehnt der Browser den Drop ab.
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        setDragOver(true);
+        setHit(hitFromEvent(e));
       }}
       onDragLeave={(e) => {
         // Nur raeumen, wenn der Zeiger das Pane wirklich verlaesst -- beim
         // Wechsel zwischen Kindelementen feuert dragleave ebenfalls.
         if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
+        setHit(null);
       }}
       onDrop={(e) => {
         const sourceId = e.dataTransfer.getData(PANE_DRAG_TYPE);
-        setDragOver(false);
+        setHit(null);
         if (!sourceId || sourceId === paneId) return;
         e.preventDefault();
-        swapPanesInLayout(sourceId, paneId);
+        // Zone aus dem Drop selbst bestimmen, nicht aus dem letzten dragover --
+        // so zaehlt genau die Stelle, an der losgelassen wurde.
+        const dropHit = hitFromEvent(e);
+        const edge = rootSideOf(dropHit);
+        if (edge) dockPaneAtEdge(sourceId, edge);
+        else if (dropHit === 'center') swapPanesInLayout(sourceId, paneId);
+        else movePaneInLayout(sourceId, paneId, dropHit as DockSide);
       }}
     >
       <div
         className="pane-header"
-        draggable={!editingLabel}
+        draggable={!editingLabel && canDrag}
         onDragStart={(e) => {
           e.dataTransfer.setData(PANE_DRAG_TYPE, paneId);
           e.dataTransfer.effectAllowed = 'move';
           setDraggingPane(paneId);
         }}
         onDragEnd={() => {
-          setDragOver(false);
+          setHit(null);
           setDraggingPane(null);
         }}
       >
@@ -341,10 +392,19 @@ export function Pane({ paneId, cwd, active = true }: Props): React.JSX.Element {
         <SearchBar paneId={paneId} />
         <TerminalView paneId={paneId} cwd={cwd} active={active} />
       </div>
-      {/* Sagt an, WAS beim Loslassen passiert: getauscht wird mit der Quelle,
-          nicht eingefuegt. aria-hidden, weil ein HTML5-Drag ohnehin nur mit
-          der Maus laeuft -- fuer die Tastatur gibt es Mod+Shift+Pfeil. */}
-      {dragOver && (
+      {/* Sagt an, WAS beim Loslassen passiert: am Rand wird angedockt (die
+          Vorschau deckt die Haelfte, die das Pane bekommt), in der Mitte
+          getauscht. aria-hidden, weil ein HTML5-Drag ohnehin nur mit
+          der Maus laeuft -- fuer die Tastatur gibt es Mod+Alt+Shift+Pfeil (verschieben). */}
+      {dropZone && dropZone !== 'center' && (
+        <div className={`pane-dock-preview dock-${dropZone}`} aria-hidden="true">
+          <span className="pane-drop-hint-inner">
+            <DockIcon side={dropZone} />
+            <span className="pane-drop-hint-text">{t(`pane.dock.${dropZone}`)}</span>
+          </span>
+        </div>
+      )}
+      {dropZone === 'center' && (
         <div className="pane-drop-hint" aria-hidden="true">
           <span className="pane-drop-hint-inner">
             <Swap />

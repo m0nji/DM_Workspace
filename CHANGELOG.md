@@ -2,6 +2,12 @@
 
 All notable changes to DM Workspace. Newest version first. Always written in English.
 
+## 0.25.0 – 2026-11-19
+- feat: Move panes freely by dragging their header. Drop on the edge of another pane to place it left of, right of, above or below that pane; drop in the middle to swap the two as before. A preview shows the half the pane will take before you let go, and running terminals keep going.
+- feat: Drop a pane into the narrow band along the outer edge of the workspace to dock it across the full width or height, for example one wide pane at the bottom under a grid.
+- feat: Move the focused pane with the keyboard: Cmd+Option+Shift+Arrow on macOS, Ctrl+Alt+Shift+Arrow elsewhere, swaps it with its neighbour in that direction. The shortcuts can be changed in Settings → Shortcuts and are also in the command palette. On some Linux desktops (for example GNOME) the system may use the Up/Down variants; rebind them there if needed.
+- fix: A pane header can no longer be dragged when there is nowhere to drop it (a single pane or a maximized pane), so the window no longer blurs for nothing.
+
 ## 0.24.0 – 2026-11-11
 - feat: Export and import your settings in Settings → Backup & transfer. One JSON file carries all settings, AI agents with their launch parameters, environment variables and start prompts, keyboard shortcuts, templates and workspaces, so a new computer is set up in one step. Before anything is applied you see what the file contains and choose what to import. Folders under your home directory are adjusted to the new computer, and workspaces that already exist are not added twice. Server sign-ins and terminal history are not exported; environment variables are stored in plain text, so keep the file safe.
 - fix: Updated Electron to 42 together with the latest security fixes for DOMPurify, Vite, undici and Zod.

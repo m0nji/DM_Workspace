@@ -238,7 +238,11 @@
         "focusPaneLeft": "Focus pane to the left",
         "focusPaneRight": "Focus pane to the right",
         "focusPaneUp": "Focus pane above",
-        "focusPaneDown": "Focus pane below"
+        "focusPaneDown": "Focus pane below",
+        "movePaneLeft": "Move pane left",
+        "movePaneRight": "Move pane right",
+        "movePaneUp": "Move pane up",
+        "movePaneDown": "Move pane down"
       }
     },
     "templates": {
@@ -527,6 +531,10 @@
       "focusPaneRight": "Focus the pane to the right",
       "focusPaneUp": "Focus the pane above",
       "focusPaneDown": "Focus the pane below",
+      "movePaneLeft": "Swap the focused pane with the one to the left",
+      "movePaneRight": "Swap the focused pane with the one to the right",
+      "movePaneUp": "Swap the focused pane with the one above",
+      "movePaneDown": "Swap the focused pane with the one below",
       "togglePreview": "Toggle preview panel",
       "openFileBrowser": "Open file browser",
       "openSettings": "Open settings",
@@ -701,6 +709,18 @@
     "restore": "Restore",
     "swapWith": "Swap with “{{name}}”",
     "swapWithUnnamed": "Swap into this spot",
+    "dock": {
+      "left": "Dock to the left",
+      "right": "Dock to the right",
+      "top": "Dock above",
+      "bottom": "Dock below"
+    },
+    "dockEdge": {
+      "left": "Far left, full height",
+      "right": "Far right, full height",
+      "top": "Top, full width",
+      "bottom": "Bottom, full width"
+    },
     "closeTitle": "Close window?",
     "closeMessage": "This window and its running terminal process will be closed.",
     "closeConfirm": "Close window",

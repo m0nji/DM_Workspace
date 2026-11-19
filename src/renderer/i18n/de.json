@@ -238,7 +238,11 @@
         "focusPaneLeft": "Fokus nach links",
         "focusPaneRight": "Fokus nach rechts",
         "focusPaneUp": "Fokus nach oben",
-        "focusPaneDown": "Fokus nach unten"
+        "focusPaneDown": "Fokus nach unten",
+        "movePaneLeft": "Bereich nach links verschieben",
+        "movePaneRight": "Bereich nach rechts verschieben",
+        "movePaneUp": "Bereich nach oben verschieben",
+        "movePaneDown": "Bereich nach unten verschieben"
       }
     },
     "templates": {
@@ -527,6 +531,10 @@
       "focusPaneRight": "Fokus auf den Bereich rechts",
       "focusPaneUp": "Fokus auf den Bereich darüber",
       "focusPaneDown": "Fokus auf den Bereich darunter",
+      "movePaneLeft": "Fokussierten Bereich mit dem links daneben tauschen",
+      "movePaneRight": "Fokussierten Bereich mit dem rechts daneben tauschen",
+      "movePaneUp": "Fokussierten Bereich mit dem darüber tauschen",
+      "movePaneDown": "Fokussierten Bereich mit dem darunter tauschen",
       "togglePreview": "Vorschau-Bereich umschalten",
       "openFileBrowser": "Datei-Browser öffnen",
       "openSettings": "Einstellungen öffnen",
@@ -701,6 +709,18 @@
     "restore": "Wiederherstellen",
     "swapWith": "Tauschen mit „{{name}}“",
     "swapWithUnnamed": "Hierher tauschen",
+    "dock": {
+      "left": "Links andocken",
+      "right": "Rechts andocken",
+      "top": "Oben andocken",
+      "bottom": "Unten andocken"
+    },
+    "dockEdge": {
+      "left": "Ganz links, volle Höhe",
+      "right": "Ganz rechts, volle Höhe",
+      "top": "Ganz oben, volle Breite",
+      "bottom": "Ganz unten, volle Breite"
+    },
     "closeTitle": "Fenster schließen?",
     "closeMessage": "Dieses Fenster und der laufende Terminal-Prozess werden geschlossen.",
     "closeConfirm": "Fenster schließen",

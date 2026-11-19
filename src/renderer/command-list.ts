@@ -148,7 +148,11 @@ export function buildCommandList({
       { id: 'focus-pane-left', title: t('palette.cmd.focusPaneLeft'), category: catActions, hint: hint('focusPaneLeft'), run: act(() => s.focusPaneInDirection('left')) },
       { id: 'focus-pane-right', title: t('palette.cmd.focusPaneRight'), category: catActions, hint: hint('focusPaneRight'), run: act(() => s.focusPaneInDirection('right')) },
       { id: 'focus-pane-up', title: t('palette.cmd.focusPaneUp'), category: catActions, hint: hint('focusPaneUp'), run: act(() => s.focusPaneInDirection('up')) },
-      { id: 'focus-pane-down', title: t('palette.cmd.focusPaneDown'), category: catActions, hint: hint('focusPaneDown'), run: act(() => s.focusPaneInDirection('down')) }
+      { id: 'focus-pane-down', title: t('palette.cmd.focusPaneDown'), category: catActions, hint: hint('focusPaneDown'), run: act(() => s.focusPaneInDirection('down')) },
+      { id: 'move-pane-left', title: t('palette.cmd.movePaneLeft'), category: catActions, hint: hint('movePaneLeft'), run: act(() => s.movePaneInDirection('left')) },
+      { id: 'move-pane-right', title: t('palette.cmd.movePaneRight'), category: catActions, hint: hint('movePaneRight'), run: act(() => s.movePaneInDirection('right')) },
+      { id: 'move-pane-up', title: t('palette.cmd.movePaneUp'), category: catActions, hint: hint('movePaneUp'), run: act(() => s.movePaneInDirection('up')) },
+      { id: 'move-pane-down', title: t('palette.cmd.movePaneDown'), category: catActions, hint: hint('movePaneDown'), run: act(() => s.movePaneInDirection('down')) }
     );
   }
 

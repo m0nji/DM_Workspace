@@ -12,7 +12,8 @@ import { applyTabDrop, normalizeGroups, type DropTarget, type GroupedList } from
 import type { TabDropIntent } from '../shared/tab-drop-intent';
 import type { RemoteFilesContext } from './files-api';
 import {
-  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, swapPanes
+  makePreset, splitPane, closePane, setRatio, collectPaneIds, collectSplitIds, swapPanes, movePane,
+  dockPaneAtRoot, type DockSide
 } from '../shared/layout-tree';
 import { findPaneInDirection, type NavDirection } from '../shared/layout-navigate';
 import { cloneTemplateLayout, remapStringMap } from '../shared/template-layout';
@@ -373,6 +374,10 @@ export interface StoreState extends AppState {
   // Drop-Ziel, unbeteiligt) und der Hinweis auf dem Ziel die Quelle beim Namen
   // nennt. Transient: nichts davon wird persistiert.
   draggingPaneId: string | null;
+  // Waehrend eines Pane-Drags: welches Ziel-Pane gerade das Andocken am
+  // Aussenrand des ganzen Layouts anbietet und an welcher Seite. Die Vorschau
+  // dafuer liegt ueber dem ganzen Workspace, nicht in einem Pane.
+  edgeDockHover: { paneId: string; side: DockSide } | null;
   // Offene Rückfrage vor dem Schließen. `remote` unterscheidet nur den Text und
   // den Vollzug — der Dialog selbst ist für beide Fälle derselbe (App.tsx), damit
   // kein Einstiegspunkt still an der Rückfrage vorbeikommt.
@@ -441,6 +446,10 @@ export interface StoreState extends AppState {
   toggleMaximize: (paneId: string) => void;
   focusPaneInDirection: (direction: NavDirection) => void;
   swapPanesInLayout: (aId: string, bId: string) => void;
+  movePaneInLayout: (sourceId: string, targetId: string, side: DockSide) => void;
+  setEdgeDockHover: (hover: { paneId: string; side: DockSide } | null) => void;
+  dockPaneAtEdge: (sourceId: string, side: DockSide) => void;
+  movePaneInDirection: (direction: NavDirection) => void;
   // settings
   settingsFocusSection: SettingsSection | null; // when opening, scroll to this section
   updateSettings: (patch: Partial<Settings>) => void;
@@ -687,6 +696,27 @@ function guardEditorLeave(get: () => StoreState, set: (partial: Partial<StoreSta
   else run();
 }
 
+// Gemeinsamer Abschluss fuer Layout-Aenderungen, die die Baumform umbauen
+// (Andocken): neues Layout im aktiven Workspace setzen, ALLE Panes einmal
+// nachmessen -- ein Split verschwindet, ein neuer entsteht, da aendern sich
+// mehr als die zwei beteiligten Groessen --, DOM-Fokus nachziehen (das
+// mousedown auf dem Pane-Kopf hat ihn geblurrt) und speichern. Liefert `s`
+// unveraendert zurueck, wenn die Aenderung wirkungslos war.
+function commitRestructuredLayout(s: StoreState, change: (layout: LayoutNode) => LayoutNode): StoreState {
+  const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+  if (!ws?.layout) return s;
+  const layout = change(ws.layout);
+  if (layout === ws.layout) return s;
+  const workspaces = s.workspaces.map((w) => (w.id === ws.id ? { ...w, layout } : w));
+  const ids = collectPaneIds(layout);
+  for (const id of ids) refreshTerminalLayoutAfterCommit(id);
+  const focus = s.focusedPaneId;
+  if (focus && ids.includes(focus)) requestAnimationFrame(() => focusTerminal(focus));
+  const next = { ...s, workspaces };
+  persist(next);
+  return next;
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   version: 1,
   workspaces: [],
@@ -710,6 +740,7 @@ export const useStore = create<StoreState>((set, get) => ({
   paneAutoTitles: {},
   focusedPaneId: null,
   draggingPaneId: null,
+  edgeDockHover: null,
   pendingClosePane: null,
   windowFocused: true,
   searchOpenPaneId: null,
@@ -1243,7 +1274,14 @@ export const useStore = create<StoreState>((set, get) => ({
   // Zeiger das Fenster verlassen hat. Der Tausch selbst räumt bewusst NICHT
   // mit: er findet nur beim erfolgreichen Drop statt, das dragend dagegen
   // immer, und zwei Zuständige für dasselbe Aufräumen wären einer zu viel.
-  setDraggingPane: (paneId) => set({ draggingPaneId: paneId }),
+  setDraggingPane: (paneId) => set(paneId ? { draggingPaneId: paneId } : { draggingPaneId: null, edgeDockHover: null }),
+  // Gleiche Werte nicht neu setzen: dragover feuert im Takt von ~50 ms, und
+  // jedes set wuerde alle Abonnenten neu rendern.
+  setEdgeDockHover: (hover) => set((s) => {
+    const cur = s.edgeDockHover;
+    if (cur === hover || (cur && hover && cur.paneId === hover.paneId && cur.side === hover.side)) return s;
+    return { edgeDockHover: hover };
+  }),
 
   // Nachbar-Pane in Blickrichtung fokussieren. Anders als beim Klick gibt es
   // hier kein mousedown auf der xterm-Textarea, das den DOM-Fokus mitnimmt --
@@ -1289,6 +1327,34 @@ export const useStore = create<StoreState>((set, get) => ({
     persist(next);
     return next;
   }),
+
+  // Pane an den Rand eines anderen andocken (Drag auf die Randzone statt die
+  // Mitte). Wie beim Tausch wandert nur die Pane-Id; Terminals laufen weiter,
+  // der Fokus bleibt auf derselben Id. Anders als beim Tausch aendert sich die
+  // Baumform -- ein Split verschwindet, ein neuer entsteht --, deshalb ziehen
+  // ALLE Panes einmal ihre Groesse nach, nicht nur die beiden beteiligten.
+  movePaneInLayout: (sourceId, targetId, side) => set((s) => {
+    if (sourceId === targetId) return s;
+    return commitRestructuredLayout(s, (layout) => movePane(layout, sourceId, targetId, side, nextSplitId()));
+  }),
+
+  // Wie movePaneInLayout, nur relativ zum ganzen Layout statt zu einem Pane:
+  // Drop auf die schmale Zone am Aussenrand des Arbeitsbereichs.
+  dockPaneAtEdge: (sourceId, side) => set((s) =>
+    commitRestructuredLayout(s, (layout) => dockPaneAtRoot(layout, sourceId, side, nextSplitId()))),
+
+  // Tastatur-Gegenstueck zum Drag: das fokussierte Pane tauscht mit seinem
+  // Nachbarn in Blickrichtung. Der Fokus bleibt auf derselben Id und wandert
+  // damit sichtbar mit -- mehrmals druecken schiebt das Pane weiter.
+  movePaneInDirection: (direction) => {
+    const s = get();
+    if (s.maximizedPaneId || !s.focusedPaneId) return;
+    const ws = s.workspaces.find((w) => w.id === s.activeWorkspaceId);
+    if (!ws?.layout) return;
+    const target = findPaneInDirection(ws.layout, s.focusedPaneId, direction);
+    if (!target || target === s.focusedPaneId) return;
+    s.swapPanesInLayout(s.focusedPaneId, target);
+  },
 
   setWindowFocused: (focused) => set({ windowFocused: focused }),
   setSearchOpen: (paneId) => set({ searchOpenPaneId: paneId }),

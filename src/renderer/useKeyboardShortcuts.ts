@@ -82,6 +82,10 @@ export function useKeyboardShortcuts(): void {
         if (is('focusPaneRight')) { stop(); s.focusPaneInDirection('right'); return; }
         if (is('focusPaneUp')) { stop(); s.focusPaneInDirection('up'); return; }
         if (is('focusPaneDown')) { stop(); s.focusPaneInDirection('down'); return; }
+        if (is('movePaneLeft')) { stop(); s.movePaneInDirection('left'); return; }
+        if (is('movePaneRight')) { stop(); s.movePaneInDirection('right'); return; }
+        if (is('movePaneUp')) { stop(); s.movePaneInDirection('up'); return; }
+        if (is('movePaneDown')) { stop(); s.movePaneInDirection('down'); return; }
       }
     };
     // Capture phase so we intercept before xterm's textarea handler.

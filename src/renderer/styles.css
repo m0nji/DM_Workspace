@@ -1099,6 +1099,43 @@ input[type="checkbox"]:checked::after {
 /* Ein schmales Pane soll den Hinweis kuerzen, nicht umbrechen. */
 .pane-drop-hint-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Andock-Vorschau: deckt die Haelfte des Ziels, die das gezogene Pane nach dem
+   Loslassen bekommt. Sie stellt das neue Layout dar, nicht nur einen Rand.
+   Wie .pane-drop-hint ohne pointer-events, sonst feuert dragleave. */
+.pane-dock-preview {
+  position: absolute; z-index: 9; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  transition: inset .1s ease;
+}
+.pane-dock-preview.dock-left   { inset: 0 50% 0 0; }
+.pane-dock-preview.dock-right  { inset: 0 0 0 50%; }
+.pane-dock-preview.dock-top    { inset: 0 0 50% 0; }
+.pane-dock-preview.dock-bottom { inset: 50% 0 0 0; }
+
+/* Beim Andocken an ein Pane zeigt die Vorschau die Haelfte, die sich aendert.
+   Ring und Toenung ueber dem GANZEN Pane wuerden das verwischen -- es bleibt
+   nur die Akzent-Randfarbe zur Orientierung. */
+.pane.drop-target.dock-zone { box-shadow: none; }
+.pane.drop-target.dock-zone::after { opacity: 0; visibility: hidden; }
+
+/* Andocken am Aussenrand des ganzen Layouts: dieselbe Sprache wie
+   .pane-dock-preview, aber ueber dem Workspace statt in einem Pane. Liegt
+   ueber den Panes (deren Overlays bis z-index 9), pointer-events aus. */
+.layout-edge-preview {
+  position: absolute; z-index: 20; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.layout-edge-preview.dock-left   { inset: 0 50% 0 0; }
+.layout-edge-preview.dock-right  { inset: 0 0 0 50%; }
+.layout-edge-preview.dock-top    { inset: 0 0 50% 0; }
+.layout-edge-preview.dock-bottom { inset: 50% 0 0 0; }
+
 /* Agent status dot in the pane header */
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
 .status-dot.idle { background: var(--disabled); }

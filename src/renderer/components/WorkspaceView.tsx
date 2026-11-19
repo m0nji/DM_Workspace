@@ -4,6 +4,7 @@ import { collectPaneIds } from '../../shared/layout-tree';
 import { WelcomeScreen } from './WelcomeScreen';
 import { LayoutRenderer } from './LayoutRenderer';
 import { PanePortal } from './PanePortal';
+import { EdgeDockPreview } from './EdgeDockPreview';
 import { useDocumentVisible } from '../use-document-visible';
 
 // Every workspace stays mounted; only the active one is visible. This keeps each
@@ -44,6 +45,7 @@ export function WorkspaceView(): React.JSX.Element {
                 <PanePortal key={paneId} paneId={paneId} cwd={ws.cwd}
                   active={active && documentVisible && (!maximizedPaneId || maximizedPaneId === paneId)} />
               ))}
+              {active && <EdgeDockPreview />}
             </>
           );
         }
